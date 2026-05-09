@@ -279,9 +279,15 @@ Write `.workflow/.maestro/ralph-{YYYYMMDD-HHmmss}/status.json`:
 }
 ```
 
-### 1.7: Initialize plan + confirm
+### 1.7: Initialize tracking + confirm
 
 ```
+// Goal = outer constraint — ensures entire lifecycle chain completes
+functions.create_goal({
+  objective: `Ralph lifecycle: ${lifecycle_position} → milestone-complete | ${steps.length} steps (${decision_count} decisions) | quality=${quality_mode}`
+})
+
+// Plan = inner tracking — sub-step progress
 functions.update_plan({
   explanation: "Ralph lifecycle: {position} → milestone-complete",
   plan: steps.map(step => ({ step: stepLabel(step), status: "pending" }))
@@ -587,7 +593,12 @@ functions.update_plan({
   explanation: "Ralph lifecycle complete",
   plan: steps.map(step => ({ step: stepLabel(step), status: "completed" }))
 })
+
+// Release goal constraint — only on true completion
+functions.update_goal({ status: "complete" })
 ```
+
+**Note**: Pause/escalate paths (`post-debug-escalate` STOP, session pause) do NOT call `update_goal` — goal stays running for resume.
 
 Display:
 ```

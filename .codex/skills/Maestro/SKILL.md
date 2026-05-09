@@ -139,9 +139,15 @@ After each barrier skill completes, read its artifacts and update `state.context
 }
 ```
 
-7. **Initialize plan tracking** (dual-track: status.json + update_plan):
+7. **Initialize tracking** (goal constraint → plan sub-items):
 
 ```
+// Goal = outer constraint — ensures entire chain completes
+functions.create_goal({
+  objective: `Maestro ${chain_name}: ${steps.length} steps [${steps.map(s => s.skill).join(' → ')}]`
+})
+
+// Plan = inner tracking — sub-step progress
 functions.update_plan({
   plan: steps.map((step, i) => ({
     id: `step-${i}`,
@@ -233,9 +239,12 @@ Object with all fields required: `status` ("completed"|"failed"), `skill_call` (
 
 ### Phase 3: Completion Report
 
-Finalize dual tracking:
+Finalize tracking:
 - status.json: `state.status = 'completed'`
 - update_plan: all steps → `"completed"` (skipped steps also marked completed)
+- **update_goal**: `functions.update_goal({ status: "complete" })` — release goal constraint
+
+**Note**: Abort path (Phase 2 step 7) does NOT call `update_goal` — goal stays running for `--continue` resume.
 
 ```
 === COORDINATE COMPLETE ===

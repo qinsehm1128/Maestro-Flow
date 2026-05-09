@@ -153,6 +153,13 @@ Load session state by explicit ID or most recent `MCP-*/state.json` with `status
 4. Group into waves: barrier nodes → solo wave, non-barrier nodes → accumulate into parallel wave
 5. Build steps array from waves, write `state.json`
 
+**Step 2.5a — Register goal constraint**:
+```
+functions.create_goal({
+  objective: `Player ${template_name}: ${steps.length} steps from template ${template_id}`
+})
+```
+
 **Step 2.6** — Display start banner:
 ```
 ============================================================
@@ -272,6 +279,9 @@ const RESULT_SCHEMA = {
 ```
 
 Update `state.status = "completed"`, write final `state.json`.
+Release goal constraint: `functions.update_goal({ status: "complete" })`
+
+**Note**: Abort path (Phase 3 step 3g) does NOT call `update_goal` — goal stays running for `-c` resume.
 </execution>
 
 <csv_schema>
