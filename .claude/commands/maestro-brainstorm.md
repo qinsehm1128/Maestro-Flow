@@ -91,6 +91,10 @@ Single role mode:
 - [ ] Final Output Gate passed (Step 5.5) or `--yes` bypassed
 - [ ] All user decisions captured with Decision Recording Protocol
 - [ ] Session metadata updated with completion status
+- [ ] Confidence scored per role completion and after cross-role analysis
+- [ ] Readiness gate checked before spec generation
+- [ ] Pressure pass completed on at least 1 feature spec
+- [ ] Confidence summary appended to synthesis-changelog.md
 
 **Single role mode**:
 - [ ] analysis.md written to `{output_dir}/{role}/`

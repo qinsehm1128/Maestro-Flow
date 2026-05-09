@@ -326,10 +326,28 @@ For quality-gate decisions (post-verify, post-business-test, post-review, post-t
 | post-review | `{artifact_dir}/review.json` |
 | post-test | `{artifact_dir}/uat.md`, `{artifact_dir}/.tests/test-results.json` |
 
+**Confidence-aware evaluation**:
+
+Before delegating, check if artifact contains a confidence section (added by downstream commands):
+- `verification.json` → `confidence.overall` (from maestro-verify)
+- `report.json` → `confidence.overall` (from quality-auto-test)
+- `review.json` → may contain dimension confidence (from quality-review)
+- `uat.md` → confidence summary section (from quality-test)
+
+If confidence data found, include in delegate prompt as additional signal:
+```
+已有置信度评估: 整体 {overall}%, 最弱维度: {weakest} ({score}%)
+```
+
+**Confidence-based verdict bias**: When artifact confidence is available:
+- confidence < 60% → bias toward "fix" even if surface status looks clean (hidden quality gaps)
+- confidence 60-95% → use delegate verdict as-is
+- confidence > 95% → bias toward "proceed" (strong evidence of quality)
+
 ```
 Bash({
   command: `maestro delegate "PURPOSE: 评估 ${meta.decision} 质量门结果，判断是否通过
-TASK: 读取结果文件 | 分析通过/失败状态 | 评估问题严重性 | 给出下一步建议
+TASK: 读取结果文件 | 分析通过/失败状态 | 评估问题严重性 | 检查置信度评分 | 给出下一步建议
 MODE: analysis
 CONTEXT: @${result_files}
 EXPECTED: 严格按以下格式输出:
@@ -338,8 +356,10 @@ STATUS: proceed | fix | escalate
 REASON: 一句话解释
 GAP_SUMMARY: 具体问题描述（仅 fix/escalate 时填写，用于传递给 quality-debug）
 CONFIDENCE: high | medium | low
+CONFIDENCE_SCORE: 0-100（从结果文件中读取置信度分数，无则估算）
+WEAKEST_DIMENSION: 最弱维度名称
 ---END---
-CONSTRAINTS: 只评估不修改 | STATUS 三选一 | 如果 retry ${meta.retry_count}/${meta.max_retries} 已达上限且仍有问题则必须 escalate" --role analyze --mode analysis`,
+CONSTRAINTS: 只评估不修改 | STATUS 三选一 | 置信度 < 60% 倾向 fix | 如果 retry ${meta.retry_count}/${meta.max_retries} 已达上限且仍有问题则必须 escalate" --role analyze --mode analysis`,
   run_in_background: true
 })
 STOP — wait for callback.
@@ -352,12 +372,20 @@ STOP — wait for callback.
 Parse structured response:
 ```
 Extract between ---VERDICT--- and ---END---:
-  verdict.status   = "proceed" | "fix" | "escalate"
-  verdict.reason   = string
-  verdict.gap_summary = string (context for quality-debug)
-  verdict.confidence = "high" | "medium" | "low"
+  verdict.status           = "proceed" | "fix" | "escalate"
+  verdict.reason           = string
+  verdict.gap_summary      = string (context for quality-debug)
+  verdict.confidence       = "high" | "medium" | "low"
+  verdict.confidence_score = 0-100 (numeric, from artifact or estimated)
+  verdict.weakest_dimension = string (weakest confidence dimension)
 
 If parse fails → fallback: treat as "fix" with generic gap_summary
+
+Confidence-based verdict adjustment (after parse, before apply):
+  If verdict.confidence_score < 60 AND verdict.status == "proceed":
+    → Override to "fix", reason += " (置信度不足: {score}%，{weakest_dimension} 需加强)"
+  If verdict.confidence_score > 95 AND verdict.status == "fix" AND retry_count > 0:
+    → Suggest "proceed" override, reason += " (置信度充分: {score}%，建议通过)"
 ```
 
 **Apply verdict:**
@@ -503,9 +531,11 @@ End.
 - [ ] Full quality pipeline generated: verify → business-test → review → test-gen → test
 - [ ] Decision nodes inserted after: post-verify, post-business-test, post-review, post-test, post-milestone
 - [ ] Quality-gate decisions delegated via `maestro delegate --role analyze --mode analysis`
-- [ ] Delegate verdict parsed: STATUS / REASON / GAP_SUMMARY / CONFIDENCE
-- [ ] `-y` mode: auto-follow delegate verdict without user confirmation
-- [ ] Interactive mode: display recommendation + AskUserQuestion with override options
+- [ ] Delegate verdict parsed: STATUS / REASON / GAP_SUMMARY / CONFIDENCE / CONFIDENCE_SCORE / WEAKEST_DIMENSION
+- [ ] Confidence-based verdict adjustment applied (< 60% bias fix, > 95% bias proceed)
+- [ ] Artifact confidence sections read when available (verification.json, report.json, uat.md)
+- [ ] `-y` mode: auto-follow adjusted verdict without user confirmation
+- [ ] Interactive mode: display recommendation with confidence score + AskUserQuestion with override options
 - [ ] Delegate failure fallback: treat as "fix" verdict
 - [ ] gap_summary from delegate passed to quality-debug as context
 - [ ] Fix-loop templates applied per decision type with retry_count increment

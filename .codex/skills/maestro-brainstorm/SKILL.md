@@ -364,9 +364,15 @@ spawn_agents_on_csv({
 - Skill: maestro-roadmap --mode full -- Generate full spec package from brainstorm
 ```
 
-4. Copy artifacts to output `.brainstorming/` directory (phase mode or scratch mode target)
-5. Update phase `index.json` with brainstorm status (if phase mode)
-6. **Next-Step Routing** (skip if AUTO_YES — default to first applicable):
+4. **Brainstorm confidence scoring**:
+
+   Dimensions (5): role_coverage, cross_role_consistency, feature_completeness, spec_quality, design_feasibility. Factors (weights): analysis_depth(.30), evidence_strength(.25), coverage_breadth(.20), user_validation(.15, 0 if --yes), consistency(.10). Append confidence summary to `synthesis-changelog.md`.
+
+   **Conflict-based quality gate**: >3 `[UNRESOLVED]` conflicts → warn before artifact registration.
+
+5. Copy artifacts to output `.brainstorming/` directory (phase mode or scratch mode target)
+6. Update phase `index.json` with brainstorm status (if phase mode)
+7. **Next-Step Routing** (skip if AUTO_YES — default to first applicable):
    - Detect UI features: scan feature-index.json for UI/frontend-related features (keywords: ui, interface, page, component, dashboard, form, layout)
    - `request_user_input` (include UI Design option only when UI features detected):
      ```json
@@ -439,4 +445,7 @@ echo '{"ts":"<ISO>","worker":"{id}","type":"terminology","data":{"term":"CRDT","
 - [ ] context.md produced with full brainstorm report
 - [ ] Artifacts copied to target .brainstorming/ directory
 - [ ] discoveries.ndjson append-only throughout
+- [ ] Confidence scored per role and after cross-role synthesis
+- [ ] Conflict-based quality gate evaluated (> 3 unresolved = warning)
+- [ ] Confidence summary appended to synthesis-changelog.md
 </success_criteria>

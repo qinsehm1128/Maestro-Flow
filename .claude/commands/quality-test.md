@@ -95,6 +95,10 @@ Append to state.json.artifacts[]:
 - [ ] Severity inferred from natural language (never asked)
 - [ ] Batched writes: on issue, every 5 passes, or completion
 - [ ] test-results.json and coverage-report.json written
+- [ ] UAT confidence scored with 4-dimension factor model
+- [ ] Readiness gate checked before final report
+- [ ] Pressure pass completed if > 80% pass rate
+- [ ] Confidence summary appended to uat.md
 - [ ] index.json uat fields updated
 - [ ] If issues: parallel debug agents spawned per gap cluster
 - [ ] Gaps updated with root_cause, fix_direction, affected_files

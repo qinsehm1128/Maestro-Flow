@@ -116,6 +116,10 @@ Append to state.json.artifacts[]:
 - [ ] Tests executed progressively (L0→L3) with fail-fast on critical
 - [ ] Iteration engine ran (inner: test_defect fix, outer: strategy adjust)
 - [ ] state.json, report.json, reflection-log.md written
+- [ ] Test confidence scored per iteration (Step 7.5) with 5-dimension factor model
+- [ ] Convergence check includes confidence >= 60% alongside pass_rate threshold
+- [ ] Pressure pass completed on highest-pass-rate layer before completion
+- [ ] report.json includes confidence section
 - [ ] index.json updated with auto_test section
 - [ ] If spec source: traceability matrix built, traceability.md written
 - [ ] If failures: issues auto-created in issues.jsonl

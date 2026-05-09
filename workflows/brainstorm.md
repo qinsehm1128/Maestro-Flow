@@ -331,7 +331,7 @@ Each agent receives:
 
 ### Step 5: Synthesis Integration (Auto Mode)
 
-Six sub-phases producing feature specs from cross-role analysis:
+Seven sub-phases producing feature specs from cross-role analysis:
 
 **Sub-phase 1: Discovery**
 - Detect session, validate analysis files exist
@@ -348,6 +348,16 @@ Six sub-phases producing feature specs from cross-role analysis:
 - Input: analysis index files (feature mode) or all analysis files (fallback)
 - Output: `enhancement_recommendations` (EP-001, EP-002, ...) + `feature_conflict_map` (per-feature consensus/conflicts/cross_refs)
 - Conflict resolution quality: actionable, justified ("because...tradeoff:..."), scoped, confidence-tagged ([RESOLVED]|[SUGGESTED]|[UNRESOLVED])
+
+**Sub-phase 3B: Brainstorm Confidence Scoring**
+
+Compute after cross-role analysis, before user interaction. Dimensions (5): role_coverage, cross_role_consistency, feature_completeness, spec_quality, design_feasibility. Factors (weights): analysis_depth(.30), evidence_strength(.25), coverage_breadth(.20), user_validation(.15), consistency(.10).
+
+Scoring points: per-role completion → `role_coverage`; after cross-role → `cross_role_consistency`; after user interaction → `user_validation`.
+
+**Quality mechanisms**: Pressure Pass (before spec gen) — verify claims backed by ≥2 role analyses. Devil's Advocate — challenge when dimension > 0.7. Conflict Detection (replaces stall) — >3 `[UNRESOLVED]` conflicts → challenge.
+
+**Readiness Gate** (before Sub-phase 4): Block if role_coverage < 100% | cross_role_consistency < 40% | feature_completeness below intent count | no pressure pass. If blocked → AskUserQuestion: fill gaps or proceed with residual risks. Append confidence summary to synthesis-changelog.md.
 
 **Sub-phase 4: User Interaction**
 - Enhancement selection: AskUserQuestion (multiSelect=true, batched by 4)

@@ -251,12 +251,22 @@ Bidirectional linking: update matching issues in `.workflow/issues/issues.jsonl`
    - Critical issues → re-spawn planner with issues, revise, re-check
    - Warnings only → log and proceed
 
-3. **Update index.json**
-   - Set `index.json.plan` = `{ task_ids, task_count, complexity, waves, executor_assignments: {} }`
+3. **Plan Confidence Scoring**
+
+   Dimensions (5): requirements_coverage, task_quality, dependency_correctness, estimation_accuracy, collision_safety. Factors (weights): completeness(.30), specificity(.25), structural_validity(.20), user_validation(.15), consistency(.10). Re-score after each revision round.
+
+   Quality mechanisms: Pressure Pass (mandatory before P4.5) — verify highest-complexity task's read_first/convergence.criteria/action. Devil's Advocate — requirements_coverage > 0.7 → "隐含需求？". Scope Minimizer — task_count exceeds guard → "最小可行任务集？". Stall Detection — delta < 5% → suggest broader revision.
+
+4. **Plan Readiness Gate** (blocks P4.5)
+
+   Block if: requirements_coverage < 40% | task missing read_first/convergence.criteria | no pressure pass | circular deps. If blocked → AskUserQuestion: 修订计划 or 忽略风险并继续 (record residual_risks). Add confidence section to plan.json.
+
+5. **Update index.json**
+   - Set `index.json.plan` = `{ task_ids, task_count, complexity, waves, executor_assignments: {}, confidence: overall_score }`
    - Set `status: "planning"`, `updated_at: now()`
 
 ### Output
-- Updated plan.json (if revised)
+- Updated plan.json (if revised) with confidence section
 - Updated .task/ files (if revised)
 - Updated index.json with plan fields
 
@@ -286,7 +296,7 @@ Bidirectional linking: update matching issues in `.workflow/issues/issues.jsonl`
 
 ### Steps
 
-1. **Display plan summary** — summary, approach, task count, wave structure, complexity, key dependencies
+1. **Display plan summary** — summary, approach, task count, wave structure, complexity, key dependencies, **plan confidence** (overall %, weakest dimension, pressure pass result)
 
 2. **Present options via AskUserQuestion** (skip if `config.gates.confirm_plan == false`, auto-proceed)
    - Execute now → build executionContext, hand off to /workflow:execute

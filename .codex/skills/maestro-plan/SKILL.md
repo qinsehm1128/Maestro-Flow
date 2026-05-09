@@ -359,6 +359,12 @@ spawn_agents_on_csv({
 1. **Plan checking** (inline, not a separate wave):
    Read `plan.json` + all `.task/TASK-*.json`. Validate: requirements coverage, file feasibility, dependency correctness (no cycles, valid wave order), grep-verifiable convergence criteria, read_first completeness, action concreteness, no parallel file conflicts, **task count within complexity threshold** (reject over-split plans), **no per-file splitting** (each task must be feature-level).
 
+1b. **Plan confidence scoring**:
+
+   Dimensions (5): requirements_coverage, task_quality, dependency_correctness, estimation_accuracy, collision_safety. Factors (weights): completeness(.30), specificity(.25), structural_validity(.20), user_validation(.15), consistency(.10). Add `confidence` section to `plan.json`.
+
+   **Readiness gate**: Block if requirements_coverage < 40% or any task missing read_first/convergence.criteria.
+
 2. **Revision loop** (max 3 rounds): If critical issues found, regenerate affected tasks.
 
 2b. **Spec Enrichment**: Persist cross-task reusable design decisions:
@@ -397,6 +403,7 @@ spawn_agents_on_csv({
    Tasks: {task_count} tasks in {wave_count} waves
    Check: {checker_status} (iteration {check_count}/{max_checks})
    Collision: {collision_status}
+   Confidence: {overall}% (weakest: {dim})
 
    Next steps:
      $maestro-execute "{phase}"     -- Execute the plan
@@ -464,6 +471,9 @@ echo '{"ts":"<ISO>","worker":"{id}","type":"existing_pattern","data":{"name":"Re
 - [ ] plan.json produced in phase directory
 - [ ] .task/TASK-*.json files produced for all tasks
 - [ ] Plan passes quality checks (coverage, deps, criteria)
+- [ ] Plan confidence scored with 5-dimension factor model
+- [ ] Readiness gate checked before confirmation
+- [ ] plan.json includes confidence section
 - [ ] Collision detection executed against same-milestone plans
 - [ ] PLN artifact registered in state.json
 - [ ] context.md produced with exploration findings + plan overview

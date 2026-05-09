@@ -115,7 +115,11 @@ If user confirms, invoke `Skill({ skill: "spec-add", args: "<category> <content>
 - [ ] evidence.ndjson written with structured NDJSON entries
 - [ ] understanding.md tracks evolving understanding per cluster
 - [ ] Root causes collected with fix_direction and affected_files
+- [ ] Multi-factor confidence scored per gap (Step 7.0) replacing simple high/medium/low
+- [ ] Readiness gate checked before ROOT CAUSE declaration
+- [ ] Pressure pass completed on confirmed hypothesis
+- [ ] Confidence table appended to understanding.md
 - [ ] If --from-uat: uat.md gaps updated with diagnosis artifacts
-- [ ] Results unified into diagnosis summary
+- [ ] Results unified into diagnosis summary with confidence section
 - [ ] Next step routed (plan --gaps + execute if fix needed, verify if fix applied, resume if inconclusive)
 </success_criteria>

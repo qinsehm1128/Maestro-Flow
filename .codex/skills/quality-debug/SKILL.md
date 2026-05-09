@@ -257,6 +257,10 @@ spawn_agents_on_csv({
 
 2. **Generate context.md**: Debug report with summary (mode, hypothesis/confirmed/fixed/verified counts), per-hypothesis results (hypothesis, evidence for/against, findings, status), per-fix results (fix applied, verified, findings), aggregated root causes, and next steps.
 
+2b. **Debug confidence scoring**:
+
+   Dimensions (4): hypothesis_quality, evidence_completeness, root_cause_isolation, fix_confidence. Factors (weights): evidence_depth(.30), evidence_strength(.25), coverage_breadth(.20), reproduction(.15), consistency(.10). Map to legacy: <40% = low, 40-70% = medium, >70% = high. Append confidence assessment to context.md.
+
 3. **UAT update** (if --from-uat): Update `uat.md` gaps with `root_cause`, `fix_direction`, `affected_files` for confirmed hypotheses.
 
 4. **Issue update**: If `issues.jsonl` exists, update matching issues with status `diagnosed`, add `context.suggested_fix` and `context.notes`.
@@ -296,7 +300,7 @@ spawn_agents_on_csv({
 
 | Type | Dedup Key | Data Schema | Description |
 |------|-----------|-------------|-------------|
-| `root_cause` | `data.location` | `{location, cause, severity, confidence}` | Confirmed root cause |
+| `root_cause` | `data.location` | `{location, cause, severity, confidence_score, confidence_factors}` | Confirmed root cause |
 | `hypothesis_evidence` | `data.hypothesis+data.location` | `{hypothesis, location, type, conclusion}` | Evidence for/against hypothesis |
 | `affected_component` | `data.component` | `{component, files[], impact}` | Component affected by bug |
 | `reproduction_path` | `data.trigger` | `{trigger, steps[], frequency}` | Bug reproduction path |
@@ -333,6 +337,8 @@ echo '{"ts":"<ISO>","worker":"{id}","type":"root_cause","data":{"location":"src/
 - [ ] Refuted/inconclusive hypotheses correctly skip wave 2 fix tasks
 - [ ] Wave 2 fixes attempted only for confirmed hypotheses
 - [ ] context.md produced with diagnosis summary
+- [ ] Multi-factor confidence scored per hypothesis replacing simple high/medium/low
+- [ ] Confidence assessment appended to context.md
 - [ ] UAT gaps updated (if --from-uat)
 - [ ] Issues updated with diagnosis results
 - [ ] discoveries.ndjson append-only throughout

@@ -143,8 +143,12 @@ Follow workflow plan.md § "Revise Mode" and § "Check Mode" respectively. These
 - [ ] Every task has `read_first[]` with at least the file being modified + source of truth files
 - [ ] Every task has `convergence.criteria[]` with grep-verifiable conditions (no subjective language)
 - [ ] Every task `action` and `implementation` contain concrete values (no "align X with Y")
+- [ ] Plan confidence scored in P4 with 5-dimension factor model
+- [ ] Plan readiness gate checked before P4.5 collision detection
+- [ ] Pressure pass completed on highest-complexity task
+- [ ] plan.json includes confidence section (overall, dimensions, pressure_pass)
 - [ ] Collision detection executed against same-milestone plans (non-blocking)
 - [ ] Plan-checker passed (or minor issues acknowledged)
-- [ ] User confirmation captured (execute/modify/cancel)
+- [ ] User confirmation captured (execute/modify/cancel) with confidence displayed
 - [ ] Artifact registered in state.json with correct scope/milestone/phase/depends_on
 </success_criteria>

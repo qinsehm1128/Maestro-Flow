@@ -355,8 +355,10 @@ STATUS: proceed | fix | escalate
 REASON: 一句话解释
 GAP_SUMMARY: 问题描述（fix/escalate 时填写）
 CONFIDENCE: high | medium | low
+CONFIDENCE_SCORE: 0-100（从结果文件中读取置信度分数，无则估算）
+WEAKEST_DIMENSION: 最弱维度名称
 ---END---
-CONSTRAINTS: 只评估 | STATUS 三选一 | retry ${meta.retry_count}/${meta.max_retries} 达上限必须 escalate" --role analyze --mode analysis`,
+CONSTRAINTS: 只评估 | STATUS 三选一 | 置信度 < 60% 倾向 fix | retry ${meta.retry_count}/${meta.max_retries} 达上限必须 escalate" --role analyze --mode analysis`,
   yield_time_ms: 30000,
   max_output_tokens: 6000
 })
@@ -366,17 +368,25 @@ CONSTRAINTS: 只评估 | STATUS 三选一 | retry ${meta.retry_count}/${meta.max
 
 **Parse verdict** (on callback):
 ```
-Extract STATUS / REASON / GAP_SUMMARY / CONFIDENCE from output.
+Extract STATUS / REASON / GAP_SUMMARY / CONFIDENCE / CONFIDENCE_SCORE / WEAKEST_DIMENSION from output.
 If parse fails → fallback: STATUS = "fix", GAP_SUMMARY = generic
+
+Confidence-based verdict adjustment (after parse, before apply):
+  If CONFIDENCE_SCORE < 60 AND STATUS == "proceed":
+    → Override to "fix", REASON += " (置信度不足: {score}%，{weakest} 需加强)"
+  If CONFIDENCE_SCORE > 95 AND STATUS == "fix" AND retry_count > 0:
+    → Suggest "proceed" override, REASON += " (置信度充分: {score}%，建议通过)"
 ```
+
+**Confidence-aware evaluation**: Before delegating, check if artifact contains confidence section (added by downstream commands). If found, include `已有置信度评估: 整体 {overall}%, 最弱维度: {weakest} ({score}%)` in delegate prompt as additional signal.
 
 **Apply verdict:**
 
 | Mode | Behavior |
 |------|----------|
-| `-y` (auto_mode) | Follow verdict directly, no user prompt |
-| Interactive + confidence == "high" | Display recommendation, prompt user with options below |
-| Interactive + confidence != "high" | Display recommendation **with warning**, prompt user with options below |
+| `-y` (auto_mode) | Follow adjusted verdict directly, no user prompt |
+| Interactive + confidence_score >= 80 | Display recommendation with confidence, prompt user |
+| Interactive + confidence_score < 80 | Display recommendation **with confidence warning**, prompt user |
 
 Interactive prompt (via `request_user_input`):
 ```json
@@ -665,9 +675,11 @@ Rules:
 - [ ] Conditional steps evaluated at decision time (coverage threshold)
 - [ ] buildSkillCall() completes arg enrichment + auto flag, CSV contains full commands
 - [ ] Quality-gate decisions delegate-evaluated via `maestro delegate --role analyze`
-- [ ] Delegate verdict parsed: STATUS / REASON / GAP_SUMMARY / CONFIDENCE
-- [ ] `-y` mode: auto-follow delegate verdict, no STOP (except post-debug-escalate)
-- [ ] Interactive mode: display recommendation + request_user_input with override
+- [ ] Delegate verdict parsed: STATUS / REASON / GAP_SUMMARY / CONFIDENCE / CONFIDENCE_SCORE / WEAKEST_DIMENSION
+- [ ] Confidence-based verdict adjustment applied (< 60% bias fix, > 95% bias proceed)
+- [ ] Artifact confidence sections read when available as additional signal
+- [ ] `-y` mode: auto-follow adjusted verdict, no STOP (except post-debug-escalate)
+- [ ] Interactive mode: display recommendation with confidence score + request_user_input with override
 - [ ] Delegate failure fallback: treat as "fix" verdict
 - [ ] passed_gates[] tracks passed quality gates, skips re-runs in retry loops
 - [ ] passed_gates cleared when code changes (fix-loop inserts execute step)

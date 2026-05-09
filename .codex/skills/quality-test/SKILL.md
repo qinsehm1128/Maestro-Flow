@@ -434,6 +434,12 @@ Options:
 If re-verify passes: update uat.md gaps as resolved, report success.
 If gaps remain after 2 iterations: report remaining, suggest manual intervention.
 
+### Step 12.5: UAT Confidence Scoring
+
+Dimensions (4): scenario_coverage, diagnostic_depth, observation_quality, closure_completeness. Factors (weights): requirements_mapped(.30), observation_specificity(.25), user_validation(.20), diagnostic_depth(.15), consistency(.10). Append confidence summary to `uat.md`.
+
+**Readiness gate** (before final report): Block if scenario_coverage < 40% or any blocker-severity gap without diagnosis.
+
 ### Step 13: Report
 
 ```
@@ -490,6 +496,9 @@ Files:
 - [ ] test-results.json and coverage-report.json written
 - [ ] index.json uat fields updated
 - [ ] Artifact registered in state.json
+- [ ] UAT confidence scored with 4-dimension factor model
+- [ ] Readiness gate checked before final report
+- [ ] Confidence summary appended to uat.md
 - [ ] If issues: diagnosis.csv built, spawn_agents_on_csv executed per gap cluster
 - [ ] Gaps updated with root_cause, fix_direction, affected_files
 - [ ] Gap-fix loop triggered if --auto-fix (max 2 iterations)

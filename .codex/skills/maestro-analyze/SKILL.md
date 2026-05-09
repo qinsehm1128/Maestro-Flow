@@ -112,6 +112,7 @@ id,title,description,dimension,analysis_type,deps,context_from,wave,status,findi
 | `findings` | Output | Key findings summary (max 500 chars) |
 | `score` | Output | Dimension score (0-100 for scoring tasks, empty for explore/decide) |
 | `recommendations` | Output | Dimension-specific recommendations |
+| `confidence_score` | Output | Per-dimension confidence score (0-100) from factor-based assessment |
 | `error` | Output | Error message if failed |
 
 ### Per-Wave CSV (Temporary)
@@ -356,6 +357,10 @@ Write wave CSV with `prev_context`, execute `spawn_agents_on_csv` for synthesis 
 {prioritized recommendations with rationale}
 ```
 
+3b. **Confidence scoring** (full mode only):
+
+   Factors (weights): findings_depth(.30), evidence_strength(.25), coverage_breadth(.20), user_validation(.15, 0 in CSV mode), consistency(.10). Overall = average of dimension scores. Thresholds: <60% deeper | 60-80% optional | 80-95% converging | >95% converge. Append confidence summary to `analysis.md` and `conclusions.json`.
+
 4. Build `context.md` (both modes):
 
 ```markdown
@@ -479,6 +484,8 @@ echo '{"ts":"<ISO>","worker":"{id}","type":"exploration_finding","data":{"file":
 - [ ] analysis.md + conclusions.json produced (full mode only)
 - [ ] Deferred items auto-created as issues
 - [ ] Artifact registered in state.json
+- [ ] Confidence scored per dimension with factor-based model (full mode only)
+- [ ] Confidence summary appended to analysis.md and conclusions.json
 - [ ] Final outputs copied to scratchDir
 - [ ] discoveries.ndjson append-only throughout
 </success_criteria>

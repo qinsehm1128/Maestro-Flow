@@ -137,7 +137,7 @@ For each cluster, spawn concurrently as general-purpose agent (`run_in_backgroun
 
 - **Input**: cluster name, phase, all gaps (test_id, truth, reason, severity). Mode: `symptoms_prefilled`.
 - **Process**: read source files, form 2-3 hypotheses per gap ranked by likelihood, search code for evidence, log each as NDJSON line, confirm/refute.
-- **Output per gap**: `root_cause`, `fix_direction`, `affected_files` (file:line), `confidence` (high/medium/low), `evidence` summary.
+- **Output per gap**: `root_cause`, `fix_direction`, `affected_files` (file:line), `confidence` (multi-factor; also include legacy `confidence_level`: high/medium/low for backward compat), `evidence` summary.
 - **Files**: `{debug_dir}/evidence-{cluster_slug}.ndjson`, `{debug_dir}/understanding-{cluster_slug}.md`
 
 All agents run concurrently. Collect all results.
@@ -198,7 +198,7 @@ For each agent result, extract:
 - root_cause per gap
 - fix_direction per gap
 - affected_files per gap
-- confidence level
+- confidence (multi-factor, see 7.1)
 - evidence summary
 
 Build unified diagnosis:
@@ -215,13 +215,22 @@ Build unified diagnosis:
           "root_cause": "...",
           "fix_direction": "...",
           "affected_files": ["src/components/Comments.tsx:42"],
-          "confidence": "high"
+          "confidence": { "overall": 0.78, "dimensions": {} }
         }
       ]
     }
-  ]
+  ],
+  "confidence": {}
 }
 ```
+
+### Step 7.0: Debug Confidence Scoring
+
+Dimensions (4): hypothesis_quality, evidence_completeness, root_cause_isolation, fix_confidence. Factors (weights): evidence_depth(.30), evidence_strength(.25), coverage_breadth(.20), reproduction(.15), consistency(.10). Map to legacy levels: <40% = low, 40-70% = medium, >70% = high.
+
+Quality mechanisms: Pressure Pass (before Step 9) — cross-check confirmed vs refuted hypotheses. Devil's Advocate — root_cause_isolation > 0.7 → "根因在更深层？". Stall Detection — no new evidence + delta < 5% for 2 continuations → "调查可能停滞".
+
+Readiness Gate (blocks Step 9): evidence_completeness ≥ 40% | pressure pass done | no contradicting evidence | fix_direction has specific files. If blocked → AskUserQuestion: 补充调查 or 忽略风险并确认. Append confidence table to understanding.md.
 
 ### Step 7.1: Update Issues with Diagnosis
 

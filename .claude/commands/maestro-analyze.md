@@ -108,6 +108,10 @@ Full mode:
 - [ ] analysis.md written with all 6 dimensions scored with evidence
 - [ ] conclusions.json created with recommendations and decision trail
 - [ ] Intent Coverage tracked and verified (no unresolved ❌ items)
+- [ ] Confidence tracking initialized (Step 4.6) and re-scored each round (Step 5.8)
+- [ ] Readiness gate checked before synthesis (Step 5.10)
+- [ ] Pressure pass completed ≥ 1 time before Step 6
+- [ ] Confidence summary with factor decomposition written to analysis.md
 
 Gaps mode:
 - [ ] Issues loaded from issues.jsonl (all open/registered, or single ISS-ID)

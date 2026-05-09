@@ -385,6 +385,9 @@ OUTER LOOP (max_iter iterations):
     Analyze: pass rate delta, failure clusters, strategy effectiveness
     Append to reflection-log.md
 
+    **Test confidence scoring** (at each REFLECT step):
+       Dimensions (5): scenario_coverage, test_quality, diagnostic_accuracy, strategy_effectiveness, infrastructure_fitness. Factors (weights): completeness(.30), pass_rate_trend(.25), classification_accuracy(.20), coverage_breadth(.15), consistency(.10). Enhanced convergence: BOTH pass_rate ≥ threshold AND confidence ≥ 60%. Add confidence to `report.json`.
+
   ADJUST (Adaptive Strategy):
     IF startStrategy provided AND iteration == 1: use startStrategy as initial
     OTHERWISE auto-select:
@@ -540,6 +543,9 @@ CSV Session: .tests/auto-test/.csv-session/
 - [ ] discoveries.ndjson append-only throughout
 - [ ] Cross-layer context propagation via prev_context column
 - [ ] Iteration engine ran (inner: test_defect fix, outer: strategy adjust)
+- [ ] Test confidence scored per iteration with 5-dimension factor model
+- [ ] Convergence check includes confidence >= 60% alongside pass_rate
+- [ ] Confidence section added to report.json
 - [ ] state.json, report.json, reflection-log.md written
 - [ ] If spec: traceability.md produced
 - [ ] If failures: issues auto-created in issues.jsonl
