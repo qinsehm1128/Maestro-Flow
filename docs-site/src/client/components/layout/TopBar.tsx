@@ -1,14 +1,17 @@
 import { useState } from 'react';
 import { useI18n } from '@/client/i18n/index.js';
+import { useSidebar } from './SidebarContext.js';
 import { SearchInput } from '@/client/components/navigation/index.js';
 import { Link } from 'react-router-dom';
 
 // ---------------------------------------------------------------------------
 // TopBar — warm minimal header with logo, search, nav links, version badge
+// Mobile: hamburger menu button toggles sidebar drawer
 // ---------------------------------------------------------------------------
 
 export function TopBar() {
   const { t, locale, setLocale } = useI18n();
+  const { toggle: toggleSidebar } = useSidebar();
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     try {
       const stored = localStorage.getItem('docs-site-theme');
@@ -39,8 +42,20 @@ export function TopBar() {
       role="banner"
       className="fixed top-0 left-0 right-0 flex items-center justify-between px-[var(--spacing-6)] h-[var(--size-topbar-height)] bg-bg-secondary/85 backdrop-blur-[12px] border-b border-border shrink-0 z-[100]"
     >
-      {/* Left: Logo + separator + subtitle */}
+      {/* Left: Hamburger (mobile) + Logo + separator + subtitle */}
       <div className="flex items-center gap-[var(--spacing-4)]">
+        {/* Mobile hamburger menu */}
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          aria-label={t('sidebar.toggle')}
+          className="lg:hidden flex items-center justify-center w-8 h-8 rounded-[var(--radius-default)] transition-all duration-[var(--duration-fast)] hover:bg-bg-hover text-text-tertiary hover:text-text-primary"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+
         <Link to="/" className="flex items-center gap-[var(--spacing-2)] no-underline">
           {/* Logo icon */}
           <span className="w-6 h-6 rounded-[var(--radius-default)] bg-text-primary flex items-center justify-center">
@@ -54,8 +69,8 @@ export function TopBar() {
             Maestro
           </span>
         </Link>
-        <span className="w-px h-5 bg-border"></span>
-        <span className="text-[length:var(--font-size-sm)] font-[var(--font-weight-medium)] text-text-secondary">
+        <span className="w-px h-5 bg-border hidden sm:block"></span>
+        <span className="hidden sm:block text-[length:var(--font-size-sm)] font-[var(--font-weight-medium)] text-text-secondary">
           {t('topbar.title')}
         </span>
       </div>
@@ -108,7 +123,7 @@ export function TopBar() {
         </button>
 
         {/* Version badge */}
-        <span className="text-[length:10px] font-[var(--font-weight-semibold)] px-[var(--spacing-2-5)] py-[3px] rounded-full bg-status-bg-completed text-accent-green">
+        <span className="hidden sm:inline-flex text-[length:10px] font-[var(--font-weight-semibold)] px-[var(--spacing-2-5)] py-[3px] rounded-full bg-status-bg-completed text-accent-green">
           v0.1.0
         </span>
       </div>

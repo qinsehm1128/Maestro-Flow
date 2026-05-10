@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useI18n } from '@/client/i18n/index.js';
+import { useSidebar } from './SidebarContext.js';
 import { inventoryData, getCommandsByCategory, getCommandSlug, type Command, type Skill } from '@/client/routes/route-config.js';
 import { getAllGuideMeta } from '@/client/data/index.js';
 import { getGuideIcon } from '@/client/utils/guideIcons.js';
@@ -38,6 +39,23 @@ interface CategorySection {
 export function Sidebar() {
   const { t } = useI18n();
   const location = useLocation();
+  const { isOpen: isMobileOpen, close: closeSidebar } = useSidebar();
+
+  // Close mobile sidebar on route change
+  useEffect(() => {
+    closeSidebar();
+  }, [location.pathname, closeSidebar]);
+
+  // Close mobile sidebar on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isMobileOpen) {
+        closeSidebar();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isMobileOpen, closeSidebar]);
 
   const defaultSections: CategorySection[] = useMemo(() => {
     return inventoryData.categories.map((cat) => ({
@@ -66,11 +84,28 @@ export function Sidebar() {
   };
 
   return (
-    <aside
-      role="navigation"
-      aria-label={t('sidebar.categories')}
-      className="fixed top-[var(--size-topbar-height)] bottom-0 left-0 w-[var(--size-sidebar-width)] bg-bg-secondary border-r border-border overflow-y-auto z-50"
-    >
+    <>
+      {/* Mobile backdrop overlay */}
+      {isMobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/30 z-40 lg:hidden"
+          onClick={closeSidebar}
+          aria-hidden="true"
+        />
+      )}
+
+      <aside
+        role="navigation"
+        aria-label={t('sidebar.categories')}
+        className={[
+          'fixed top-[var(--size-topbar-height)] bottom-0 left-0 w-[var(--size-sidebar-width)]',
+          'bg-bg-secondary border-r border-border overflow-y-auto z-50',
+          'transition-transform duration-[var(--duration-smooth)] ease-[var(--ease-notion)]',
+          // Mobile: slide-out drawer, hidden by default
+          'max-lg:-translate-x-full',
+          isMobileOpen ? 'max-lg:translate-x-0' : '',
+        ].join(' ')}
+      >
       <nav className="py-[var(--spacing-4)]" aria-label="Command categories">
         {/* Guides section */}
         <SidebarGuidesSection />
@@ -89,6 +124,7 @@ export function Sidebar() {
         ))}
       </nav>
     </aside>
+    </>
   );
 }
 

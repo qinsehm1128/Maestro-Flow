@@ -18,7 +18,7 @@ export function MainContent({ children, showBreadcrumbs = true }: MainContentPro
     <main
       role="main"
       aria-label={t('accessibility.main_content')}
-      className="ml-[var(--size-sidebar-width)] flex-1 overflow-y-auto bg-bg-primary"
+      className="lg:ml-[var(--size-sidebar-width)] flex-1 overflow-y-auto bg-bg-primary"
     >
       {/* Skip to content link */}
       <a
@@ -28,7 +28,7 @@ export function MainContent({ children, showBreadcrumbs = true }: MainContentPro
         {t('accessibility.skip_to_content')}
       </a>
 
-      <div id="main-content" className="max-w-[var(--size-content-max-width)] mx-auto px-[var(--spacing-10)] py-[var(--spacing-10)]">
+      <div id="main-content" className="max-w-[var(--size-content-max-width)] mx-auto px-[var(--spacing-4)] sm:px-[var(--spacing-6)] lg:px-[var(--spacing-10)] py-[var(--spacing-6)] lg:py-[var(--spacing-10)]">
         {/* Breadcrumbs */}
         {showBreadcrumbs && (
           <div className="mb-[var(--spacing-6)]">

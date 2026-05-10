@@ -86,7 +86,7 @@ export default function GuidePage({ slug }: GuidePageProps) {
       </div>
 
       {/* Guide content + floating TOC — centered together */}
-      <div className="flex gap-[var(--spacing-10)] justify-center">
+      <div className="flex gap-[var(--spacing-6)] xl:gap-[var(--spacing-10)] justify-center">
         <div className="flex-1 min-w-0 max-w-[860px]">
           <MarkdownRenderer content={content?.rawContent || ''} />
         </div>
