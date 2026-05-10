@@ -170,8 +170,7 @@ flag = auto_flag_map[next.skill] || "-y"
 effective_args = `${next.args} ${flag}`
 
 Bash({
-  command: `maestro delegate "Execute: Skill({ skill: \"${next.skill}\", args: \"${effective_args}\" })
-Do NOT reimplement — invoke the skill command directly." --to claude --mode write`,
+  command: `maestro delegate "/${next.skill} ${effective_args}" --to claude --mode write`,
   run_in_background: true,
   timeout: 600000
 })
