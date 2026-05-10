@@ -87,34 +87,60 @@ Revoked column must be set rather than deleting tokens.
 
 Tool specs are reusable process/tool definitions stored in `tools.md`. They declare per-entry roles and can reference knowhow detail documents for long procedures.
 
+**Entry description format**: First line after `### Title` states **when to use** this tool, followed by the steps or scope summary. For ref entries this line is critical — `spec load` only shows the first 200 chars after the heading.
+
 **Inline mode** (short process, <10 steps):
 ```markdown
-<spec-entry roles="implement,test" keywords="testing,integration,api" date="2026-05-10">
+<spec-entry roles="implement,test" keywords="payment,gateway,idempotency" date="2026-05-10">
 
-### Integration Test Flow
+### Payment Gateway Idempotency Verification
 
-1. Setup test environment
-2. Seed test data
-3. Run integration suite
-4. Validate coverage threshold
-5. Generate report
+Use when testing payment integration endpoints for retry safety and webhook delivery guarantees.
+
+1. Generate idempotency key (UUID v4)
+2. Submit charge request with key
+3. Retry same request with same key — assert identical response
+4. Submit different amount with same key — assert 409 conflict
+5. Verify gateway webhook delivers exactly once
+6. Assert ledger entry matches charge amount
 
 </spec-entry>
 ```
 
 **Ref mode** (long process, >=10 steps or with code examples):
+
+Spec index entry — description includes usage timing (shown by `spec load`, max 200 chars):
 ```markdown
-<spec-entry roles="implement" keywords="deploy,pipeline,production" date="2026-05-10"
-  ref="knowhow/RCP-deploy-flow.md">
+<spec-entry roles="implement" keywords="oauth,pkce,token,exchange" date="2026-05-10"
+  ref="knowhow/RCP-oauth-pkce-flow.md">
 
-### Production Deploy Flow
+### OAuth PKCE Authorization Flow
 
-Standard deployment procedure with rollback safety. See referenced document.
+Use when implementing OAuth 2.0 login for public clients (SPA/mobile). Covers code_verifier generation, authorization redirect, token exchange, refresh rotation with CSRF validation.
 
 </spec-entry>
 ```
 
-**Registration**: `/maestro-tools-register` — extract, generate, or optimize tool definitions.
+Referenced knowhow document — YAML `summary` includes usage timing (shown by `wiki list` and wiki-role-loader hook):
+```markdown
+---
+title: OAuth PKCE Authorization Flow
+type: recipe
+summary: "Use when implementing OAuth 2.0 login for public clients (SPA/mobile). Complete PKCE flow with code_verifier, token exchange, refresh rotation."
+tags: [oauth, pkce, auth, token]
+roles: [implement]
+---
+
+## Prerequisites
+...
+
+## Steps
+1. Generate code_verifier (43-128 chars, URL-safe random)
+2. Derive code_challenge = BASE64URL(SHA256(code_verifier))
+...
+```
+
+**Registration**: `/maestro-tools-register` — codify reusable processes as tool specs. Register during planning (standardize flows), after execution (capture validated procedures), before testing (register verification methods), or during retrospective/harvest (extract process knowledge). Registered entries are auto-discovered by agents via `spec load --role` and spec-injector.
 
 **Execution**: `/maestro-tools-execute` — load tool by name or role, execute step-by-step.
 
@@ -188,14 +214,26 @@ Knowhow is broad knowledge storage supporting multiple document types. All files
 
 Similar to spec's `<spec-entry>`, knowhow files support container multi-entry mode:
 
+YAML frontmatter fields:
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `title` | Yes | Document title |
+| `type` | Yes | Knowhow type (session, tip, template, recipe, etc.) |
+| `summary` | No | One-line description with usage timing. Shown by `wiki list` and wiki-role-loader. Falls back to first paragraph of body if absent. |
+| `tags` | No | Searchable keywords |
+| `roles` | No | Applicable agent roles |
+| `created` | Auto | Creation timestamp |
+| Type-specific | No | `lang`, `source`, `status`, `assetType`, `codePaths` |
+
 ```markdown
 ---
 title: Session Compact 20260510
-category: session
+type: session
 roles: [analyze, review]
 ---
 
-<knowhow-entry category="pattern" keywords="auth,jwt" date="2026-05-10" roles="implement">
+<knowhow-entry keywords="pattern,auth,jwt" date="2026-05-10" roles="implement">
 
 ### JWT Refresh Token Rotation
 
@@ -213,7 +251,7 @@ Code asset documents (AST-/BLP-) associate source code via frontmatter `codePath
 ```yaml
 ---
 title: Auth API Contract
-category: asset
+type: asset
 assetType: api-contract
 codePaths:
   - src/api/auth/
@@ -310,12 +348,12 @@ Sub-entries inherit container's roles. Entry-level roles override container role
 
 ```bash
 # Entry management
-maestro wiki list [--type <type>] [--role <role>] [--category <cat>] [-q <query>]
+maestro wiki list [--type <type>] [--role <role>] [-q <query>]
 maestro wiki load <id1> [id2...] [--json]
 maestro wiki get <id>
 maestro wiki search <query>
 maestro wiki create --type knowhow --slug <slug> --title <title>
-maestro wiki append <containerId> --category <cat> --body <text>
+maestro wiki append <containerId> --body <text> --keywords <kw>
 maestro wiki remove-entry <subEntryId>
 
 # Knowhow CLI
@@ -462,14 +500,14 @@ maestro spec status [--scope <scope>] [--uid <uid>]
 /maestro-tools-execute "<name>" | --role <role>   # Load and execute tool step-by-step
 
 # ── Wiki Retrieval ────────────────────────────────────────────
-maestro wiki list [--type <type>] [--role <role>] [--category <cat>] [--tag <tag>] [-q <query>] [--group] [--json]
+maestro wiki list [--type <type>] [--role <role>] [--tag <tag>] [-q <query>] [--group] [--json]
 maestro wiki load <id1> [id2...] [--json]
 maestro wiki get <id> [--json]
 maestro wiki search <query> [--json]
 
 # ── Wiki Write ────────────────────────────────────────────────
 maestro wiki create --type <spec|knowhow> --slug <slug> --title <title> [--body <text>]
-maestro wiki append <containerId> --category <cat> --body <text> [--keywords <kw>]
+maestro wiki append <containerId> --body <text> [--keywords <kw>]
 maestro wiki remove-entry <subEntryId>
 maestro wiki update <id> [--title <title>] [--frontmatter <json>]
 maestro wiki delete <id>
