@@ -24,7 +24,7 @@ import { getProjectRoot } from '../utils/path-validator.js';
 
 // --- Types ---
 
-const CATEGORIES = ['session', 'tip', 'template', 'recipe', 'reference', 'decision', 'asset', 'blueprint'] as const;
+const CATEGORIES = ['session', 'tip', 'template', 'recipe', 'reference', 'decision', 'asset', 'blueprint', 'document'] as const;
 type KnowHowCategory = (typeof CATEGORIES)[number];
 
 const PREFIX_MAP: Record<KnowHowCategory, string> = {
@@ -36,6 +36,7 @@ const PREFIX_MAP: Record<KnowHowCategory, string> = {
   decision: 'DCS',
   asset: 'AST',
   blueprint: 'BLP',
+  document: 'DOC',
 };
 
 const DECISION_STATUSES = ['proposed', 'accepted', 'superseded'] as const;
@@ -262,6 +263,7 @@ export const schema: ToolSchema = {
   decision   → DCS-{ts}.md   architecture decision record
   asset      → AST-{ts}.md   reusable asset (prompt, config, workflow)
   blueprint  → BLP-{ts}.md   architecture blueprint with code paths
+  document   → DOC-{ts}.md   general document / fallback category
 
 Entries are automatically indexed by WikiIndexer (type=knowhow, category={type}).`,
   inputSchema: {

@@ -22,7 +22,20 @@ Supports 4 scopes: project (default), global, team, personal.
 <context>
 $ARGUMENTS -- expects `[--scope <scope>] [--uid <uid>] <category> <content>`
 
+**Additional options:**
+- `--ref <path>` — Create as index entry referencing a knowhow document. If the path exists, only creates the spec index entry. If path doesn't exist, also creates the knowhow file.
+- `--knowhow-type <type>` — Knowhow document type when creating with --ref (asset, blueprint, document, template, recipe, reference, decision)
+
 Scope-to-directory mapping, category-to-file mapping, and entry format defined in workflow specs-add.md.
+
+**Examples:**
+```bash
+# Index entry referencing existing knowhow doc
+/spec-add arch "OAuth PKCE 集成" "完整流程设计" --ref knowhow/AST-oauth-flow.md
+
+# Create both knowhow doc + spec index (when doc doesn't exist yet)
+/spec-add learning "API 设计规范" "统一 REST 命名、版本控制..." --ref knowhow/DOC-api-design.md --knowhow-type document
+```
 </context>
 
 <execution>

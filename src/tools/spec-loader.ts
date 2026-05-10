@@ -8,7 +8,7 @@
 
 import { readFileSync, existsSync, readdirSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseSpecEntries, formatSpecEntries } from './spec-entry-parser.js';
+import { parseSpecEntries, formatSpecEntries, type SpecEntryParsed } from './spec-entry-parser.js';
 import { paths } from '../config/paths.js';
 
 // ============================================================================
@@ -259,19 +259,45 @@ function formatFileContent(body: string, keyword?: string): string | null {
 
   const parts: string[] = [];
 
+  // Separate ref entries (lightweight display) from regular entries
+  const refEntries = entries.filter(e => e.ref);
+  const regularEntries = entries.filter(e => !e.ref);
+
   if (keyword) {
     const kw = keyword.toLowerCase();
-    const matchedEntries = entries.filter(e => e.keywords.includes(kw));
-    if (matchedEntries.length > 0) parts.push(formatSpecEntries(matchedEntries));
+    const matchedRegular = regularEntries.filter(e => e.keywords.includes(kw));
+    const matchedRef = refEntries.filter(e => e.keywords.includes(kw));
+    if (matchedRegular.length > 0) parts.push(formatSpecEntries(matchedRegular));
+    if (matchedRef.length > 0) parts.push(matchedRef.map(formatRefEntry).join('\n\n---\n\n'));
     for (const leg of legacy) {
       if (leg.content.toLowerCase().includes(kw)) parts.push(leg.content);
     }
   } else {
-    if (entries.length > 0) parts.push(formatSpecEntries(entries));
+    if (regularEntries.length > 0) parts.push(formatSpecEntries(regularEntries));
+    if (refEntries.length > 0) parts.push(refEntries.map(formatRefEntry).join('\n\n---\n\n'));
     for (const leg of legacy) parts.push(leg.content);
   }
 
   return parts.length > 0 ? parts.join('\n\n---\n\n') : null;
+}
+
+/**
+ * Format a ref entry as a lightweight summary with a load command hint.
+ */
+function formatRefEntry(e: SpecEntryParsed): string {
+  const refStem = (e.ref ?? '').replace(/^knowhow\//, '').replace(/\.md$/, '');
+  const refSlug = refStem.replace(/^(KNW|TIP|TPL|RCP|REF|DCS|AST|BLP|DOC)-/i, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const refId = `knowhow-${refSlug}`;
+
+  // Extract summary from content (strip heading)
+  let summary = e.content;
+  const headingIdx = summary.indexOf('\n');
+  if (headingIdx !== -1 && summary.trimStart().startsWith('###')) {
+    summary = summary.slice(headingIdx).trim();
+  }
+  summary = summary.slice(0, 200).replace(/\s+/g, ' ').trim();
+
+  return `### ${e.title}\n\n${summary}\n\n\u2192 Detail: maestro wiki load ${refId}`;
 }
 
 function stripFrontmatter(raw: string): string {

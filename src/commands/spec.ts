@@ -234,6 +234,8 @@ export function registerSpecCommand(program: Command): void {
     .argument('[content]', 'Entry content (if omitted, reads from remaining args)')
     .option('--keywords <words>', 'Comma-separated keywords')
     .option('--source <source>', 'Source reference (e.g., analyze:ANL-xxx)')
+    .option('--ref <path>', 'Create as index entry referencing a knowhow document')
+    .option('--knowhow-type <type>', 'Knowhow type for --ref (asset, blueprint, document, template, etc.)')
     .option('--scope <scope>', 'Spec scope: project|global|team|personal (default: project)')
     .option('--uid <uid>', 'User id for personal scope')
     .option('--stdin', 'Read JSON array from stdin: [{category,title,content,keywords}]')
@@ -313,6 +315,81 @@ export function registerSpecCommand(program: Command): void {
       const keywords = typeof opts.keywords === 'string'
         ? opts.keywords.split(',').map((k: string) => k.trim()).filter(Boolean)
         : [];
+
+      // ── --ref mode: create index entry referencing a knowhow document ──
+      const refPath = opts.ref as string | undefined;
+      if (refPath) {
+        const { existsSync: fileExists, mkdirSync: mkDir, writeFileSync: writeFs, readFileSync: readFs } = await import('node:fs');
+        const { join: pathJoin, resolve: pathResolve } = await import('node:path');
+
+        const knowhowType = (opts.knowhowType ?? opts['knowhow-type']) as string | undefined;
+        const absRefPath = pathResolve(process.cwd(), '.workflow', refPath);
+
+        // If ref file doesn't exist AND --knowhow-type given → create knowhow doc first
+        if (!fileExists(absRefPath) && knowhowType) {
+          const KNOWHOW_PREFIX_MAP: Record<string, string> = {
+            session: 'KNW', tip: 'TIP', template: 'TPL', recipe: 'RCP',
+            reference: 'REF', decision: 'DCS', asset: 'AST', blueprint: 'BLP',
+            document: 'DOC',
+          };
+          const prefix = KNOWHOW_PREFIX_MAP[knowhowType] ?? 'DOC';
+          const dir = pathJoin(process.cwd(), '.workflow', 'knowhow');
+          if (!fileExists(dir)) mkDir(dir, { recursive: true });
+
+          const now = new Date();
+          const fmLines = ['---', `title: ${title}`, `type: ${knowhowType}`, `category: ${knowhowType}`, `created: ${now.toISOString()}`];
+          if (keywords.length > 0) {
+            fmLines.push('tags:');
+            for (const t of keywords) fmLines.push(`  - ${t}`);
+          }
+          fmLines.push('---', '', content || '');
+          writeFs(absRefPath, fmLines.join('\n'), 'utf-8');
+          console.log(`Created knowhow doc: ${refPath}`);
+        } else if (!fileExists(absRefPath) && !knowhowType) {
+          console.error(`Error: ref path "${refPath}" does not exist. Use --knowhow-type to create it.`);
+          process.exit(1);
+        }
+
+        // Create spec index entry with summary (first ~200 chars)
+        let summary = content || '';
+        if (!summary && fileExists(absRefPath)) {
+          const raw = readFs(absRefPath, 'utf-8');
+          // Strip frontmatter
+          const trimmed = raw.trimStart();
+          if (trimmed.startsWith('---')) {
+            const endIdx = trimmed.indexOf('\n---', 3);
+            summary = endIdx !== -1 ? trimmed.substring(endIdx + 4).trim() : raw;
+          } else {
+            summary = raw;
+          }
+        }
+        summary = summary.slice(0, 200).replace(/\s+/g, ' ').trim();
+
+        const { appendSpecEntryWithRef } = await import('../tools/spec-writer.js');
+        const result = appendSpecEntryWithRef(
+          process.cwd(),
+          category as import('../tools/spec-loader.js').SpecCategory,
+          title,
+          summary,
+          keywords,
+          refPath,
+          opts.source as string | undefined,
+          scope,
+          uid,
+        );
+
+        if (opts.json) {
+          console.log(JSON.stringify(result, null, 2));
+        } else if (result.duplicate) {
+          console.log(`\u26A0 Skipped duplicate: "${result.title}" already exists in ${result.file}`);
+        } else if (result.ok) {
+          console.log(`\u2713 Added ref entry to ${result.file} [${result.category}] "${result.title}" → ${refPath}`);
+        } else {
+          console.error(`Error: failed to add "${result.title}"`);
+          process.exit(1);
+        }
+        return;
+      }
 
       const result = appendSpecEntry(
         process.cwd(),

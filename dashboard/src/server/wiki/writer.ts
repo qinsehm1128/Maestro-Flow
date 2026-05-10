@@ -498,7 +498,8 @@ function categoryToPrefix(category?: string): string {
     case 'decision':  return 'DCS';
     case 'asset':     return 'AST';
     case 'blueprint': return 'BLP';
-    default:          return 'KNW';
+    case 'document':  return 'DOC';
+    default:          return 'DOC';
   }
 }
 

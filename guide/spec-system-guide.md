@@ -89,11 +89,14 @@ Revoked column must be set rather than deleting tokens.
 # 添加条目
 /spec-add coding "Always use named exports"     # 项目级
 /spec-add --scope global arch "Use gRPC"        # 全局级
+/spec-add arch "OAuth PKCE 集成" "完整流程设计" --ref knowhow/AST-oauth-flow.md  # 引用 knowhow
 
 # 加载
 /spec-load --category coding                    # 按 category
 /spec-load --keyword auth                       # 按 keyword
 /spec-load --role implement                     # 含 wiki role 知识（新增）
+# 含 ref 属性的条目仅显示摘要，完整内容通过 wiki load 加载：
+#   → maestro wiki load <knowhow-id>
 
 # CLI 等价
 maestro spec add <category> "<title>" "<content>" --keywords kw1,kw2
@@ -140,6 +143,7 @@ Knowhow 是广谱知识存储，支持多种文档类型。所有文件存储在
 | `DCS-` | decision | 架构/设计决策 |
 | `AST-` | asset | 通用代码资产（API 契约、数据模型、UI 原型等） |
 | `BLP-` | blueprint | 架构蓝图、系统设计 |
+| `DOC-` | document | 长篇规范/文档（通用回退） |
 
 #### 容器模式（`<knowhow-entry>`）
 
@@ -396,7 +400,8 @@ maestro wiki append knowhow-...  ──┘     │
 │   ├── DCS-20260429-1100.md            # 决策记录
 │   ├── TIP-20260429-1200.md            # 提示
 │   ├── AST-auth-api.md                 # 代码资产（API 契约）
-│   └── BLP-microservice-arch.md        # 架构蓝图
+│   ├── BLP-microservice-arch.md        # 架构蓝图
+│   └── DOC-api-design-standard.md      # 长篇规范文档
 ├── collab/
 │   └── specs/                          # scope: team
 │       └── {uid}/                      # scope: personal
@@ -430,7 +435,7 @@ tags: [auth, api, jwt]
 # ── Spec ────────────────────────────────────────────────────────
 maestro spec init [--scope <scope>]
 maestro spec load [--category <cat>] [--keyword <kw>] [--scope <scope>] [--role <role>] [--json]
-maestro spec add <category> "<title>" "<content>" [--keywords kw1,kw2] [--source <src>]
+maestro spec add <category> "<title>" "<content>" [--keywords kw1,kw2] [--source <src>] [--ref <path>] [--knowhow-type <type>]
 maestro spec list [--scope <scope>]
 maestro spec status [--scope <scope>]
 

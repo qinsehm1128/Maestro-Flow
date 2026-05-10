@@ -11,11 +11,11 @@ import { readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { readdirSync } from 'node:fs';
 
-const CATEGORIES = ['session', 'tip', 'template', 'recipe', 'reference', 'decision', 'asset', 'blueprint'] as const;
+const CATEGORIES = ['session', 'tip', 'template', 'recipe', 'reference', 'decision', 'asset', 'blueprint', 'document'] as const;
 const PREFIX_MAP: Record<string, string> = {
   session: 'KNW', tip: 'TIP', template: 'TPL',
   recipe: 'RCP', reference: 'REF', decision: 'DCS',
-  asset: 'AST', blueprint: 'BLP',
+  asset: 'AST', blueprint: 'BLP', document: 'DOC',
 };
 
 function getKnowhowDir(): string {
@@ -47,7 +47,7 @@ export function registerKnowhowCommand(program: Command): void {
   knowhow
     .command('add')
     .description('Create a new knowhow entry')
-    .requiredOption('--type <type>', 'session|tip|template|recipe|reference|decision')
+    .requiredOption('--type <type>', 'session|tip|template|recipe|reference|decision|document')
     .requiredOption('--title <title>', 'Entry title')
     .requiredOption('--body <text>', 'Entry body (markdown)')
     .option('--body-file <path>', 'Read body from file')

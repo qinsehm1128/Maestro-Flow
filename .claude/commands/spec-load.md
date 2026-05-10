@@ -35,6 +35,11 @@ Category-to-file mapping (1:1) and flag details defined in workflow specs-load.m
 /spec-load --category arch
 /spec-load --role implement --keyword auth
 ```
+
+**Ref entries:**
+When loading entries with `ref` attribute, only the summary is shown with a load command:
+  → Detail: maestro wiki load <knowhow-id>
+Use the load command to read the full referenced document.
 </context>
 
 <execution>

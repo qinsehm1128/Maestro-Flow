@@ -215,7 +215,7 @@ export class WikiIndexer {
           const related: string[] = [];
           if (se.ref) {
             const refStem = se.ref.replace(/^knowhow\//, '').replace(/\.md$/, '');
-            const refSlug = refStem.replace(/^(KNW|TIP|TPL|RCP|REF|DCS|AST|BLP)-/i, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+            const refSlug = refStem.replace(/^(KNW|TIP|TPL|RCP|REF|DCS|AST|BLP|DOC)-/i, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
             related.push(`knowhow-${refSlug}`);
           }
           out.push({
@@ -242,7 +242,7 @@ export class WikiIndexer {
       }
     }
 
-    // knowhow/*.md  (KNW-→session, TIP-→tip, TPL-→template, RCP-→recipe, REF-→reference, DCS-→decision)
+    // knowhow/*.md  (KNW-→session, TIP-→tip, TPL-→template, RCP-→recipe, REF-→reference, DCS-→decision, DOC-→document)
     for (const name of await safeReaddir(join(this.workflowRoot, 'knowhow'))) {
       if (extname(name).toLowerCase() !== '.md') continue;
       const entry = await this.parseFileEntry(join(this.workflowRoot, 'knowhow', name), 'knowhow');
@@ -257,6 +257,7 @@ export class WikiIndexer {
         else if (upper.startsWith('TIP-')) entry.category = 'tip';
         else if (upper.startsWith('AST-')) entry.category = 'asset';
         else if (upper.startsWith('BLP-')) entry.category = 'blueprint';
+        else if (upper.startsWith('DOC-')) entry.category = 'document';
         out.push(entry);
 
         // Parse <knowhow-entry> blocks into sub-node WikiEntries
@@ -268,7 +269,7 @@ export class WikiIndexer {
           const related: string[] = [];
           if (se.ref) {
             const refStem = se.ref.replace(/^knowhow\//, '').replace(/\.md$/, '');
-            const refSlug = refStem.replace(/^(KNW|TIP|TPL|RCP|REF|DCS|AST|BLP)-/i, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+            const refSlug = refStem.replace(/^(KNW|TIP|TPL|RCP|REF|DCS|AST|BLP|DOC)-/i, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
             related.push(`knowhow-${refSlug}`);
           }
           out.push({
@@ -430,7 +431,7 @@ export class WikiIndexer {
     // Strip the 4-char prefix (KNW-/TIP-/TPL-/RCP-/REF-/DCS-/AST-/BLP-) from the id-generating
     // stem so the id matches what WikiWriter produced at create time (`knowhow-<slug>`).
     let idStem = stem;
-    if (/^(KNW|TIP|TPL|RCP|REF|DCS|AST|BLP)-/i.test(stem)) idStem = stem.slice(4);
+    if (/^(KNW|TIP|TPL|RCP|REF|DCS|AST|BLP|DOC)-/i.test(stem)) idStem = stem.slice(4);
     const id = `${type}-${slugify(idStem)}`;
 
     return {
