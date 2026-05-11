@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { useSettingsStore } from '@/client/store/settings-store.js';
 import LayoutGrid from 'lucide-react/dist/esm/icons/layout-grid.js';
 import FileText from 'lucide-react/dist/esm/icons/file-text.js';
 import MessageSquare from 'lucide-react/dist/esm/icons/message-square.js';
@@ -98,6 +99,18 @@ export function DockRail({ isPinned, onTogglePin }: DockRailProps) {
     );
   }, [processes]);
 
+  // Filter nav items based on settings (use JSON stringify for stable comparison)
+  const hiddenNavItems = useSettingsStore((s) => {
+    const items = s.draft?.general?.hiddenNavItems ?? s.config?.general?.hiddenNavItems;
+    return items;
+  });
+  const DEFAULT_HIDDEN = useMemo(() => ['/requirement', '/rooms'], []);
+  const hidden = hiddenNavItems ?? DEFAULT_HIDDEN;
+  const visibleNavItems = useMemo(
+    () => NAV_ITEMS.filter((item) => !hidden.includes(item.path)),
+    [hidden],
+  );
+
   const [sessionsExpanded, setSessionsExpanded] = useState(false);
   const SESSION_COLLAPSE_LIMIT = 5;
 
@@ -138,7 +151,7 @@ export function DockRail({ isPinned, onTogglePin }: DockRailProps) {
         onMouseLeave={handleRailLeave}
       >
         {/* View buttons */}
-        {NAV_ITEMS.map((item) => (
+        {visibleNavItems.map((item) => (
           <RailButton
             key={item.path}
             item={item}
@@ -213,7 +226,7 @@ export function DockRail({ isPinned, onTogglePin }: DockRailProps) {
             {t('dock.views_label')}
           </h2>
           <nav className="flex flex-col gap-0.5">
-            {NAV_ITEMS.map((item) => (
+            {visibleNavItems.map((item) => (
               <PanelNavItem key={item.path} item={item} t={t} />
             ))}
           </nav>

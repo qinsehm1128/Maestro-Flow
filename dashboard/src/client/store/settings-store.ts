@@ -22,6 +22,8 @@ export interface AgentSettingsEntry {
 export interface GeneralSettings {
   theme: 'system' | 'dark' | 'light';
   language: 'en' | 'zh-CN';
+  /** Navigation paths hidden from dock rail and sidebar */
+  hiddenNavItems?: string[];
 }
 
 /** Linear integration settings */
@@ -83,7 +85,7 @@ const DEFAULT_AGENTS: Record<AgentType, AgentSettingsEntry> = {
 };
 
 const DEFAULT_CONFIG: SettingsConfig = {
-  general: { theme: 'system', language: 'en' },
+  general: { theme: 'system', language: 'en', hiddenNavItems: ['/requirement', '/rooms'] },
   agents: DEFAULT_AGENTS,
   cliTools: '{}',
   linear: { apiKey: '' },
