@@ -43,9 +43,8 @@ export function registerSpecCommand(program: Command): void {
   // ── load ──────────────────────────────────────────────────────────────
   spec
     .command('load')
-    .description('Load specs matching role')
-    .addOption(new Option('--category <stage>', '(deprecated) Filter by category').hideHelp())
-    .option('--role <role>', 'Filter by role: implement|plan|test|review|analyze|explore|brainstorm|research')
+    .description('Load specs by category')
+    .option('--category <cat>', 'Filter by category: coding|arch|debug|test|review|learning')
     .option('--keyword <word>', 'Filter entries by keyword')
     .option('--scope <scope>', 'Spec scope: project|global|team|personal (default: project)')
     .option('--uid <uid>', 'User id for personal scope (auto-detected from git if omitted)')
@@ -83,8 +82,7 @@ export function registerSpecCommand(program: Command): void {
         process.exit(1);
       }
 
-      const role = opts.role as string | undefined;
-      const result = loadSpecs(projectPath, opts.category, uid, keyword, scope, { role });
+      const result = loadSpecs(projectPath, opts.category, uid, keyword, scope);
 
       if (opts.stdin) {
         if (result.content) {
@@ -231,11 +229,10 @@ export function registerSpecCommand(program: Command): void {
   spec
     .command('add')
     .description('Add a spec entry to the appropriate file')
-    .argument('<category>', 'Entry category: coding|arch|quality|debug|test|review|learning')
+    .argument('<category>', 'Entry category: coding|arch|debug|test|review|learning')
     .argument('<title>', 'Entry title')
     .argument('[content]', 'Entry content (if omitted, reads from remaining args)')
     .option('--keywords <words>', 'Comma-separated keywords')
-    .option('--roles <roles>', 'Comma-separated roles (implement,plan,test,review,analyze,explore)')
     .option('--source <source>', 'Source reference (e.g., analyze:ANL-xxx)')
     .option('--ref <path>', 'Create as index entry referencing a knowhow document')
     .option('--knowhow-type <type>', 'Knowhow type for --ref (asset, blueprint, document, template, etc.)')
@@ -319,10 +316,6 @@ export function registerSpecCommand(program: Command): void {
         ? opts.keywords.split(',').map((k: string) => k.trim()).filter(Boolean)
         : [];
 
-      const roles = typeof opts.roles === 'string'
-        ? opts.roles.split(',').map((r: string) => r.trim().toLowerCase()).filter(Boolean)
-        : undefined;
-
       // ── --ref mode: create index entry referencing a knowhow document ──
       const refPath = opts.ref as string | undefined;
       if (refPath) {
@@ -344,9 +337,9 @@ export function registerSpecCommand(program: Command): void {
           if (!fileExists(dir)) mkDir(dir, { recursive: true });
 
           const now = new Date();
-          const fmLines = ['---', `title: ${title}`, `type: ${knowhowType}`, `created: ${now.toISOString()}`];
+          const fmLines = ['---', `title: ${title}`, `type: ${knowhowType}`, `category: ${category}`, `created: ${now.toISOString()}`];
           if (keywords.length > 0) {
-            fmLines.push('tags:');
+            fmLines.push('keywords:');
             for (const t of keywords) fmLines.push(`  - ${t}`);
           }
           fmLines.push('---', '', content || '');
@@ -407,7 +400,6 @@ export function registerSpecCommand(program: Command): void {
         opts.source as string | undefined,
         scope,
         uid,
-        roles,
       );
 
       if (opts.json) {

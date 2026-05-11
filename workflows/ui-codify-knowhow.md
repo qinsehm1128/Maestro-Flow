@@ -253,6 +253,6 @@ Open preview:
   file://${absolutePath}/preview.html
 
 Next steps:
-  maestro wiki list --role implement
+  maestro wiki list --category coding
   maestro spec load --keyword ${package_name}
 ```

@@ -270,21 +270,21 @@ CLI 协调器：分析用户意图 → 选择命令链 → 通过 maestro delega
 
 ### `spec-add` — Add Spec Entry
 
-**Usage:** `/spec-add [--scope project|global|team|personal] [--roles <csv>] <category> <content>`
+**Usage:** `/spec-add [--scope project|global|team|personal] <category> <content>`
 
 Add knowledge entries to the spec system with role tagging. Supports tools category for reusable process definitions, and ref mode for long procedures.
 
-**Flags:** --scope (scope) · --roles (applicable roles: implement,plan,test,review,analyze) · <category> (target file) · --ref (knowhow reference) · --knowhow-type (knowhow document type: asset|blueprint|document|template|recipe|reference|decision)
+**Flags:** --scope (scope) · <category> (target file) · --ref (knowhow reference) · --knowhow-type (knowhow document type: asset|blueprint|document|template|recipe|reference|decision)
 
 ---
 
 ### `spec-load` — Load Specs by Role
 
-**Usage:** `/spec-load [--role <role>] [--keyword <word>]`
+**Usage:** `/spec-load [--category <category>] [--keyword <word>]`
 
 Load specs by role: primary role doc in full + cross-file entries with matching roles attribute. Role-based loading replaces category-based loading.
 
-**Flags:** --role <role> (implement|plan|test|review|analyze) · --keyword <word> (keyword filter) · --with-lessons (include learning records)
+**Flags:** --category <category> (implement|plan|test|review|analyze) · --keyword <word> (keyword filter) · --with-lessons (include learning records)
 
 ---
 
@@ -300,11 +300,11 @@ Codify reusable business processes as tool specs (e.g. payment reconciliation, O
 
 ### `maestro-tools-execute` — Execute Tool Spec
 
-**Usage:** `/maestro-tools-execute [tool-name | --role <role>]`
+**Usage:** `/maestro-tools-execute [tool-name | --category <category>]`
 
 Load registered tool specs and execute step-by-step. Supports direct invocation by name or role-based recommendation with interactive selection.
 
-**Flags:** <tool-name> (direct) · --role <role> (list available tools for role)
+**Flags:** <tool-name> (direct) · --category <category> (list available tools for role)
 
 ---
 

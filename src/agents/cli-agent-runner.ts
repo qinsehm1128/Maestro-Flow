@@ -145,18 +145,18 @@ export function generateCliExecId(tool: string): string {
 // ---------------------------------------------------------------------------
 
 const ROLE_SPEC_CATEGORIES: Record<string, SpecCategory[]> = {
-  analyze:    ['arch', 'coding', 'quality'],
+  analyze:    ['arch', 'coding', 'debug'],
   explore:    ['arch', 'coding'],
-  review:     ['review', 'quality', 'coding'],
-  implement:  ['coding', 'arch', 'quality', 'test'],
+  review:     ['review', 'coding'],
+  implement:  ['coding', 'arch', 'test'],
   plan:       ['arch', 'coding'],
   brainstorm: ['arch'],
   research:   ['arch'],
 };
 
 const MODE_SPEC_CATEGORIES: Record<string, SpecCategory[]> = {
-  analysis: ['arch', 'coding', 'quality', 'review'],
-  write:    ['coding', 'arch', 'quality', 'test'],
+  analysis: ['arch', 'coding', 'review'],
+  write:    ['coding', 'arch', 'test'],
 };
 
 async function assemblePrompt(

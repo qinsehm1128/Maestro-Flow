@@ -6,7 +6,7 @@ allowed-tools: Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion, Agent
 ---
 
 <purpose>
-Codify reusable business processes as tool specs into `.workflow/specs/tools.md`. Once registered, entries are auto-discovered by downstream agents via `spec load --role` and spec-injector — plan agents pick up design/architecture flows, test agents pick up verification methods, implement agents pick up execution steps.
+Codify reusable business processes as knowhow documents with `tool: true` in YAML frontmatter. Once registered, entries are auto-discovered by downstream agents via `spec load --category` — plan agents pick up design/architecture flows, test agents pick up verification methods, coding agents pick up execution steps.
 
 Three modes:
 
@@ -22,26 +22,24 @@ $ARGUMENTS — User intent description, or empty (interactive guidance)
 
 ```bash
 $maestro-tools-register "extract OAuth PKCE token exchange flow from src/auth/"
-$maestro-tools-register "generate Stripe webhook idempotency verification --roles implement,test"
-$maestro-tools-register "generate E2E checkout flow with payment gateway mock setup --roles test"
+$maestro-tools-register "generate Stripe webhook idempotency verification"
+$maestro-tools-register "generate E2E checkout flow with payment gateway mock setup"
 $maestro-tools-register "optimize e2e-checkout tool"
 ```
 
-**Tool spec storage**: `.workflow/specs/tools.md`, format:
-```xml
-<spec-entry roles="implement,test" keywords="testing,api" date="YYYY-MM-DD">
-### Tool Name
-Step content...
-</spec-entry>
-```
+**Tool registration**: Creates knowhow documents in `knowhow/` folder with `tool: true` in YAML frontmatter. Tools are auto-discovered by `spec load` based on category + tool flag.
 
-**Ref mode** (long processes):
-```xml
-<spec-entry roles="implement" keywords="deploy,pipeline" date="YYYY-MM-DD"
-  ref="knowhow/RCP-deploy-flow.md">
-### Deploy Flow
-Standard deployment process. See referenced document.
-</spec-entry>
+**Knowhow format**:
+```yaml
+---
+title: Tool Name
+type: recipe
+category: coding
+summary: "Use when <timing>. <scope description>"
+tags: [testing, api]
+tool: true
+---
+Step content...
 ```
 </context>
 
@@ -66,19 +64,19 @@ Parse $ARGUMENTS to determine mode:
 - If unclear, ask user with AskUserQuestion
 
 **Optimize mode**:
-- Load existing tool: `maestro spec load --role implement --keyword <name>`
+- Load existing tool: `maestro spec load --category coding --keyword <name>`
 - Analyze improvement points (step splitting, prerequisites, error handling)
 
 **For all modes** — identify the usage timing: when should an agent or user invoke this tool? This becomes the first line of the entry description (see Step 5).
 
-### Step 3: Determine Roles
+### Step 3: Determine Category
 
-Infer applicable roles from context, or ask user:
-- implement — execution tools (build, deploy, integrate)
+Infer applicable category from context, or ask user:
+- coding — execution tools (build, deploy, integrate)
 - test — testing tools (test flows, verification steps)
 - review — review tools (checklists, audit standards)
-- plan — planning tools (design flows, analysis steps)
-- analyze — analysis tools (diagnostic flows, investigation steps)
+- arch — planning tools (design flows, analysis steps)
+- debug — analysis tools (diagnostic flows, investigation steps)
 
 ### Step 4: Decide Inline vs Ref
 
@@ -98,32 +96,39 @@ Use when {timing/trigger condition}.
 ```
 
 **Inline mode**:
-```bash
-maestro spec add tools "<title>" "Use when <timing>.\n\n1. <step1>\n2. <step2>" --roles "<csv>" --keywords "<csv>"
-```
-
-**Ref mode**:
-1. Generate knowhow detail document (RCP- or DOC- prefix). YAML frontmatter must include `summary` with usage timing — this is what `wiki list` and wiki-role-loader show to agents:
+Create a knowhow document in `knowhow/` with `tool: true` frontmatter:
 ```yaml
 ---
 title: <Title>
 type: recipe
-category: recipe
+category: <category>
 summary: "Use when <timing>. <scope description>"
 tags: [<keywords>]
-roles: [<roles>]
+tool: true
 ---
+Use when <timing>.
+
+1. <step1>
+2. <step2>
 ```
-2. Register spec index entry — description must also include usage timing within 200 chars (this is what `spec load` shows):
-```bash
-maestro spec add tools "<title>" "Use when <timing>. <scope summary>" --roles "<csv>" --keywords "<csv>" \
-  --ref "knowhow/RCP-<slug>.md" --knowhow-type recipe
+
+**Ref mode**:
+1. Generate knowhow detail document (RCP- or DOC- prefix). YAML frontmatter must include `summary` with usage timing and `tool: true`:
+```yaml
+---
+title: <Title>
+type: recipe
+category: <category>
+summary: "Use when <timing>. <scope description>"
+tags: [<keywords>]
+tool: true
+---
 ```
 
 ### Step 6: Verify
 
-- `maestro spec load --role <role> --keyword <keyword>` to confirm loadable
-- Display result: title, roles, keywords, storage location
+- `maestro spec load --category <category> --keyword <keyword>` to confirm loadable
+- Display result: title, category, keywords, storage location
 
 </execution>
 
@@ -132,13 +137,13 @@ maestro spec add tools "<title>" "Use when <timing>. <scope summary>" --roles "<
 |------|----------|-------------|
 | E001 | fatal | `.workflow/specs/` does not exist — run `maestro spec init` |
 | E002 | warning | Duplicate tool name detected — confirm overwrite/optimize |
-| E003 | fatal | roles parameter empty — tools must declare applicable roles |
+| E003 | fatal | category parameter empty — tools must declare applicable category |
 </error_codes>
 
 <success_criteria>
-- [ ] Tool definition written to tools.md (or ref to knowhow)
-- [ ] roles attribute correctly set
+- [ ] Tool registered as knowhow document with `tool: true` frontmatter
+- [ ] category attribute correctly set
 - [ ] keywords auto-extracted (3-5 terms)
-- [ ] Loadable via `spec load --role <role>`
+- [ ] Loadable via `spec load --category <category>`
 - [ ] Long processes use ref mode with knowhow file created
 </success_criteria>

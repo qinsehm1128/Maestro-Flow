@@ -1,9 +1,9 @@
 /**
- * Spec Loader (simplified)
+ * Spec Loader
  *
- * Filename-based category routing. No frontmatter dependency.
+ * Category-based loading with keyword cross-matching and knowhow tool discovery.
  * Reads .workflow/specs/*.md, filters by category via static mapping,
- * returns concatenated content.
+ * discovers knowhow tools with matching category, returns concatenated content.
  */
 
 import { readFileSync, existsSync, readdirSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -15,7 +15,7 @@ import { paths } from '../config/paths.js';
 // Types
 // ============================================================================
 
-export type SpecCategory = 'coding' | 'arch' | 'quality' | 'debug' | 'test' | 'review' | 'learning' | 'tools';
+export type SpecCategory = 'coding' | 'arch' | 'debug' | 'test' | 'review' | 'learning';
 
 export type SpecScope = 'project' | 'global' | 'team' | 'personal';
 
@@ -32,24 +32,10 @@ export interface SpecLoadResult {
 export const CATEGORY_MAP: Record<string, SpecCategory> = {
   'coding-conventions.md':      'coding',
   'architecture-constraints.md': 'arch',
-  'quality-rules.md':           'quality',
   'debug-notes.md':             'debug',
   'test-conventions.md':        'test',
   'review-standards.md':        'review',
   'learnings.md':               'learning',
-  'tools.md':                   'tools',
-};
-
-/** File → primary role mapping. Used by --role loading to identify main docs. */
-export const FILE_ROLE_MAP: Record<string, string> = {
-  'coding-conventions.md':       'implement',
-  'architecture-constraints.md': 'plan',
-  'test-conventions.md':         'test',
-  'review-standards.md':         'review',
-  'debug-notes.md':              'analyze',
-  'quality-rules.md':            'review',
-  'learnings.md':                'implement',
-  'tools.md':                    '',  // no primary role — per-entry roles
 };
 
 const SPECS_DIR = '.workflow/specs';
@@ -114,7 +100,7 @@ export interface LoadSpecsOptions {
   globalDir?: string;
 }
 
-export function loadSpecs(projectPath: string, category?: SpecCategory, uid?: string, keyword?: string, scope?: SpecScope, options?: LoadSpecsOptions & { role?: string }): SpecLoadResult {
+export function loadSpecs(projectPath: string, category?: SpecCategory, uid?: string, keyword?: string, scope?: SpecScope, options?: LoadSpecsOptions): SpecLoadResult {
   const globalDir = options?.globalDir ?? paths.specs;
 
   // Build ordered list of (directory, label) pairs to scan
@@ -125,12 +111,10 @@ export function loadSpecs(projectPath: string, category?: SpecCategory, uid?: st
   autoInitSeeds(join(projectPath, SPECS_DIR));
   autoInitSeeds(globalDir);
 
-  const role = options?.role;
-
   // First pass: collect results per layer (skip empty)
   const layerResults: Array<{ label: string; sections: string[]; matched: string[] }> = [];
   for (const { dir, label } of layers) {
-    const { sections, matched } = loadFromDir(dir, category, keyword, role);
+    const { sections, matched } = loadFromDir(dir, category, keyword);
     if (sections.length > 0) {
       layerResults.push({ label, sections, matched });
     }
@@ -151,6 +135,15 @@ export function loadSpecs(projectPath: string, category?: SpecCategory, uid?: st
     }
     allMatched.push(...matched);
     totalCount += matched.length;
+  }
+
+  // Tool discovery: scan knowhow/ for documents matching category + tool: true
+  if (category) {
+    const toolSection = discoverKnowhowTools(join(projectPath, '.workflow'), category);
+    if (toolSection) {
+      allSections.push(toolSection.content);
+      totalCount += toolSection.count;
+    }
   }
 
   return {
@@ -200,15 +193,14 @@ function buildLayers(projectPath: string, uid?: string, scope?: SpecScope, globa
  * Load spec files from a single directory. Returns empty arrays if the
  * directory does not exist or is unreadable.
  *
- * When `role` is provided:
- * - Primary role docs (FILE_ROLE_MAP match) are loaded in full
- * - Other files: only entries with matching roles attr are included
+ * When `category` is provided:
+ * - Primary category doc is loaded in full
+ * - Other files: only entries with matching keywords are included (cross-category)
  */
 function loadFromDir(
   specsDir: string,
   category?: SpecCategory,
   keyword?: string,
-  role?: string,
 ): { sections: string[]; matched: string[] } {
   if (!existsSync(specsDir)) return { sections: [], matched: [] };
 
@@ -223,7 +215,7 @@ function loadFromDir(
   const matched: string[] = [];
 
   for (const file of files) {
-    if (!shouldInclude(file, category, role)) continue;
+    if (!shouldInclude(file, category)) continue;
 
     const filePath = join(specsDir, file);
     let raw: string;
@@ -236,12 +228,12 @@ function loadFromDir(
     const body = stripFrontmatter(raw).trim();
     if (!body) continue;
 
-    // Determine load mode for this file
-    const fileRole = FILE_ROLE_MAP[file];
-    const isFullLoad = role && fileRole === role;
+    // Primary category doc → full load; other files → keyword-filtered only
+    const fileCategory = CATEGORY_MAP[file];
+    const isPrimaryDoc = category && fileCategory === category;
 
     const workflowRoot = join(specsDir, '..');
-    const formatted = formatFileContent(body, keyword, isFullLoad ? undefined : role, workflowRoot);
+    const formatted = formatFileContent(body, keyword, isPrimaryDoc ? undefined : category, workflowRoot);
     if (formatted) {
       sections.push(formatted);
       matched.push(file);
@@ -255,50 +247,49 @@ function loadFromDir(
 // Internal
 // ============================================================================
 
-function shouldInclude(filename: string, category?: SpecCategory, role?: string): boolean {
-  // Category filter takes precedence
-  if (category) {
-    const cat = CATEGORY_MAP[filename];
-    return cat ? cat === category : false;
-  }
+function shouldInclude(filename: string, category?: SpecCategory): boolean {
+  if (!category) return true; // No filter → load all
 
-  // Role filter: include primary role docs + all other files (for entry-level filtering)
-  if (role) {
-    const fileRole = FILE_ROLE_MAP[filename];
-    // Primary doc for this role → always include (full load)
-    if (fileRole === role) return true;
-    // Files with no role mapping or different primary role → include for entry-level filtering
-    return true;
-  }
+  // Category filter: include primary doc + all other files (for keyword cross-matching)
+  const cat = CATEGORY_MAP[filename];
+  if (!cat) return false; // Unknown file
 
-  // No filter → load all
+  // Primary category doc → always include (full load)
+  if (cat === category) return true;
+
+  // Other category files → include for keyword-based cross-category matching
   return true;
 }
 
 /**
  * Parse file body, strip <spec-entry> tags, format clean output with metadata.
  * When keyword is provided, only return matching entries.
- * When role is provided, only return entries with matching roles attribute.
+ * When crossCategory is provided, only return entries whose keywords overlap
+ * (cross-category matching for non-primary docs).
  * Falls back to raw body for files with no structured entries.
  */
-function formatFileContent(body: string, keyword?: string, role?: string, workflowRoot?: string): string | null {
+function formatFileContent(body: string, keyword?: string, crossCategory?: SpecCategory, workflowRoot?: string): string | null {
   const { entries, legacy } = parseSpecEntries(body);
 
   // No structured entries → pass through raw body (or keyword-grep it)
   if (entries.length === 0 && legacy.length === 0) {
-    // Role filtering: non-primary docs with no structured entries are skipped
-    if (role) return null;
+    // Cross-category mode: non-primary docs with no structured entries are skipped
+    if (crossCategory) return null;
     if (keyword) {
       return body.toLowerCase().includes(keyword.toLowerCase()) ? body : null;
     }
     return body;
   }
 
-  // Apply role filter at entry level
+  // In cross-category mode: only show entries that have keyword overlap
   let filteredEntries = entries;
-  if (role) {
-    filteredEntries = entries.filter(e => e.roles.includes(role));
+  if (crossCategory && keyword) {
+    const kw = keyword.toLowerCase();
+    filteredEntries = entries.filter(e => e.keywords.includes(kw));
     if (filteredEntries.length === 0) return null;
+  } else if (crossCategory) {
+    // Cross-category without keyword → skip (no way to match)
+    return null;
   }
 
   const parts: string[] = [];
@@ -313,7 +304,7 @@ function formatFileContent(body: string, keyword?: string, role?: string, workfl
     const matchedRef = refEntries.filter(e => e.keywords.includes(kw));
     if (matchedRegular.length > 0) parts.push(formatSpecEntries(matchedRegular));
     if (matchedRef.length > 0) parts.push(matchedRef.map(e => formatRefEntry(e, workflowRoot)).join('\n\n---\n\n'));
-    if (!role) {
+    if (!crossCategory) {
       for (const leg of legacy) {
         if (leg.content.toLowerCase().includes(kw)) parts.push(leg.content);
       }
@@ -321,7 +312,7 @@ function formatFileContent(body: string, keyword?: string, role?: string, workfl
   } else {
     if (regularEntries.length > 0) parts.push(formatSpecEntries(regularEntries));
     if (refEntries.length > 0) parts.push(refEntries.map(e => formatRefEntry(e, workflowRoot)).join('\n\n---\n\n'));
-    if (!role) {
+    if (!crossCategory) {
       for (const leg of legacy) parts.push(leg.content);
     }
   }
@@ -375,6 +366,64 @@ function resolveRefSummary(ref: string | undefined, workflowRoot: string | undef
   }
 }
 
+/**
+ * Scan knowhow/ for documents matching category + tool: true in YAML frontmatter.
+ * Returns a formatted section with tool summaries and load commands.
+ */
+function discoverKnowhowTools(workflowRoot: string, category: SpecCategory): { content: string; count: number } | null {
+  const knowhowDir = join(workflowRoot, 'knowhow');
+  if (!existsSync(knowhowDir)) return null;
+
+  let files: string[];
+  try {
+    files = readdirSync(knowhowDir).filter(f => f.endsWith('.md'));
+  } catch {
+    return null;
+  }
+
+  const tools: Array<{ title: string; summary: string; id: string }> = [];
+
+  for (const file of files) {
+    try {
+      const raw = readFileSync(join(knowhowDir, file), 'utf-8');
+      const fmMatch = raw.match(/^---\s*\n([\s\S]*?)\n---/);
+      if (!fmMatch) continue;
+
+      const fm = fmMatch[1];
+      // Check tool: true
+      if (!/^tool:\s*true\s*$/m.test(fm)) continue;
+      // Check category match
+      const catMatch = fm.match(/^category:\s*(.+)$/m);
+      if (!catMatch || catMatch[1].trim() !== category) continue;
+
+      const titleMatch = fm.match(/^title:\s*(.+)$/m);
+      const summaryMatch = fm.match(/^summary:\s*"?(.+?)"?\s*$/m);
+      const title = titleMatch ? titleMatch[1].trim() : file;
+
+      // Summary: YAML summary field, or first paragraph after frontmatter
+      let summary = summaryMatch ? summaryMatch[1].trim() : '';
+      if (!summary) {
+        const body = raw.slice(fmMatch[0].length + 1).trim();
+        summary = body.split('\n\n')[0].slice(0, 200).replace(/\s+/g, ' ');
+      }
+
+      const stem = file.replace(/\.md$/, '');
+      const slug = stem.replace(/^(KNW|TIP|TPL|RCP|REF|DCS|AST|BLP|DOC)-/i, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+      tools.push({ title, summary, id: `knowhow-${slug}` });
+    } catch {
+      continue;
+    }
+  }
+
+  if (tools.length === 0) return null;
+
+  const content = `## Available Tools (${category})\n\n` +
+    tools.map(t => `### ${t.title} (tool)\n\n${t.summary}\n\n→ Load: maestro wiki load ${t.id}`).join('\n\n---\n\n');
+
+  return { content, count: tools.length };
+}
+
 function stripFrontmatter(raw: string): string {
   const trimmed = raw.trimStart();
   if (!trimmed.startsWith('---')) return raw;
@@ -395,7 +444,6 @@ const AUTO_INIT_SEEDS: Array<[string, string]> = [
   ['coding-conventions.md', '# Coding Conventions\n\n## Entries\n\n'],
   ['architecture-constraints.md', '# Architecture Constraints\n\n## Entries\n\n'],
   ['learnings.md', '# Learnings\n\n## Entries\n\n'],
-  ['quality-rules.md', '# Quality Rules\n\n## Entries\n\n'],
   ['debug-notes.md', '# Debug Notes\n\n## Entries\n\n'],
   ['test-conventions.md', '# Test Conventions\n\n## Entries\n\n'],
   ['review-standards.md', '# Review Standards\n\n## Entries\n\n'],

@@ -226,11 +226,11 @@ describe('evaluateSpecInjection — config override', () => {
 // Wiki role loading integration
 // ---------------------------------------------------------------------------
 
-describe('evaluateSpecInjection — wiki role loading', () => {
+describe('evaluateSpecInjection — wiki category loading', () => {
   it('includes wiki knowledge when wiki-index.json exists', () => {
     writeFileSync(join(testDir, '.workflow', 'wiki-index.json'), JSON.stringify({
       entries: [
-        { type: 'knowhow', title: 'Auth API Pattern', summary: 'JWT refresh design', roles: ['implement'], updated: '2026-05-01' },
+        { type: 'knowhow', title: 'Auth API Pattern', summary: 'JWT refresh design', category: 'coding', updated: '2026-05-01' },
       ],
     }), 'utf-8');
 
@@ -248,36 +248,36 @@ describe('evaluateSpecInjection — wiki role loading', () => {
     expect(result.content).not.toContain('Wiki Knowledge');
   });
 
-  it('maps code-developer to implement role for wiki', () => {
+  it('maps code-developer to coding category for wiki', () => {
     writeFileSync(join(testDir, '.workflow', 'wiki-index.json'), JSON.stringify({
       entries: [
-        { type: 'knowhow', title: 'Implement Pattern', summary: 'For implementers', roles: ['implement'], updated: '2026-05-01' },
-        { type: 'knowhow', title: 'Plan Pattern', summary: 'For planners', roles: ['plan'], updated: '2026-05-01' },
+        { type: 'knowhow', title: 'Coding Pattern', summary: 'For coders', category: 'coding', updated: '2026-05-01' },
+        { type: 'knowhow', title: 'Plan Pattern', summary: 'For planners', category: 'arch', updated: '2026-05-01' },
       ],
     }), 'utf-8');
 
     const result = evaluateSpecInjection('code-developer', testDir);
-    expect(result.content).toContain('Implement Pattern');
+    expect(result.content).toContain('Coding Pattern');
     expect(result.content).not.toContain('Plan Pattern');
   });
 
-  it('maps workflow-planner to plan role for wiki', () => {
+  it('maps workflow-planner to arch category for wiki', () => {
     writeFileSync(join(testDir, '.workflow', 'wiki-index.json'), JSON.stringify({
       entries: [
-        { type: 'knowhow', title: 'Plan Pattern', summary: 'For planners', roles: ['plan'], updated: '2026-05-01' },
-        { type: 'knowhow', title: 'Implement Pattern', summary: 'For implementers', roles: ['implement'], updated: '2026-05-01' },
+        { type: 'knowhow', title: 'Arch Pattern', summary: 'For planners', category: 'arch', updated: '2026-05-01' },
+        { type: 'knowhow', title: 'Coding Pattern', summary: 'For coders', category: 'coding', updated: '2026-05-01' },
       ],
     }), 'utf-8');
 
     const result = evaluateSpecInjection('workflow-planner', testDir);
-    expect(result.content).toContain('Plan Pattern');
-    expect(result.content).not.toContain('Implement Pattern');
+    expect(result.content).toContain('Arch Pattern');
+    expect(result.content).not.toContain('Coding Pattern');
   });
 
-  it('maps debug-explore-agent to analyze role for wiki', () => {
+  it('maps debug-explore-agent to debug category for wiki', () => {
     writeFileSync(join(testDir, '.workflow', 'wiki-index.json'), JSON.stringify({
       entries: [
-        { type: 'knowhow', title: 'Debug Insight', summary: 'Analysis pattern', roles: ['analyze'], updated: '2026-05-01' },
+        { type: 'knowhow', title: 'Debug Insight', summary: 'Debug pattern', category: 'debug', updated: '2026-05-01' },
       ],
     }), 'utf-8');
 

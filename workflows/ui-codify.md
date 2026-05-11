@@ -220,6 +220,6 @@ Open preview:
   file://{absolute_path}/preview.html
 
 Next steps:
-  maestro wiki list --role implement    # Browse by role
+  maestro wiki list --category coding    # Browse by category
   maestro spec load --keyword {package_name}    # Load related specs
 ```

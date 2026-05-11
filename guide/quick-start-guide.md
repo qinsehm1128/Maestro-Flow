@@ -302,7 +302,7 @@ maestro stop              # 停止服务
 | `maestro coordinate run "..." --chain default -y` | 图协调器 |
 | `maestro overlay list` | Overlay 管理 |
 | `maestro hooks status` | Hook 状态 |
-| `maestro spec load --role implement` | 加载规范 |
+| `maestro spec load --category coding` | 加载规范 |
 | `maestro view` | Dashboard 看板 |
 | `maestro launcher -w my-project` | Claude Code 启动器 |
 | `maestro knowhow search "auth"` | 搜索持久记忆 |

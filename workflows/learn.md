@@ -118,7 +118,7 @@ First match wins. If nothing matches, category = `technique`.
 
 ```
 entry = <spec-entry
-  roles="{role}"
+  category="{category}"
   keywords="{category},{parsed --keywords values joined by comma}"
   date="{YYYY-MM-DD}"
   id="INS-{hex}"

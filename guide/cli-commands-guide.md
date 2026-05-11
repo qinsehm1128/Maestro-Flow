@@ -284,7 +284,7 @@ maestro launcher scan ./configs         # 扫描配置文件
 
 ```bash
 maestro spec init                              # 初始化
-maestro spec load --role implement --keyword auth   # 加载
+maestro spec load --category coding --keyword auth   # 加载
 maestro spec list                              # 列出文件
 maestro spec status                            # 状态
 maestro spec add <category> "<title>" "<content>"    # 添加条目

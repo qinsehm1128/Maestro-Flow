@@ -1,21 +1,21 @@
 # Knowledge Management System Guide
 
-Maestro's knowledge management consists of **Spec** (coded constraints/tools) and **Wiki** (broad knowledge graph). Spec provides role-based project specifications, Wiki provides knowhow, design assets, and learning notes. Both layers are unified through `<entry>` tag format, WikiIndexer indexing, and role-based retrieval.
+Maestro's knowledge management consists of **Spec** (coded constraints/tools) and **Wiki** (broad knowledge graph). Spec provides category-based project specifications, Wiki provides knowhow, design assets, and learning notes. Both layers are unified through `<entry>` tag format, WikiIndexer indexing, and category-based retrieval.
 
 ## Table of Contents
 
 - [Spec System](#spec-system)
   - [Scope](#scope)
-  - [File → Role Mapping](#file--role-mapping)
+  - [File → Category Mapping](#file--category-mapping)
   - [Entry Format](#entry-format)
-  - [Tool Spec](#tool-spec)
+  - [Tool Discovery](#tool-discovery)
   - [Commands](#spec-commands)
   - [Progressive Fill](#progressive-fill)
   - [Auto-Init](#auto-init)
   - [Keyword System](#keyword-system)
 - [Wiki Knowledge Graph](#wiki-knowledge-graph)
   - [Knowhow System](#knowhow-system)
-  - [Role-Based Retrieval](#role-based-retrieval)
+  - [Category-Based Retrieval](#category-based-retrieval)
   - [Three-Layer Loading](#three-layer-loading)
   - [Wiki Commands](#wiki-commands)
 - [Unified Index & Injection](#unified-index--injection)
@@ -44,27 +44,33 @@ Spec supports 4 scopes via `--scope`:
 
 **Loading priority** (low → high): global → project → team → personal. Later layers append, never overwrite.
 
-### File → Role Mapping
+### File → Category Mapping
 
-Each spec file serves as the **primary document** for a role. `spec load --role` loads the primary file in full, plus cross-file entries tagged with that role.
+Each spec file is the **primary document** for a category. `spec load --category` loads the primary file in full, plus cross-file entries matched by keywords.
 
-| File | Primary Role | Purpose |
-|------|-------------|---------|
-| `coding-conventions.md` | implement | Naming, imports, formatting, coding patterns |
-| `architecture-constraints.md` | plan | Module structure, layer boundaries, arch decisions |
-| `quality-rules.md` | review | Quality rules, lint config, enforcement standards |
-| `debug-notes.md` | analyze | Debug tips, root cause records, known issues |
-| `test-conventions.md` | test | Test framework, patterns, coverage requirements |
-| `review-standards.md` | review | Review checklists, quality gates |
-| `learnings.md` | implement | Bugs, pitfalls, lessons learned |
-| `tools.md` | _(per-entry)_ | Reusable process/tool definitions |
+| File | Category | Implicit Role | Purpose |
+|------|----------|---------------|---------|
+| `coding-conventions.md` | coding | implement | Naming, imports, formatting, coding patterns |
+| `architecture-constraints.md` | arch | plan | Module structure, layer boundaries, arch decisions |
+| `review-standards.md` | review | review | Quality rules, review checklists, enforcement standards |
+| `debug-notes.md` | debug | analyze | Debug tips, root cause records, known issues |
+| `test-conventions.md` | test | test | Test framework, patterns, coverage requirements |
+| `learnings.md` | learning | implement | Bugs, pitfalls, lessons learned |
+
+**Category → implicit delegate role**: each category maps to a delegate system role. This mapping is internal — users only interact with `category`, the role resolution is transparent.
+
+```
+coding   → implement    arch     → plan
+review   → review       debug    → analyze
+test     → test         learning → implement
+```
 
 ### Entry Format
 
-All entries use `<spec-entry>` closed tags with **`roles`** as the primary attribute:
+All entries use `<spec-entry>` closed tags with **`category`** as a required single-value attribute:
 
 ```markdown
-<spec-entry roles="implement,test" keywords="auth,token,rotation" date="2026-04-21">
+<spec-entry category="coding" keywords="auth,token,rotation" date="2026-04-21">
 
 ### Token rotation needs email carried through refresh flow
 
@@ -75,27 +81,35 @@ Revoked column must be set rather than deleting tokens.
 
 | Attribute | Required | Format | Description |
 |-----------|----------|--------|-------------|
-| `roles` | Yes* | Comma-separated | Applicable agent roles (implement, plan, test, review, analyze, explore) |
-| `keywords` | Yes | Comma-separated, lowercase | Searchable keywords |
+| `category` | Yes | Single value | One of: coding, arch, review, debug, test, learning |
+| `keywords` | Yes | Comma-separated, lowercase | Searchable keywords for cross-category discovery |
 | `date` | Yes | `YYYY-MM-DD` | Creation date |
 | `source` | No | String | Origin (manual / agent / phase) |
 | `ref` | No | Path | Reference to knowhow detail document |
 
-*Backward compat: legacy `category` attribute is still parsed and auto-mapped to roles via `CATEGORY_ROLE_FALLBACK`. New entries must use `roles`.
+**Two dimensions, clear separation**:
+- `category` = **who is responsible** (determines file routing, agent injection)
+- `keywords` = **what it's about** (enables cross-category discovery)
 
-### Tool Spec
+### Tool Discovery
 
-Tool specs are reusable process/tool definitions stored in `tools.md`. They declare per-entry roles and can reference knowhow detail documents for long procedures.
+Tools are no longer registered in a dedicated `tools.md` file. Instead, any knowhow document can be marked as a tool via the `tool: true` YAML frontmatter field.
 
-**Entry description format**: First line after `### Title` states **when to use** this tool, followed by the steps or scope summary. For ref entries this line is critical — `spec load` only shows the first 200 chars after the heading.
-
-**Inline mode** (short process, <10 steps):
+**Knowhow as tool** (in `knowhow/` folder):
 ```markdown
-<spec-entry roles="implement,test" keywords="payment,gateway,idempotency" date="2026-05-10">
+---
+title: Payment Gateway Idempotency Verification
+type: recipe
+category: coding
+keywords: [payment, gateway, idempotency, testing]
+tool: true
+---
 
-### Payment Gateway Idempotency Verification
+## When to Use
 
 Use when testing payment integration endpoints for retry safety and webhook delivery guarantees.
+
+## Steps
 
 1. Generate idempotency key (UUID v4)
 2. Submit charge request with key
@@ -103,46 +117,34 @@ Use when testing payment integration endpoints for retry safety and webhook deli
 4. Submit different amount with same key — assert 409 conflict
 5. Verify gateway webhook delivers exactly once
 6. Assert ledger entry matches charge amount
+```
+
+**Spec ref entry** (optional — index pointer in `specs/` for discoverability):
+```markdown
+<spec-entry category="coding" keywords="payment,gateway,idempotency" date="2026-05-10"
+  ref="knowhow/RCP-payment-idempotency.md">
+
+### Payment Gateway Idempotency Verification
+
+Use when testing payment integration endpoints for retry safety and webhook delivery guarantees.
 
 </spec-entry>
 ```
 
-**Ref mode** (long process, >=10 steps or with code examples):
+**`spec load` display for ref entries** — summary + load command, not full content:
+```
+### Payment Gateway Idempotency Verification (tool)
 
-Spec index entry — description includes usage timing (shown by `spec load`, max 200 chars):
-```markdown
-<spec-entry roles="implement" keywords="oauth,pkce,token,exchange" date="2026-05-10"
-  ref="knowhow/RCP-oauth-pkce-flow.md">
+Use when testing payment integration endpoints for retry safety and webhook delivery guarantees.
 
-### OAuth PKCE Authorization Flow
-
-Use when implementing OAuth 2.0 login for public clients (SPA/mobile). Covers code_verifier generation, authorization redirect, token exchange, refresh rotation with CSRF validation.
-
-</spec-entry>
+→ Detail: maestro wiki load knowhow-payment-idempotency
 ```
 
-Referenced knowhow document — YAML `summary` includes usage timing (shown by `wiki list` and wiki-role-loader hook):
-```markdown
----
-title: OAuth PKCE Authorization Flow
-type: recipe
-summary: "Use when implementing OAuth 2.0 login for public clients (SPA/mobile). Complete PKCE flow with code_verifier, token exchange, refresh rotation."
-tags: [oauth, pkce, auth, token]
-roles: [implement]
----
+**Tool discovery flow**: `spec load --category coding` automatically scans `knowhow/` for documents with matching `category` + `tool: true`, and appends tool summaries to the output. No explicit registration required.
 
-## Prerequisites
-...
+**Registration**: `/maestro-tools-register` — codify reusable processes as knowhow tool documents. Creates a knowhow file with `tool: true` and optionally a spec ref entry for index discoverability.
 
-## Steps
-1. Generate code_verifier (43-128 chars, URL-safe random)
-2. Derive code_challenge = BASE64URL(SHA256(code_verifier))
-...
-```
-
-**Registration**: `/maestro-tools-register` — codify reusable processes as tool specs. Register during planning (standardize flows), after execution (capture validated procedures), before testing (register verification methods), or during retrospective/harvest (extract process knowledge). Registered entries are auto-discovered by agents via `spec load --role` and spec-injector.
-
-**Execution**: `/maestro-tools-execute` — load tool by name or role, execute step-by-step.
+**Execution**: `/maestro-tools-execute` — load tool by name or category from knowhow, execute step-by-step.
 
 ### Spec Commands
 
@@ -151,21 +153,20 @@ roles: [implement]
 maestro spec init [--scope <scope>] [--uid <uid>]
 
 # Add entry
-maestro spec add coding "Always use named exports" --roles "implement"
-maestro spec add tools "Test Flow" "Steps..." --roles "implement,test" --keywords "testing"
-maestro spec add tools "OAuth PKCE" "Summary" --roles "implement" --ref "knowhow/RCP-oauth.md"
-echo '{"category":"coding","title":"...","content":"...","roles":"implement"}' | maestro spec add --stdin
-maestro spec add coding "title" "content" --json   # JSON 格式输出
+maestro spec add coding "Always use named exports" --keywords "exports,naming"
+maestro spec add coding "OAuth PKCE" "Summary" --keywords "oauth,pkce" --ref "knowhow/RCP-oauth.md"
+echo '{"category":"coding","title":"...","content":"..."}' | maestro spec add --stdin
+maestro spec add coding "title" "content" --json   # JSON output
 
 # Load
-maestro spec load --role implement              # Primary doc + cross-file role entries
-maestro spec load --role implement --keyword auth
-maestro spec load --keyword auth                # Keyword-only filter across all files
-echo '{"role":"implement"}' | maestro spec load --stdin
+maestro spec load --category coding                 # Primary doc + cross-file keyword matches + tools
+maestro spec load --category coding --keyword auth  # With keyword filter
+maestro spec load --keyword auth                    # Keyword-only filter across all files
+echo '{"category":"coding"}' | maestro spec load --stdin
 
 # CLI equivalent
-maestro spec add <category> "<title>" "<content>" --roles r1,r2 --keywords kw1,kw2 [--uid <uid>]
-maestro spec load --role <role> [--keyword <word>] [--uid <uid>] --json
+maestro spec add <category> "<title>" "<content>" --keywords kw1,kw2 [--uid <uid>]
+maestro spec load --category <category> [--keyword <word>] [--uid <uid>] --json
 ```
 
 ### Progressive Fill
@@ -174,20 +175,21 @@ Specs are progressively enriched by pipeline phases:
 
 ```
 maestro-init       → spec-setup (skeleton + scan)
-maestro-analyze    → Locked decisions → plan, code patterns → implement
-maestro-plan       → Design conventions → implement/plan, test strategy → test
-maestro-execute    → Learnings → implement, root causes → analyze
+maestro-analyze    → Locked decisions → arch, code patterns → coding
+maestro-plan       → Design conventions → coding/arch, test strategy → test
+maestro-execute    → Learnings → learning, root causes → debug
 maestro-verify     → Quality findings → review
 ```
 
 ### Auto-Init
 
-`loadSpecs()` auto-detects and creates missing spec directories (with 8 seed files including `tools.md`), no manual init required.
+`loadSpecs()` auto-detects and creates missing spec directories (with 6 seed files), no manual init required.
 
 ### Keyword System
 
 - `spec add` auto-extracts 3-5 domain keywords
-- `spec load --keyword <kw>` matches `<spec-entry>` `keywords` attribute
+- `spec load --keyword <kw>` matches `<spec-entry>` `keywords` attribute across all category files
+- Keywords enable cross-category discovery: an entry in `test-conventions.md` with `keywords="auth,jwt"` is discoverable via `spec load --category coding --keyword auth`
 - Legacy heading entries fallback to text search
 
 ---
@@ -210,30 +212,50 @@ Knowhow is broad knowledge storage supporting multiple document types. All files
 | `BLP-` | blueprint | Architecture blueprints, system designs |
 | `DOC-` | document | Long-form specs/documents (general fallback) |
 
-#### Container Pattern (`<knowhow-entry>`)
-
-Similar to spec's `<spec-entry>`, knowhow files support container multi-entry mode:
-
-YAML frontmatter fields:
+#### YAML Frontmatter
 
 | Field | Required | Description |
 |-------|----------|-------------|
 | `title` | Yes | Document title |
 | `type` | Yes | Knowhow type (session, tip, template, recipe, etc.) |
-| `summary` | No | One-line description with usage timing. Shown by `wiki list` and wiki-role-loader. Falls back to first paragraph of body if absent. |
-| `tags` | No | Searchable keywords |
-| `roles` | No | Applicable agent roles |
+| `category` | No | Single-value category (coding, arch, review, debug, test, learning). Maps to delegate role for agent injection. |
+| `keywords` | No | Searchable keyword list. Used for cross-category discovery and wiki search. |
+| `tool` | No | `true` to mark this document as an executable tool. Discovered by `spec load` and `/maestro-tools-execute`. |
+| `summary` | No | One-line description with usage timing. Shown by `wiki list` and auto-injection. Falls back to first paragraph if absent. |
 | `created` | Auto | Creation timestamp |
 | Type-specific | No | `lang`, `source`, `status`, `assetType`, `codePaths` |
 
 ```markdown
 ---
-title: Session Compact 20260510
-type: session
-roles: [analyze, review]
+title: OAuth PKCE Authorization Flow
+type: recipe
+category: coding
+keywords: [oauth, pkce, auth, token]
+tool: true
+summary: "Use when implementing OAuth 2.0 login for public clients (SPA/mobile). Complete PKCE flow with code_verifier, token exchange, refresh rotation."
 ---
 
-<knowhow-entry keywords="pattern,auth,jwt" date="2026-05-10" roles="implement">
+## Prerequisites
+...
+
+## Steps
+1. Generate code_verifier (43-128 chars, URL-safe random)
+2. Derive code_challenge = BASE64URL(SHA256(code_verifier))
+...
+```
+
+#### Container Pattern (`<knowhow-entry>`)
+
+Knowhow files support container multi-entry mode:
+
+```markdown
+---
+title: Session Compact 20260510
+type: session
+category: debug
+---
+
+<knowhow-entry keywords="pattern,auth,jwt" date="2026-05-10" category="coding">
 
 ### JWT Refresh Token Rotation
 
@@ -242,7 +264,7 @@ Always rotate refresh tokens on use to prevent replay attacks.
 </knowhow-entry>
 ```
 
-Each `<knowhow-entry>` is parsed by WikiIndexer as an independent WikiEntry sub-node.
+Each `<knowhow-entry>` is parsed by WikiIndexer as an independent WikiEntry sub-node. Sub-entries inherit container's `category`. Entry-level `category` overrides container when present.
 
 #### Code Asset Association (codePaths)
 
@@ -253,11 +275,11 @@ Code asset documents (AST-/BLP-) associate source code via frontmatter `codePath
 title: Auth API Contract
 type: asset
 assetType: api-contract
+category: coding
+keywords: [auth, api, jwt]
 codePaths:
   - src/api/auth/
   - src/types/auth.ts
-roles: [implement, review]
-tags: [auth, api, jwt]
 ---
 ```
 
@@ -267,7 +289,7 @@ Spec is the index/rule layer, Knowhow is the detail layer. When a topic is too c
 
 ```markdown
 <!-- Inline mode (short insight) -->
-<spec-entry roles="implement" keywords="auth,jwt" date="2026-05-10">
+<spec-entry category="coding" keywords="auth,jwt" date="2026-05-10">
 
 ### JWT Token Rotation
 
@@ -276,7 +298,7 @@ Always rotate refresh tokens on use.
 </spec-entry>
 
 <!-- Ref mode (complex topic → knowhow detail) -->
-<spec-entry roles="implement" keywords="oauth,pkce" date="2026-05-10"
+<spec-entry category="coding" keywords="oauth,pkce" date="2026-05-10"
   ref="knowhow/RCP-oauth-flow.md">
 
 ### OAuth 2.0 Integration
@@ -291,12 +313,12 @@ Complete OAuth PKCE flow design. See referenced document.
 Inline entry (full content):
 ```
 ### JWT Token Rotation
-> implement · auth, jwt · 2026-05-10
+> coding · auth, jwt · 2026-05-10
 
 Always rotate refresh tokens on use.
 ```
 
-Ref entry (summary from YAML `summary` field or first 200 chars + load command):
+Ref entry (summary + load command):
 ```
 ### OAuth 2.0 Integration
 
@@ -310,36 +332,44 @@ Use when implementing OAuth 2.0 login for public clients. Complete PKCE flow des
 - **Knowhow** (`knowhow/`) = detail docs. Full documents, loaded on demand
 - **ref** = bridge from index entry to detail doc
 
-### Role-Based Retrieval
+### Category-Based Retrieval
 
-Wiki entries support `roles` annotation, aligned with the 7 delegate system roles:
+Wiki entries support `category` annotation, aligned with the 6 spec categories:
 
 ```
-analyze | explore | review | implement | plan | brainstorm | research
+coding | arch | review | debug | test | learning
 ```
 
-Declared via frontmatter `roles: [analyze, review]` or entry-level `roles` attribute.
+Each category implicitly maps to a delegate role for agent auto-injection.
+
+Declared via frontmatter `category: coding` or entry-level `category` attribute.
 
 ```bash
-# Browse knowledge index by role
-maestro wiki list --role analyze
+# Browse knowledge index by category
+maestro wiki list --category coding
+
+# Filter by keyword
+maestro wiki list --keyword auth
+
+# List all tools
+maestro wiki list --tool
 
 # Load selected documents
 maestro wiki load knowhow-auth-api spec:project:arch-001
 ```
 
-Sub-entries inherit container's roles. Entry-level roles override container roles when present.
+Sub-entries inherit container's category. Entry-level category overrides container when present.
 
 ### Three-Layer Loading
 
 | Layer | Command | Depth | Use |
 |-------|---------|-------|-----|
-| Index browse | `maestro wiki list --role <role>` | id + title | Browse, decide what to load |
+| Index browse | `maestro wiki list --category <cat>` | id + title | Browse, decide what to load |
 | Precise load | `maestro wiki load <id1> [id2...]` | Full body | Load selected docs by ID |
-| Hook auto-inject | `loadWikiByRole()` | title + summary | Lightweight context injection (sync) |
+| Hook auto-inject | `loadWikiByCategory()` | title + summary | Lightweight context injection (sync) |
 
 **Usage flow** (commands/agents):
-1. `maestro wiki list --role analyze` → browse role-relevant doc index
+1. `maestro wiki list --category debug` → browse category-relevant doc index
 2. Analyze index, identify task-relevant entries
 3. `maestro wiki load <id1> <id2>` → load selected full docs
 4. Review loaded knowledge, then execute
@@ -348,7 +378,7 @@ Sub-entries inherit container's roles. Entry-level roles override container role
 
 ```bash
 # Entry management
-maestro wiki list [--type <type>] [--role <role>] [-q <query>]
+maestro wiki list [--type <type>] [--category <cat>] [--keyword <kw>] [--tool] [-q <query>]
 maestro wiki load <id1> [id2...] [--json]
 maestro wiki get <id>
 maestro wiki search <query>
@@ -380,26 +410,26 @@ WikiIndexer parses `<spec-entry>` and `<knowhow-entry>` into independent WikiEnt
 ```
 Container file                      WikiEntry nodes
 ┌───────────────────┐        ┌──────────────────────────┐
-│ specs/tools.md    │   ──>  │ spec:project:tools       │ (container)
-│   <spec-entry>    │   ──>  │ spec:project:tools-001   │ (sub-node, parent=container)
-│   <spec-entry>    │   ──>  │ spec:project:tools-002   │
+│ specs/coding-     │   ──>  │ spec:project:coding      │ (container)
+│   <spec-entry>    │   ──>  │ spec:project:coding-001  │ (sub-node, parent=container)
+│   <spec-entry>    │   ──>  │ spec:project:coding-002  │
 └───────────────────┘        └──────────────────────────┘
 ```
 
-Sub-nodes inherit container's `roles`, `createdBy`, `sourceRef`. Entry-level `roles` override container roles. Keywords bubble up to container frontmatter.
+Sub-nodes inherit container's `category`, `createdBy`, `sourceRef`. Entry-level `category` overrides container. Keywords bubble up to container frontmatter.
 
 ### Write Path
 
 Spec and Knowhow share unified WikiWriter write path:
 
 ```
-/spec-add tools "..."            ──┐
-maestro wiki append spec-...     ──┤──> WikiWriter.appendEntry()
-maestro wiki append knowhow-...  ──┘     │
-                                         ├── Detect container type → <spec-entry> or <knowhow-entry>
-                                         ├── Append entry block
-                                         ├── Bubble keywords to frontmatter
-                                         └── Refresh WikiIndex
+/spec-add coding "..."              ──┐
+maestro wiki append spec-...        ──┤──> WikiWriter.appendEntry()
+maestro wiki append knowhow-...     ──┘     │
+                                            ├── Detect container type → <spec-entry> or <knowhow-entry>
+                                            ├── Append entry block
+                                            ├── Bubble keywords to frontmatter
+                                            └── Refresh WikiIndex
 ```
 
 ### Write Protection
@@ -415,26 +445,40 @@ maestro wiki append knowhow-...  ──┘     │
 
 ### Auto-Injection
 
-#### Spec Injection (by role)
+#### Spec Injection (by category)
 
-`spec-injector` hook at `PreToolUse:Agent` auto-injects specs based on agent role:
+`spec-injector` hook at `PreToolUse:Agent` auto-injects specs based on agent type → category mapping:
 
-| Agent Type | Role | Loaded Content |
-|-----------|------|---------------|
-| code-developer, tdd-developer | implement | Primary doc + cross-file implement entries |
-| workflow-planner | plan | Primary doc + cross-file plan entries |
-| workflow-reviewer | review | Primary doc + cross-file review entries |
-| debug-explore-agent | analyze | Primary doc + cross-file analyze entries |
+```typescript
+const AGENT_CATEGORY_MAP: Record<string, string[]> = {
+  'code-developer':        ['coding', 'learning'],
+  'tdd-developer':         ['coding', 'test'],
+  'workflow-executor':     ['coding'],
+  'universal-executor':    ['coding'],
+  'test-fix-agent':        ['coding', 'test'],
+  'cli-lite-planning-agent': ['arch'],
+  'action-planning-agent':   ['arch'],
+  'workflow-planner':        ['arch'],
+  'workflow-reviewer':     ['review'],
+  'debug-explore-agent':   ['debug'],
+  'workflow-debugger':     ['debug'],
+};
+```
 
-#### Wiki Injection (by role)
+For each mapped category:
+1. Load primary spec file in full
+2. Load cross-file entries with matching keywords
+3. Discover knowhow tools with matching category
 
-`spec-injector` simultaneously loads role-relevant wiki knowledge (title + summary) from `wiki-index.json`.
+#### Wiki Injection (by category)
+
+`spec-injector` simultaneously loads category-relevant wiki knowledge (title + summary) from `wiki-index.json`.
 
 Both layers merged and controlled by context budget (full/reduced/minimal/skip).
 
 #### Keyword Injection
 
-`keyword-spec-injector` at `UserPromptSubmit` extracts keywords from prompt, matches spec entries (max 5 per trigger, session-deduped).
+`keyword-spec-injector` at `UserPromptSubmit` extracts keywords from prompt, matches spec entries across all category files (max 5 per trigger, session-deduped).
 
 ### Session Dedup
 
@@ -454,18 +498,16 @@ Both layers merged and controlled by context budget (full/reduced/minimal/skip).
 
 .workflow/
 ├── specs/                              # scope: project
-│   ├── coding-conventions.md           # role: implement
-│   ├── architecture-constraints.md     # role: plan
-│   ├── quality-rules.md               # role: review
-│   ├── debug-notes.md                 # role: analyze
-│   ├── test-conventions.md            # role: test
-│   ├── review-standards.md            # role: review
-│   ├── learnings.md                   # role: implement
-│   └── tools.md                       # role: per-entry
+│   ├── coding-conventions.md           # category: coding
+│   ├── architecture-constraints.md     # category: arch
+│   ├── review-standards.md             # category: review
+│   ├── debug-notes.md                  # category: debug
+│   ├── test-conventions.md             # category: test
+│   └── learnings.md                    # category: learning
 ├── knowhow/                            # Broad knowledge (unified markdown)
 │   ├── KNW-20260427-1912.md            # Session records
 │   ├── TPL-20260427-1913.md            # Templates
-│   ├── RCP-20260428-0900.md            # Recipes / tool procedures
+│   ├── RCP-20260428-0900.md            # Recipes / tool procedures (tool: true)
 │   ├── REF-20260428-1000.md            # References
 │   ├── DCS-20260429-1100.md            # Decisions
 │   ├── TIP-20260429-1200.md            # Tips
@@ -489,18 +531,18 @@ Both layers merged and controlled by context budget (full/reduced/minimal/skip).
 ```bash
 # ── Spec ────────────────────────────────────────────────────────
 maestro spec init [--scope <scope>] [--uid <uid>]
-maestro spec load [--role <role>] [--keyword <kw>] [--scope <scope>] [--json] [--uid <uid>] [--stdin]
-maestro spec add <category> "<title>" "<content>" [--roles r1,r2] [--keywords kw1,kw2] [--source <src>] [--ref <path>] [--knowhow-type <type>] [--uid <uid>] [--stdin] [--json]
+maestro spec load [--category <cat>] [--keyword <kw>] [--scope <scope>] [--json] [--uid <uid>] [--stdin]
+maestro spec add <category> "<title>" "<content>" [--keywords kw1,kw2] [--source <src>] [--ref <path>] [--knowhow-type <type>] [--uid <uid>] [--stdin] [--json]
 maestro spec list [--scope <scope>] [--uid <uid>]
-maestro spec ls [--scope <scope>] [--uid <uid>]               # list 别名
+maestro spec ls [--scope <scope>] [--uid <uid>]               # list alias
 maestro spec status [--scope <scope>] [--uid <uid>]
 
-# ── Tool Spec (via spec system) ───────────────────────────────
-/maestro-tools-register "<description>"          # Extract, generate, or optimize tool definitions
-/maestro-tools-execute "<name>" | --role <role>   # Load and execute tool step-by-step
+# ── Tool Discovery (via knowhow) ────────────────────────────────
+/maestro-tools-register "<description>"          # Create knowhow doc with tool: true
+/maestro-tools-execute "<name>" | --category <cat>  # Load and execute tool step-by-step
 
 # ── Wiki Retrieval ────────────────────────────────────────────
-maestro wiki list [--type <type>] [--role <role>] [--tag <tag>] [-q <query>] [--group] [--json]
+maestro wiki list [--type <type>] [--category <cat>] [--keyword <kw>] [--tool] [-q <query>] [--group] [--json]
 maestro wiki load <id1> [id2...] [--json]
 maestro wiki get <id> [--json]
 maestro wiki search <query> [--json]
@@ -521,7 +563,7 @@ maestro wiki backlinks <id>
 maestro wiki forward <id>
 
 # ── Knowhow ──────────────────────────────────────────────────
-maestro knowhow add --type <type> --title <title> --body <text> [--tags <csv>]
+maestro knowhow add --type <type> --title <title> --body <text> [--keywords <csv>]
 maestro knowhow add --type asset --asset-type <type> --code-paths <paths>
 maestro knowhow list [--type <type>] [--json]
 maestro knowhow search <query> [--json]

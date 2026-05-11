@@ -51,7 +51,7 @@ export function registerKnowhowCommand(program: Command): void {
     .requiredOption('--title <title>', 'Entry title')
     .requiredOption('--body <text>', 'Entry body (markdown)')
     .option('--body-file <path>', 'Read body from file')
-    .option('--tags <csv>', 'Comma-separated tags')
+    .option('--keywords <csv>', 'Comma-separated keywords')
     .option('--lang <lang>', '[template] Programming language')
     .option('--source <url>', '[reference] Original URL')
     .option('--status <status>', '[decision] proposed|accepted|superseded')
@@ -87,7 +87,7 @@ export function registerKnowhowCommand(program: Command): void {
       }
 
       const body = opts.bodyFile ? readFileSync(opts.bodyFile, 'utf-8') : opts.body;
-      const tags = opts.tags ? opts.tags.split(',').map((s: string) => s.trim()).filter(Boolean) : [];
+      const tags = opts.keywords ? opts.keywords.split(',').map((s: string) => s.trim()).filter(Boolean) : [];
 
       const dir = getKnowhowDir();
       if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
@@ -99,9 +99,9 @@ export function registerKnowhowCommand(program: Command): void {
       const filename = `${prefix}-${ts}.md`;
 
       const { writeFileSync } = await import('node:fs');
-      const fmLines = ['---', `title: ${opts.title}`, `type: ${type}`, `category: ${type}`, `created: ${now.toISOString()}`];
+      const fmLines = ['---', `title: ${opts.title}`, `type: ${type}`, `created: ${now.toISOString()}`];
       if (tags.length > 0) {
-        fmLines.push('tags:');
+        fmLines.push('keywords:');
         for (const t of tags) fmLines.push(`  - ${t}`);
       }
       if (opts.lang) fmLines.push(`lang: ${opts.lang}`);

@@ -53,12 +53,11 @@ export function registerWikiCommand(program: Command): void {
     .description('List wiki entries with optional filters')
     .option('--type <type>', 'Filter by type: project|roadmap|spec|issue|lesson|memory|note')
     .option('--scope <scope>', 'Filter by spec scope: project|global|team|personal')
-    .option('--tag <tag>', 'Filter by tag')
     .option('--status <status>', 'Filter by status')
-    .option('--category <cat>', 'Filter by category (deprecated, use --keyword)')
-    .option('--keyword <word>', 'Filter by keyword (alternative to --category)')
+    .option('--category <cat>', 'Filter by category: coding|arch|debug|test|review|learning')
+    .option('--keyword <word>', 'Filter by keyword')
+    .option('--tool', 'Filter tool documents only')
     .option('--created-by <cmd>', 'Filter by creating command/skill')
-    .option('--role <role>', 'Filter by role: analyze|explore|review|implement|plan|brainstorm|research')
     .option('-q, --query <q>', 'BM25 full-text query')
     .option('--group', 'Return results grouped by type')
     .option('--json', 'Output as JSON')
@@ -70,12 +69,10 @@ export function registerWikiCommand(program: Command): void {
         const qs = new URLSearchParams();
         if (opts.type) qs.set('type', opts.type);
         if (opts.scope) qs.set('scope', opts.scope);
-        if (opts.tag) qs.set('tag', opts.tag);
         if (opts.status) qs.set('status', opts.status);
-        if (opts.keyword) qs.set('category', opts.keyword);
-        else if (opts.category) qs.set('category', opts.category);
+        if (opts.category) qs.set('category', opts.category);
+        if (opts.keyword) qs.set('tag', opts.keyword);
         if (opts.createdBy) qs.set('createdBy', opts.createdBy);
-        if (opts.role) qs.set('role', opts.role);
         if (opts.query) qs.set('q', opts.query);
         if (opts.group) qs.set('group', 'true');
         const data = await apiGet(base, `/api/wiki?${qs.toString()}`);
@@ -103,12 +100,10 @@ export function registerWikiCommand(program: Command): void {
       const filters: WikiFilters & { scope?: WikiScope } = {};
       if (opts.type) filters.type = opts.type as WikiNodeType;
       if (opts.scope) filters.scope = opts.scope as WikiScope;
-      if (opts.tag) filters.tag = opts.tag;
       if (opts.status) filters.status = opts.status;
-      if (opts.keyword) filters.category = opts.keyword;
-      else if (opts.category) filters.category = opts.category;
+      if (opts.category) filters.category = opts.category;
+      if (opts.keyword) filters.tag = opts.keyword;
       if (opts.createdBy) filters.createdBy = opts.createdBy;
-      if (opts.role) filters.role = opts.role;
       if (opts.query) filters.q = opts.query;
 
       if (opts.group) {
@@ -191,7 +186,7 @@ export function registerWikiCommand(program: Command): void {
   // ── load ──────────────────────────────────────────────────────────────
   wiki
     .command('load <ids...>')
-    .description('Load specific wiki documents by ID array — use after "wiki list --role" to select relevant docs')
+    .description('Load specific wiki documents by ID array — use after "wiki list --category" to select relevant docs')
     .option('--json', 'Output as JSON')
     .action(async (ids: string[], opts) => {
       const { indexer } = getOfflineClients();
@@ -217,7 +212,7 @@ export function registerWikiCommand(program: Command): void {
           entries: entries.map(e => ({
             id: e.id, type: e.type, title: e.title,
             summary: e.summary, body: e.body,
-            roles: e.roles,
+            category: e.category,
             codePaths: e.ext.codePaths ?? null,
           })),
         }, null, 2));

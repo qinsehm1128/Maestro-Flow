@@ -13,19 +13,12 @@ import { loadSpecs, type SpecCategory } from '../tools/spec-loader.js';
 import { evaluateContextBudget } from './context-budget.js';
 import { resolveSelf } from '../tools/team-members.js';
 import { evaluateKeywordInjection } from './keyword-spec-injector.js';
-import { loadWikiByRole } from './wiki-role-loader.js';
+import { loadWikiByCategory } from './wiki-role-loader.js';
 import type { SpecInjectionConfig } from '../types/index.js';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-/** @deprecated Kept for backward-compat config parsing. Use AGENT_ROLE_MAP instead. */
-export interface SpecInjectionRule {
-  categories: SpecCategory[];
-  /** Additional file paths relative to project root */
-  extras: string[];
-}
 
 export interface SpecInjectionResult {
   inject: boolean;
@@ -36,43 +29,28 @@ export interface SpecInjectionResult {
 }
 
 // ---------------------------------------------------------------------------
-// Default agent-type → spec-category mapping
+// Agent-type → spec categories mapping (single source of truth)
 // ---------------------------------------------------------------------------
 
-const DEFAULT_AGENT_SPEC_MAP: Record<string, SpecInjectionRule> = {
+const AGENT_CATEGORY_MAP: Record<string, SpecCategory[]> = {
   // Execution agents → coding specs
-  'code-developer':      { categories: ['coding'], extras: [] },
-  'tdd-developer':       { categories: ['coding', 'test'], extras: [] },
-  'workflow-executor':   { categories: ['coding'], extras: [] },
-  'universal-executor':  { categories: ['coding'], extras: [] },
-  'test-fix-agent':      { categories: ['coding', 'test'], extras: [] },
+  'code-developer':      ['coding', 'learning'],
+  'tdd-developer':       ['coding', 'test'],
+  'workflow-executor':   ['coding'],
+  'universal-executor':  ['coding'],
+  'test-fix-agent':      ['coding', 'test'],
 
   // Planning agents → arch specs
-  'cli-lite-planning-agent': { categories: ['arch'], extras: [] },
-  'action-planning-agent':   { categories: ['arch'], extras: [] },
-  'workflow-planner':        { categories: ['arch'], extras: [] },
+  'cli-lite-planning-agent': ['arch'],
+  'action-planning-agent':   ['arch'],
+  'workflow-planner':        ['arch'],
 
   // Review agents → review specs
-  'workflow-reviewer':   { categories: ['review'], extras: [] },
+  'workflow-reviewer':   ['review'],
 
   // Debug agents → debug specs
-  'debug-explore-agent': { categories: ['debug'], extras: [] },
-  'workflow-debugger':   { categories: ['debug'], extras: [] },
-};
-
-/** Agent-type → delegate role mapping for wiki knowledge loading. */
-const AGENT_ROLE_MAP: Record<string, string> = {
-  'code-developer':      'implement',
-  'tdd-developer':       'implement',
-  'workflow-executor':   'implement',
-  'universal-executor':  'implement',
-  'test-fix-agent':      'implement',
-  'cli-lite-planning-agent': 'plan',
-  'action-planning-agent':   'plan',
-  'workflow-planner':        'plan',
-  'workflow-reviewer':   'review',
-  'debug-explore-agent': 'analyze',
-  'workflow-debugger':   'analyze',
+  'debug-explore-agent': ['debug'],
+  'workflow-debugger':   ['debug'],
 };
 
 // ---------------------------------------------------------------------------
@@ -95,60 +73,35 @@ export function evaluateSpecInjection(
   config?: SpecInjectionConfig,
   uid?: string,
 ): SpecInjectionResult {
-  // Primary: role-based loading (unified approach)
-  const role = AGENT_ROLE_MAP[agentType];
+  const categories = resolveCategories(agentType, config);
+  if (!categories || categories.length === 0) return { inject: false };
 
-  // Fallback: if agent not in role map, try legacy category mapping
-  if (!role) {
-    const mapping = buildMapping(config);
-    const rule = mapping[agentType];
-    if (!rule) return { inject: false };
-
-    // Legacy path: load by categories
-    const resolvedUid = uid ?? resolveUidSafe();
-    const sections: string[] = [];
-    const allCategories: string[] = [];
-    let totalCount = 0;
-    for (const category of rule.categories) {
-      const result = loadSpecs(projectPath, category as SpecCategory, resolvedUid);
-      if (result.content) {
-        sections.push(result.content);
-        allCategories.push(category);
-        totalCount += result.totalLoaded;
-      }
-    }
-    if (sections.length === 0) return { inject: false };
-    const rawContent = sections.join('\n\n---\n\n');
-    const budget = evaluateContextBudget(rawContent, sessionId);
-    if (budget.action === 'skip') return { inject: false, budgetAction: 'skip' };
-    return { inject: true, content: budget.content, categories: allCategories, specCount: totalCount, budgetAction: budget.action };
-  }
-
-  // Resolve uid from team membership if not explicitly provided
   const resolvedUid = uid ?? resolveUidSafe();
 
   const sections: string[] = [];
+  const allCategories: string[] = [];
   let totalCount = 0;
 
-  // Load specs by role (primary role doc full + cross-file role entries)
-  const specResult = loadSpecs(projectPath, undefined, resolvedUid, undefined, undefined, { role });
-  if (specResult.content) {
-    sections.push(specResult.content);
-    totalCount += specResult.totalLoaded;
-  }
+  for (const category of categories) {
+    // Load specs by category (primary doc + keyword cross-match + tool discovery)
+    const specResult = loadSpecs(projectPath, category as SpecCategory, resolvedUid);
+    if (specResult.content) {
+      sections.push(specResult.content);
+      allCategories.push(category);
+      totalCount += specResult.totalLoaded;
+    }
 
-  // Wiki role knowledge injection
-  const wikiResult = loadWikiByRole(projectPath, role);
-  if (wikiResult) {
-    sections.push(wikiResult.content);
-    totalCount += wikiResult.entryCount;
+    // Wiki category knowledge injection
+    const wikiResult = loadWikiByCategory(projectPath, category);
+    if (wikiResult) {
+      sections.push(wikiResult.content);
+      totalCount += wikiResult.entryCount;
+    }
   }
 
   if (sections.length === 0) return { inject: false };
 
   const rawContent = sections.join('\n\n---\n\n');
-
-  // Apply context budget
   const budget = evaluateContextBudget(rawContent, sessionId);
 
   if (budget.action === 'skip') {
@@ -158,7 +111,7 @@ export function evaluateSpecInjection(
   return {
     inject: true,
     content: budget.content,
-    categories: [role],
+    categories: allCategories,
     specCount: totalCount,
     budgetAction: budget.action,
   };
@@ -181,15 +134,13 @@ function resolveUidSafe(): string | undefined {
   }
 }
 
-function buildMapping(config?: SpecInjectionConfig): Record<string, SpecInjectionRule> {
-  if (!config?.mapping) return DEFAULT_AGENT_SPEC_MAP;
-
-  const merged = { ...DEFAULT_AGENT_SPEC_MAP };
-  for (const [agent, rule] of Object.entries(config.mapping)) {
-    merged[agent] = {
-      categories: rule.categories as SpecCategory[],
-      extras: rule.extras ?? [],
-    };
+/**
+ * Resolve categories for an agent type. Config overrides take precedence.
+ */
+function resolveCategories(agentType: string, config?: SpecInjectionConfig): string[] | null {
+  // Config override
+  if (config?.mapping?.[agentType]) {
+    return config.mapping[agentType].categories;
   }
-  return merged;
+  return AGENT_CATEGORY_MAP[agentType] ?? null;
 }

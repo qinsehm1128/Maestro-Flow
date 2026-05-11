@@ -302,7 +302,7 @@ Displays Phase progress, Issue status (Backlog → In Progress → Review → Do
 | `maestro coordinate run "..." --chain default -y` | Graph coordinator |
 | `maestro overlay list` | Overlay management |
 | `maestro hooks status` | Hook status |
-| `maestro spec load --role implement` | Load specs |
+| `maestro spec load --category coding` | Load specs |
 | `maestro view` | Dashboard |
 | `maestro launcher -w my-project` | Claude Code launcher |
 | `maestro knowhow search "auth"` | Search persistent memory |

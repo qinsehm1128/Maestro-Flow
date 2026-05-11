@@ -11,7 +11,6 @@
 
 export interface SpecEntryParsed {
   category: string;
-  roles: string[];
   keywords: string[];
   date: string;
   source?: string;
@@ -43,15 +42,8 @@ export interface ParseError {
 // Valid categories (shared with spec-loader)
 // ============================================================================
 
-export const VALID_CATEGORIES = ['coding', 'arch', 'quality', 'debug', 'test', 'review', 'learning', 'tools'] as const;
+export const VALID_CATEGORIES = ['coding', 'arch', 'debug', 'test', 'review', 'learning'] as const;
 
-/** @deprecated Legacy backward-compat: map old category attr to roles when roles attr is absent.
- *  Kept for reading old entries that have category= but no roles= attribute. */
-export const CATEGORY_ROLE_FALLBACK: Record<string, string[]> = {
-  coding: ['implement'], arch: ['plan'], quality: ['review'],
-  debug: ['analyze'], test: ['test', 'implement'],
-  review: ['review'], learning: ['implement'], tools: [],
-};
 export type ValidCategory = (typeof VALID_CATEGORIES)[number];
 
 // ============================================================================
@@ -112,14 +104,8 @@ export function parseSpecEntries(content: string): ParseResult {
     // Validate and build entry
     const ref = attrs.ref || undefined;
 
-    // Resolve roles: explicit roles attr, or fallback from category
-    const rolesRaw = attrs.roles
-      ? attrs.roles.split(',').map(r => r.trim().toLowerCase()).filter(Boolean)
-      : CATEGORY_ROLE_FALLBACK[attrs.category ?? ''] ?? [];
-
     const entry: SpecEntryParsed = {
       category: attrs.category ?? '',
-      roles: rolesRaw,
       keywords: attrs.keywords ? attrs.keywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean) : [],
       date: attrs.date ?? '',
       source: attrs.source,
@@ -155,11 +141,9 @@ export function parseSpecEntries(content: string): ParseResult {
 export function validateSpecEntry(entry: SpecEntryParsed): string[] {
   const errors: string[] = [];
 
-  // roles is required — category alone is no longer sufficient for new entries
-  if (entry.roles.length === 0) {
-    errors.push('Missing required attribute: roles');
-  }
-  if (entry.category && !VALID_CATEGORIES.includes(entry.category as ValidCategory)) {
+  if (!entry.category) {
+    errors.push('Missing required attribute: category');
+  } else if (!VALID_CATEGORIES.includes(entry.category as ValidCategory)) {
     errors.push(`Invalid category "${entry.category}". Must be one of: ${VALID_CATEGORIES.join(', ')}`);
   }
 
@@ -209,12 +193,11 @@ export function formatSpecEntries(entries: SpecEntryParsed[], keyword?: string):
  * Format a single parsed entry as clean markdown with metadata line.
  *
  * Input content:  `### Title\n\nBody`
- * Output:         `### Title\n> roles · kw1, kw2 · date · source\n\nBody`
+ * Output:         `### Title\n> category · kw1, kw2 · date · source\n\nBody`
  */
 function formatEntryClean(e: SpecEntryParsed): string {
   const meta: string[] = [];
-  if (e.roles.length > 0) meta.push(e.roles.join(', '));
-  else if (e.category) meta.push(e.category);
+  if (e.category) meta.push(e.category);
   if (e.keywords.length > 0) meta.push(e.keywords.join(', '));
   if (e.date) meta.push(e.date);
   if (e.source) meta.push(e.source);
@@ -243,9 +226,7 @@ function formatEntryClean(e: SpecEntryParsed): string {
 
 /**
  * Format a single entry for writing to a spec file.
- * Always writes `roles=` attribute; never writes `category=`.
- * The `category` parameter is still accepted for file routing (spec-writer.ts) but is NOT written to the XML tag.
- * When `roles` is not provided, falls back to CATEGORY_ROLE_FALLBACK to derive roles from category.
+ * Writes `category=` attribute as the primary classifier.
  */
 export function formatNewEntry(
   category: string,
@@ -255,19 +236,12 @@ export function formatNewEntry(
   content: string,
   source?: string,
   ref?: string,
-  roles?: string[],
 ): string {
   const kwStr = keywords.map(k => k.toLowerCase().trim()).filter(Boolean).join(',');
   const sourceAttr = source ? ` source="${source}"` : '';
   const refAttr = ref ? ` ref="${ref}"` : '';
 
-  // Always use roles — derive from category fallback if not explicitly provided
-  const resolvedRoles = (roles && roles.length > 0)
-    ? roles
-    : CATEGORY_ROLE_FALLBACK[category] ?? [];
-  const rolesStr = resolvedRoles.map(r => r.toLowerCase().trim()).filter(Boolean).join(',');
-
-  return `<spec-entry roles="${rolesStr}" keywords="${kwStr}" date="${date}"${sourceAttr}${refAttr}>\n\n### ${title}\n\n${content}\n\n</spec-entry>`;
+  return `<spec-entry category="${category}" keywords="${kwStr}" date="${date}"${sourceAttr}${refAttr}>\n\n### ${title}\n\n${content}\n\n</spec-entry>`;
 }
 
 // ============================================================================

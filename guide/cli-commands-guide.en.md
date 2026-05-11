@@ -288,7 +288,7 @@ Project spec management (init, load, list, status).
 
 ```bash
 maestro spec init                              # Initialize
-maestro spec load --role implement --keyword auth   # Load
+maestro spec load --category coding --keyword auth   # Load
 maestro spec list                              # List files
 maestro spec status                            # Status
 maestro spec add <category> "<title>" "<content>"    # Add entry

@@ -42,7 +42,7 @@ Milestone mode creates output dir: .workflow/scratch/verify-{milestone_slug}-{da
 ## V0: Load Project Specs
 
 ```
-specs_content = maestro spec load --role review
+specs_content = maestro spec load --category review
 ```
 
 Pass specs_content to verifier agent as quality standards context.

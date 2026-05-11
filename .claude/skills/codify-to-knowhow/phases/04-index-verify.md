@@ -104,7 +104,7 @@ Ref 链接: spec → knowhow 桥梁已建立
 Wiki 索引: 已刷新
 
 后续操作:
-  maestro wiki list --role implement    # 按角色浏览
+  maestro wiki list --category coding    # 按角色浏览
   maestro spec load --keyword {slug}    # 加载相关 spec
   maestro wiki load <id>                # 加载详文
 ```

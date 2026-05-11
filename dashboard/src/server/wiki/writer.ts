@@ -44,8 +44,6 @@ export interface AppendEntryReq {
   content: string;
   /** Optional keywords (comma-separated or array). */
   keywords?: string[] | string;
-  /** Optional roles (who loads this entry). */
-  roles?: string[];
 }
 
 export class WikiWriteError extends Error {
@@ -266,11 +264,9 @@ export class WikiWriter {
     const effectiveKws = req.category && !kwStr.split(',').includes(req.category)
       ? `${req.category},${kwStr}`
       : kwStr;
-    const rolesStr = req.roles && req.roles.length > 0 ? req.roles.join(',') : '';
-
     const entryTag = this.isKnowhowPath(absPath) ? 'knowhow-entry' : 'spec-entry';
-    const rolesAttr = rolesStr ? ` roles="${rolesStr}"` : '';
-    const entryBlock = `\n<${entryTag} keywords="${effectiveKws}" date="${date}"${rolesAttr}>\n\n### ${firstLine}\n\n${req.content.trim()}\n\n</${entryTag}>\n`;
+    const categoryAttr = req.category ? ` category="${req.category}"` : '';
+    const entryBlock = `\n<${entryTag}${categoryAttr} keywords="${effectiveKws}" date="${date}">\n\n### ${firstLine}\n\n${req.content.trim()}\n\n</${entryTag}>\n`;
 
     return this.withLock(absPath, async () => {
       let existing: string;

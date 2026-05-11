@@ -4,48 +4,19 @@ Shared reference for tool spec registration and execution commands.
 
 ## Storage
 
-Tool specs are stored in `.workflow/specs/tools.md` as `<spec-entry>` blocks with per-entry `roles` attribute. The `tools.md` file has no primary role — entries are loaded via role matching.
+Tool specs are stored as knowhow documents in `.workflow/knowhow/` with `tool: true` in YAML frontmatter. Tool registration creates knowhow files, not spec entries. The `category` field determines which `spec load --category` queries match this tool.
 
 ## Entry Format
 
-### Inline mode (short process, <10 steps)
-
-```xml
-<spec-entry roles="implement,test" keywords="payment,gateway,idempotency" date="YYYY-MM-DD">
-
-### Tool Name
-
-Use when {trigger condition / timing}.
-
-1. Step one
-2. Step two
-...
-
-</spec-entry>
-```
-
-### Ref mode (long process, >=10 steps or with code examples)
-
-Spec index entry in `tools.md`:
-```xml
-<spec-entry roles="implement" keywords="oauth,pkce,token" date="YYYY-MM-DD"
-  ref="knowhow/RCP-<slug>.md">
-
-### Tool Name
-
-Use when {trigger condition}. {scope summary — must fit within 200 chars for spec load display}.
-
-</spec-entry>
-```
-
-Referenced knowhow document (`knowhow/RCP-<slug>.md`):
+Knowhow document (`knowhow/RCP-<slug>.md`):
 ```yaml
 ---
 title: Tool Name
 type: recipe
+tool: true
 summary: "Use when {timing}. {scope description}"
 tags: [keyword1, keyword2]
-roles: [implement]
+category: coding
 ---
 
 ## Prerequisites
@@ -64,35 +35,31 @@ roles: [implement]
 ## Discovery Path
 
 ```
-Register → tools.md → spec load --role <role> / spec-injector auto-inject → agent discovers tool
+Register → tools.md → spec load --category <category> / spec-injector auto-inject → agent discovers tool
 ```
 
 Agents discover tool specs via:
-- `spec load --role <role>` — returns entries matching the role
+- `spec load --category <category>` — returns entries matching the category
 - `spec-injector` hook — auto-injects at Agent launch based on agent type
 - `spec load --keyword <word>` — keyword search across all entries
 
-## Role Reference
+## Category Reference
 
-| Role | Agent types | Tool examples |
-|------|-------------|---------------|
-| implement | code-developer, workflow-executor | Build, deploy, integrate |
+| Category | Agent types | Tool examples |
+|----------|-------------|---------------|
+| coding | code-developer, workflow-executor | Build, deploy, integrate |
 | test | tdd-developer, test-fix-agent | Test flows, verification steps |
 | review | workflow-reviewer | Checklists, audit standards |
-| plan | workflow-planner | Design flows, analysis steps |
-| analyze | debug-explore-agent | Diagnostic flows, investigation |
+| arch | workflow-planner | Design flows, analysis steps |
+| debug | debug-explore-agent | Diagnostic flows, investigation |
 
 ## CLI Commands
 
 ```bash
-# Add inline tool spec
-maestro spec add tools "<title>" "<content>" --roles "<csv>" --keywords "<csv>"
+# Register tool as knowhow document
+maestro knowhow add "knowhow/RCP-<slug>.md" --type recipe --tool
 
-# Add ref tool spec with knowhow
-maestro spec add tools "<title>" "<summary>" --roles "<csv>" --keywords "<csv>" \
-  --ref "knowhow/RCP-<slug>.md" --knowhow-type recipe
-
-# Load tool specs
-maestro spec load --role <role>
-maestro spec load --role <role> --keyword <word>
+# Load specs by category
+maestro spec load --category <category>
+maestro spec load --category <category> --keyword <word>
 ```

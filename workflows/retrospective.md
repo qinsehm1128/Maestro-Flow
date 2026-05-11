@@ -385,7 +385,7 @@ Create learnings.md with frontmatter (title, type: spec, roles: [implement]) if 
 For each insight in `distilled_insights`, append a `<spec-entry>` to `.workflow/specs/learnings.md`:
 
 ```html
-<spec-entry roles="{insight.role}" keywords="{insight.category},{insight.tags joined by comma}" date="{YYYY-MM-DD}" id="{insight.id}" source="retrospective">
+<spec-entry category="{insight.category}" keywords="{insight.tags joined by comma}" date="{YYYY-MM-DD}" id="{insight.id}" source="retrospective">
 
 ### {insight.title}
 
@@ -408,7 +408,7 @@ Append learnings to `.workflow/specs/learnings.md` (shared with milestone-comple
 
 ```
 Append each insight to .workflow/specs/learnings.md as <spec-entry> with:
-  roles="implement", keywords (3-5 extracted), date, source="retrospective"
+  category="learning", keywords (3-5 extracted), date, source="retrospective"
   Body: title, summary, phase/lens/INS_id metadata
 
 Create file with roles frontmatter + "## Entries" header if it does not exist.
@@ -499,7 +499,7 @@ If `mode == "range"` or `--all`, loop Stages 3-8 per phase, then print aggregate
 ### spec-entry (in specs/learnings.md)
 
 ```html
-<spec-entry roles="implement" keywords="pattern,auth,jwt,security" date="2026-04-11" id="INS-a1b2c3d4" source="retrospective">
+<spec-entry category="coding" keywords="pattern,auth,jwt,security" date="2026-04-11" id="INS-a1b2c3d4" source="retrospective">
 
 ### JWT refresh tokens must rotate on every use
 

@@ -390,7 +390,7 @@ Atomic insights captured during active work.
 
 ## Entries
 
-<spec-entry roles="implement" keywords="pattern,auth,jwt" date="2026-05-10" id="INS-abc123" source="manual">
+<spec-entry category="coding" keywords="pattern,auth,jwt" date="2026-05-10" id="INS-abc123" source="manual">
 
 ### JWT refresh tokens must rotate on every use
 
@@ -402,7 +402,7 @@ Refresh-on-use prevents replay attacks.
 
 </spec-entry>
 
-<spec-entry roles="analyze" keywords="gotcha,redis,cache" date="2026-05-11" id="INS-def456" source="retrospective">
+<spec-entry category="debug" keywords="gotcha,redis,cache" date="2026-05-11" id="INS-def456" source="retrospective">
 
 ### Redis MULTI is not truly transactional
 

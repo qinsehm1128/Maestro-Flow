@@ -232,11 +232,10 @@ export class WikiIndexer {
             body: se.content,
             ext: { entryType: se.type, timestamp: se.timestamp, ...(se.ref ? { ref: se.ref } : {}) },
             scope,
-            category: container.category,
+            category: se.category || container.category,
             createdBy: container.createdBy,
             sourceRef: container.sourceRef,
             parent: container.id,
-            roles: se.roles.length > 0 ? se.roles : (container.roles ?? []),
           });
         }
       }
@@ -247,17 +246,19 @@ export class WikiIndexer {
       if (extname(name).toLowerCase() !== '.md') continue;
       const entry = await this.parseFileEntry(join(this.workflowRoot, 'knowhow', name), 'knowhow');
       if (entry) {
-        // Derive category from file prefix
-        const upper = name.toUpperCase();
-        if (upper.startsWith('KNW-')) entry.category = 'session';
-        else if (upper.startsWith('TPL-')) entry.category = 'template';
-        else if (upper.startsWith('RCP-')) entry.category = 'recipe';
-        else if (upper.startsWith('REF-')) entry.category = 'reference';
-        else if (upper.startsWith('DCS-')) entry.category = 'decision';
-        else if (upper.startsWith('TIP-')) entry.category = 'tip';
-        else if (upper.startsWith('AST-')) entry.category = 'asset';
-        else if (upper.startsWith('BLP-')) entry.category = 'blueprint';
-        else if (upper.startsWith('DOC-')) entry.category = 'document';
+        // Only derive category from file prefix if no frontmatter category
+        if (!entry.category) {
+          const upper = name.toUpperCase();
+          if (upper.startsWith('KNW-')) entry.category = 'session';
+          else if (upper.startsWith('TPL-')) entry.category = 'template';
+          else if (upper.startsWith('RCP-')) entry.category = 'recipe';
+          else if (upper.startsWith('REF-')) entry.category = 'reference';
+          else if (upper.startsWith('DCS-')) entry.category = 'decision';
+          else if (upper.startsWith('TIP-')) entry.category = 'tip';
+          else if (upper.startsWith('AST-')) entry.category = 'asset';
+          else if (upper.startsWith('BLP-')) entry.category = 'blueprint';
+          else if (upper.startsWith('DOC-')) entry.category = 'document';
+        }
         out.push(entry);
 
         // Parse <knowhow-entry> blocks into sub-node WikiEntries
@@ -286,11 +287,10 @@ export class WikiIndexer {
             body: se.content,
             ext: { entryType: se.type, timestamp: se.timestamp, ...(se.ref ? { ref: se.ref } : {}) },
             scope: null,
-            category: entry.category,
+            category: se.category || entry.category,
             createdBy: entry.createdBy,
             sourceRef: entry.sourceRef,
             parent: entry.id,
-            roles: se.roles.length > 0 ? se.roles : (entry.roles ?? []),
           });
         }
       }
@@ -424,7 +424,6 @@ export class WikiIndexer {
     const createdBy = asString(data.createdBy) || null;
     const sourceRef = asString(data.sourceRef) || null;
     const parent = asString(data.parent) || null;
-    const roles = extractRoles(data);
 
     const rel = toForwardSlash(relative(this.workflowRoot, absPath));
     // Knowhow files live under knowhow/ with prefix-<slug>.md naming.
@@ -452,7 +451,6 @@ export class WikiIndexer {
       createdBy,
       sourceRef,
       parent,
-      roles,
     };
   }
 
@@ -506,7 +504,6 @@ export class WikiIndexer {
         parent: e.parent,
         related: e.related,
         source: e.source,
-        roles: e.roles,
       })),
     };
     const target = join(this.workflowRoot, 'wiki-index.json');
@@ -557,12 +554,6 @@ function extractTags(data: Record<string, unknown>): string[] {
   return tags.map(String).filter((s) => s.length > 0);
 }
 
-function extractRoles(data: Record<string, unknown>): string[] {
-  const roles = data.roles;
-  if (!Array.isArray(roles)) return [];
-  return roles.map(String).filter((s) => s.length > 0);
-}
-
 function normalizeRelated(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   const out: string[] = [];
@@ -580,7 +571,7 @@ function normalizeRelated(value: unknown): string[] {
 function extractExt(data: Record<string, unknown>): Record<string, unknown> {
   const known = new Set([
     'title', 'summary', 'tags', 'status', 'related',
-    'category', 'createdBy', 'sourceRef', 'parent', 'roles',
+    'category', 'createdBy', 'sourceRef', 'parent',
   ]);
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(data)) {
@@ -622,7 +613,6 @@ export function filterEntries(entries: WikiEntry[], filters: WikiFilters): WikiE
     if (filters.status && d.status !== filters.status) return false;
     if (filters.category && d.category !== filters.category) return false;
     if (filters.createdBy && d.createdBy !== filters.createdBy) return false;
-    if (filters.role && !d.roles.includes(filters.role)) return false;
     if (filters.q) {
       const q = filters.q.toLowerCase();
       if (!d.title.toLowerCase().includes(q) && !d.summary.toLowerCase().includes(q)) {

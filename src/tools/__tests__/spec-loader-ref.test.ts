@@ -244,8 +244,8 @@ describe('formatNewEntry — ref attribute', () => {
     const { formatNewEntry } = await import('../spec-entry-parser.js');
     const entry = formatNewEntry('learning', ['oauth', 'pkce'], '2026-05-10', 'OAuth Flow', 'Summary.', undefined, 'knowhow/AST-oauth-flow.md');
     expect(entry).toContain('ref="knowhow/AST-oauth-flow.md"');
-    expect(entry).toContain('roles="implement"');
-    expect(entry).not.toContain('category=');
+    expect(entry).toContain('category="learning"');
+    expect(entry).not.toContain('roles=');
     expect(entry).toContain('### OAuth Flow');
   });
 

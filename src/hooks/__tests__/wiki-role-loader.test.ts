@@ -1,8 +1,8 @@
 /**
- * Wiki Role Loader — comprehensive tests
+ * Wiki Category Loader — comprehensive tests
  *
- * Covers: loadWikiByRole (role-based wiki knowledge loading from persisted index)
- * Guide coverage: Role 角色化检索 + 三层加载设计 (wiki-index.json → role filter → inject)
+ * Covers: loadWikiByCategory (category-based wiki knowledge loading from persisted index)
+ * Guide coverage: Category 分类化检索 + 三层加载设计 (wiki-index.json → category filter → inject)
  */
 
 import { describe, it, beforeEach, afterEach, expect } from 'vitest';
@@ -10,7 +10,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync, existsSync } from 'node:
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-import { loadWikiByRole } from '../wiki-role-loader.js';
+import { loadWikiByCategory } from '../wiki-role-loader.js';
 
 // ---------------------------------------------------------------------------
 // Test lifecycle
@@ -19,7 +19,7 @@ import { loadWikiByRole } from '../wiki-role-loader.js';
 let testDir: string;
 
 beforeEach(() => {
-  testDir = mkdtempSync(join(tmpdir(), 'maestro-test-wiki-role-'));
+  testDir = mkdtempSync(join(tmpdir(), 'maestro-test-wiki-category-'));
   mkdirSync(join(testDir, '.workflow'), { recursive: true });
 });
 
@@ -33,7 +33,7 @@ function writeWikiIndex(entries: Array<{
   type: string;
   title: string;
   summary: string;
-  roles?: string[];
+  category?: string;
   updated: string;
 }>): void {
   writeFileSync(
@@ -44,18 +44,18 @@ function writeWikiIndex(entries: Array<{
 }
 
 // ---------------------------------------------------------------------------
-// Basic role loading
+// Basic category loading
 // ---------------------------------------------------------------------------
 
-describe('loadWikiByRole — basic', () => {
-  it('returns entries matching the requested role', () => {
+describe('loadWikiByCategory — basic', () => {
+  it('returns entries matching the requested category', () => {
     writeWikiIndex([
-      { type: 'knowhow', title: 'Auth API Design', summary: 'JWT refresh patterns', roles: ['implement', 'review'], updated: '2026-05-01' },
-      { type: 'knowhow', title: 'Cache Strategy', summary: 'Redis caching layer', roles: ['implement'], updated: '2026-04-30' },
-      { type: 'spec', title: 'Architecture Rules', summary: 'Layered arch', roles: ['plan'], updated: '2026-04-29' },
+      { type: 'knowhow', title: 'Auth API Design', summary: 'JWT refresh patterns', category: 'coding', updated: '2026-05-01' },
+      { type: 'knowhow', title: 'Cache Strategy', summary: 'Redis caching layer', category: 'coding', updated: '2026-04-30' },
+      { type: 'spec', title: 'Architecture Rules', summary: 'Layered arch', category: 'arch', updated: '2026-04-29' },
     ]);
 
-    const result = loadWikiByRole(testDir, 'implement');
+    const result = loadWikiByCategory(testDir, 'coding');
     expect(result).not.toBeNull();
     expect(result!.entryCount).toBe(2);
     expect(result!.content).toContain('Auth API Design');
@@ -63,23 +63,23 @@ describe('loadWikiByRole — basic', () => {
     expect(result!.content).not.toContain('Architecture Rules');
   });
 
-  it('returns null when no entries match the role', () => {
+  it('returns null when no entries match the category', () => {
     writeWikiIndex([
-      { type: 'knowhow', title: 'Auth Design', summary: 'Content', roles: ['implement'], updated: '2026-05-01' },
+      { type: 'knowhow', title: 'Auth Design', summary: 'Content', category: 'coding', updated: '2026-05-01' },
     ]);
 
-    const result = loadWikiByRole(testDir, 'brainstorm');
+    const result = loadWikiByCategory(testDir, 'debug');
     expect(result).toBeNull();
   });
 
   it('returns null when wiki-index.json does not exist', () => {
-    const result = loadWikiByRole(testDir, 'implement');
+    const result = loadWikiByCategory(testDir, 'coding');
     expect(result).toBeNull();
   });
 
   it('returns null when entries array is empty', () => {
     writeWikiIndex([]);
-    const result = loadWikiByRole(testDir, 'implement');
+    const result = loadWikiByCategory(testDir, 'coding');
     expect(result).toBeNull();
   });
 
@@ -89,7 +89,7 @@ describe('loadWikiByRole — basic', () => {
       'not valid json',
       'utf-8',
     );
-    const result = loadWikiByRole(testDir, 'implement');
+    const result = loadWikiByCategory(testDir, 'coding');
     expect(result).toBeNull();
   });
 });
@@ -98,25 +98,25 @@ describe('loadWikiByRole — basic', () => {
 // Content formatting
 // ---------------------------------------------------------------------------
 
-describe('loadWikiByRole — content formatting', () => {
+describe('loadWikiByCategory — content formatting', () => {
   it('formats entries with type, title, and summary', () => {
     writeWikiIndex([
-      { type: 'knowhow', title: 'Auth Pattern', summary: 'Use JWT with rotation', roles: ['implement'], updated: '2026-05-01' },
+      { type: 'knowhow', title: 'Auth Pattern', summary: 'Use JWT with rotation', category: 'coding', updated: '2026-05-01' },
     ]);
 
-    const result = loadWikiByRole(testDir, 'implement');
-    expect(result!.content).toContain('# Wiki Knowledge (role: implement)');
+    const result = loadWikiByCategory(testDir, 'coding');
+    expect(result!.content).toContain('# Wiki Knowledge (category: coding)');
     expect(result!.content).toContain('### [knowhow] Auth Pattern');
     expect(result!.content).toContain('Use JWT with rotation');
   });
 
   it('includes separator between multiple entries', () => {
     writeWikiIndex([
-      { type: 'knowhow', title: 'Entry A', summary: 'Summary A', roles: ['implement'], updated: '2026-05-01' },
-      { type: 'spec', title: 'Entry B', summary: 'Summary B', roles: ['implement'], updated: '2026-04-30' },
+      { type: 'knowhow', title: 'Entry A', summary: 'Summary A', category: 'coding', updated: '2026-05-01' },
+      { type: 'spec', title: 'Entry B', summary: 'Summary B', category: 'coding', updated: '2026-04-30' },
     ]);
 
-    const result = loadWikiByRole(testDir, 'implement');
+    const result = loadWikiByCategory(testDir, 'coding');
     expect(result!.content).toContain('---');
     expect(result!.content).toContain('Entry A');
     expect(result!.content).toContain('Entry B');
@@ -127,15 +127,15 @@ describe('loadWikiByRole — content formatting', () => {
 // Sorting and limiting
 // ---------------------------------------------------------------------------
 
-describe('loadWikiByRole — sorting and limits', () => {
+describe('loadWikiByCategory — sorting and limits', () => {
   it('sorts entries by updated date (newest first)', () => {
     writeWikiIndex([
-      { type: 'knowhow', title: 'Old Entry', summary: 'Old', roles: ['implement'], updated: '2026-01-01' },
-      { type: 'knowhow', title: 'New Entry', summary: 'New', roles: ['implement'], updated: '2026-05-10' },
-      { type: 'knowhow', title: 'Mid Entry', summary: 'Mid', roles: ['implement'], updated: '2026-03-15' },
+      { type: 'knowhow', title: 'Old Entry', summary: 'Old', category: 'coding', updated: '2026-01-01' },
+      { type: 'knowhow', title: 'New Entry', summary: 'New', category: 'coding', updated: '2026-05-10' },
+      { type: 'knowhow', title: 'Mid Entry', summary: 'Mid', category: 'coding', updated: '2026-03-15' },
     ]);
 
-    const result = loadWikiByRole(testDir, 'implement');
+    const result = loadWikiByCategory(testDir, 'coding');
     const contentLines = result!.content;
     const newIdx = contentLines.indexOf('New Entry');
     const midIdx = contentLines.indexOf('Mid Entry');
@@ -149,72 +149,61 @@ describe('loadWikiByRole — sorting and limits', () => {
       type: 'knowhow',
       title: `Entry ${i + 1}`,
       summary: `Summary ${i + 1}`,
-      roles: ['analyze'],
+      category: 'debug',
       updated: `2026-05-${String(i + 1).padStart(2, '0')}`,
     }));
 
     writeWikiIndex(entries);
 
-    const result = loadWikiByRole(testDir, 'analyze');
+    const result = loadWikiByCategory(testDir, 'debug');
     expect(result!.entryCount).toBe(10);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Role filtering edge cases
+// Category filtering edge cases
 // ---------------------------------------------------------------------------
 
-describe('loadWikiByRole — edge cases', () => {
-  it('handles entries without roles field', () => {
+describe('loadWikiByCategory — edge cases', () => {
+  it('handles entries without category field', () => {
     writeWikiIndex([
-      { type: 'knowhow', title: 'No Roles', summary: 'Content', updated: '2026-05-01' },
-      { type: 'knowhow', title: 'Has Role', summary: 'Content', roles: ['implement'], updated: '2026-05-01' },
+      { type: 'knowhow', title: 'No Category', summary: 'Content', updated: '2026-05-01' },
+      { type: 'knowhow', title: 'Has Category', summary: 'Content', category: 'coding', updated: '2026-05-01' },
     ]);
 
-    const result = loadWikiByRole(testDir, 'implement');
+    const result = loadWikiByCategory(testDir, 'coding');
     expect(result!.entryCount).toBe(1);
-    expect(result!.content).toContain('Has Role');
-    expect(result!.content).not.toContain('No Roles');
+    expect(result!.content).toContain('Has Category');
+    expect(result!.content).not.toContain('No Category');
   });
 
-  it('handles entries with empty roles array', () => {
+  it('matches exact category string (no partial matching)', () => {
     writeWikiIndex([
-      { type: 'knowhow', title: 'Empty Roles', summary: 'Content', roles: [], updated: '2026-05-01' },
-      { type: 'knowhow', title: 'Has Role', summary: 'Content', roles: ['review'], updated: '2026-05-01' },
+      { type: 'knowhow', title: 'Coding Entry', summary: 'Content', category: 'coding', updated: '2026-05-01' },
     ]);
 
-    const result = loadWikiByRole(testDir, 'review');
-    expect(result!.entryCount).toBe(1);
-    expect(result!.content).toContain('Has Role');
-  });
-
-  it('matches exact role string (no partial matching)', () => {
-    writeWikiIndex([
-      { type: 'knowhow', title: 'Implement Entry', summary: 'Content', roles: ['implement'], updated: '2026-05-01' },
-    ]);
-
-    // "impl" should NOT match "implement"
-    const result = loadWikiByRole(testDir, 'impl');
+    // "cod" should NOT match "coding"
+    const result = loadWikiByCategory(testDir, 'cod');
     expect(result).toBeNull();
   });
 
-  it('supports all 7 delegate roles', () => {
-    const roles = ['analyze', 'explore', 'review', 'implement', 'plan', 'brainstorm', 'research'];
-    const entries = roles.map((role, i) => ({
+  it('supports all spec categories', () => {
+    const categories = ['coding', 'arch', 'debug', 'test', 'review', 'learning'];
+    const entries = categories.map((cat, i) => ({
       type: 'knowhow',
-      title: `Entry for ${role}`,
-      summary: `Content for ${role}`,
-      roles: [role],
+      title: `Entry for ${cat}`,
+      summary: `Content for ${cat}`,
+      category: cat,
       updated: `2026-05-${String(i + 1).padStart(2, '0')}`,
     }));
 
     writeWikiIndex(entries);
 
-    for (const role of roles) {
-      const result = loadWikiByRole(testDir, role);
+    for (const cat of categories) {
+      const result = loadWikiByCategory(testDir, cat);
       expect(result).not.toBeNull();
       expect(result!.entryCount).toBe(1);
-      expect(result!.content).toContain(`Entry for ${role}`);
+      expect(result!.content).toContain(`Entry for ${cat}`);
     }
   });
 });

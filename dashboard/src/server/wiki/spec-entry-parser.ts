@@ -20,7 +20,6 @@ export interface SpecEntry {
   timestamp: string;
   category: string;
   keywords: string[];
-  roles: string[];
   ref?: string;
 }
 
@@ -54,22 +53,6 @@ export const FILE_CATEGORY_MAP: Record<string, string> = {
   'test-conventions': 'test',
   'review-standards': 'review',
   tools: 'tools',
-};
-
-/** Backward compat: derive roles from legacy `category` attr when no `roles` attr is present. */
-const CATEGORY_ROLE_FALLBACK: Record<string, string[]> = {
-  coding: ['implement'],
-  arch: ['plan', 'review'],
-  quality: ['review'],
-  debug: ['implement'],
-  test: ['implement', 'review'],
-  review: ['review'],
-  learning: ['implement'],
-  tools: ['implement'],
-  pattern: ['implement'],
-  decision: ['plan'],
-  rule: ['review'],
-  validation: ['review'],
 };
 
 // ---------------------------------------------------------------------------
@@ -150,10 +133,11 @@ function parseEntryBlocks(
     const type = attrs.type ?? detectEntryType(title, fileName);
     const id = `${stem}-${String(++entryIndex).padStart(3, '0')}`;
     const kws = attrs.keywords ? attrs.keywords.split(',').map((k) => k.trim()) : [];
-    const roles = attrs.roles
-      ? attrs.roles.split(',').map((r) => r.trim().toLowerCase()).filter(Boolean)
-      : (attrs.category ? (CATEGORY_ROLE_FALLBACK[attrs.category] ?? []) : []);
     const ref = attrs.ref || undefined;
+    const entryCategory = attrs.category
+      || (typeof frontmatter?.category === 'string' ? frontmatter.category : null)
+      || FILE_CATEGORY_MAP[stem]
+      || 'general';
 
     entries.push({
       id,
@@ -162,12 +146,8 @@ function parseEntryBlocks(
       content: innerContent,
       file: fileName,
       timestamp: attrs.date ?? '',
-      category:
-        (typeof frontmatter?.category === 'string'
-          ? frontmatter.category
-          : (FILE_CATEGORY_MAP[stem] ?? 'general')),
+      category: entryCategory,
       keywords: kws,
-      roles,
       ...(ref ? { ref } : {}),
     });
   }
@@ -210,7 +190,7 @@ function parseEntryBlocks(
     const keywords = Array.isArray(frontmatter?.keywords)
       ? frontmatter.keywords.map(String)
       : [];
-    entries.push({ id, type, title, content, file: fileName, timestamp, category, keywords, roles: [] });
+    entries.push({ id, type, title, content, file: fileName, timestamp, category, keywords });
   }
 
   return entries;

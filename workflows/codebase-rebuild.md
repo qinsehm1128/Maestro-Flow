@@ -61,7 +61,7 @@ Build component entry:
 ### Step 2.5: Load Project Specs
 
 ```
-specs_content = maestro spec load --role plan
+specs_content = maestro spec load --category arch
 ```
 
 Used in Step 2-4 to produce architecture-aware documentation.
