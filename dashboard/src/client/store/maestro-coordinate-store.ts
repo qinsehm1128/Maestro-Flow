@@ -110,11 +110,11 @@ export const useMaestroCoordinateStore = create<MaestroCoordinateStore>(
         set({ selectedDir: null, sessionDetail: null });
         return;
       }
+      const prev = get().selectedDir;
       set({ selectedDir: dirName });
-      // Auto-fetch detail if not already loaded for this dir
-      const state = get();
-      if (state.sessionDetail === null || state.selectedDir !== dirName) {
-        void state.fetchSessionDetail(dirName);
+      // Always fetch detail when switching to a different session
+      if (prev !== dirName) {
+        void get().fetchSessionDetail(dirName);
       }
     },
 

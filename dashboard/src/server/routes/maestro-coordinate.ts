@@ -24,7 +24,7 @@ export function createMaestroCoordinateRoutes(
   // GET /api/maestro-coordinate/sessions — list all maestro sessions
   app.get('/api/maestro-coordinate/sessions', async (c) => {
     try {
-      const maestroDir = join(getRoot(), '.workflow', '.maestro');
+      const maestroDir = join(getRoot(), '.maestro');
       const dirNames = await safeReaddir(maestroDir);
       const sessions: MaestroSessionListItem[] = [];
 
@@ -50,7 +50,7 @@ export function createMaestroCoordinateRoutes(
   app.get('/api/maestro-coordinate/sessions/:dir', async (c) => {
     try {
       const dirName = c.req.param('dir');
-      const maestroDir = join(getRoot(), '.workflow', '.maestro');
+      const maestroDir = join(getRoot(), '.maestro');
       const sessionDir = join(maestroDir, dirName);
 
       // Try status.json first (ralph + maestro sessions)
