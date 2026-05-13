@@ -44,7 +44,7 @@ export function registerSpecCommand(program: Command): void {
   spec
     .command('load')
     .description('Load specs by category')
-    .option('--category <cat>', 'Filter by category: coding|arch|debug|test|review|learning')
+    .option('--category <cat>', 'Filter by category: coding|arch|debug|test|review|learning|ui')
     .option('--keyword <word>', 'Filter entries by keyword')
     .option('--scope <scope>', 'Spec scope: project|global|team|personal (default: project)')
     .option('--uid <uid>', 'User id for personal scope (auto-detected from git if omitted)')

@@ -120,7 +120,7 @@ Write directly to `.workflow/knowhow/AST-impeccable-<slug>-<YYYYMMDD>.md`:
 title: "maestro-impeccable <command>: <description>"
 type: asset
 assetType: <design-tokens|component-patterns|design-system>
-category: coding
+category: ui
 keywords: [impeccable, <command>, ...domain keywords]
 codePaths: [<files modified by command>]
 created: "<ISO-8601>"
@@ -143,7 +143,7 @@ Create both:
 For decision and asset entries, create a spec reference for discoverability:
 
 ```bash
-maestro spec add coding "<title>" "<one-line summary>" \
+maestro spec add ui "<title>" "<one-line summary>" \
   --keywords impeccable,<command>,<domain keywords> \
   --ref "knowhow/<filename>"
 ```

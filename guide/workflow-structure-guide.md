@@ -46,6 +46,7 @@
 │   ├── test-conventions.md       # 测试规范（可选，检测到测试框架时创建）
 │   ├── debug-notes.md            # 调试笔记（可选，按需创建）
 │   ├── review-standards.md       # 审查标准（可选，按需创建）
+│   ├── ui-conventions.md          # UI 规范（可选，检测到前端框架时创建）
 │   └── learnings.md              # 学习记录（`<spec-entry>` 块，跨阶段查询）
 │
 ├── knowhow/                      # 知识文档（9 种前缀类型）
@@ -738,6 +739,7 @@ created → completed → harvested → archived
 | review | review-standards.md, quality-rules.md | — |
 | debug | debug-notes.md | — |
 | learning | learnings.md | — |
+| ui | ui-conventions.md | — |
 | tools | knowhow/*.md（tool: true） | — |
 
 ### Session ID 格式

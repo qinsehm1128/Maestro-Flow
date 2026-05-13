@@ -42,7 +42,7 @@ export interface ParseError {
 // Valid categories (shared with spec-loader)
 // ============================================================================
 
-export const VALID_CATEGORIES = ['coding', 'arch', 'debug', 'test', 'review', 'learning'] as const;
+export const VALID_CATEGORIES = ['coding', 'arch', 'debug', 'test', 'review', 'learning', 'ui'] as const;
 
 export type ValidCategory = (typeof VALID_CATEGORIES)[number];
 

@@ -50,7 +50,7 @@ Every design task is **brand** (marketing, landing, campaign: design IS the prod
 
 Identify before designing. Priority: (1) cue in the task; (2) surface in focus; (3) `register` field in PRODUCT.md. First match wins.
 
-Load the matching reference: [reference/brand.md](reference/brand.md) or [reference/product.md](reference/product.md).
+Load the matching reference: [brand.md](~/.maestro/workflows/impeccable/brand.md) or [product.md](~/.maestro/workflows/impeccable/product.md).
 
 ## Shared design laws
 
@@ -91,35 +91,35 @@ Every word earns its place. No em dashes.
 
 Two-altitude category-reflex check. If someone could guess theme+palette from category alone, or guess aesthetic family from category+anti-references, rework until neither is obvious.
 
-See [reference/brand.md](reference/brand.md) for reflex-reject aesthetic lanes.
+See [~/.maestro/workflows/impeccable/brand.md](~/.maestro/workflows/impeccable/brand.md) for reflex-reject aesthetic lanes.
 
 ## Commands
 
 | Command | Category | Description | Reference |
 |---|---|---|---|
-| `craft [feature]` | Build | Shape, then build end-to-end | [reference/craft.md](reference/craft.md) |
-| `shape [feature]` | Build | Plan UX/UI before code | [reference/shape.md](reference/shape.md) |
-| `teach` | Build | Set up PRODUCT.md and DESIGN.md | [reference/teach.md](reference/teach.md) |
-| `document` | Build | Generate DESIGN.md from code | [reference/document.md](reference/document.md) |
-| `extract [target]` | Build | Pull tokens/components into design system | [reference/extract.md](reference/extract.md) |
-| `critique [target]` | Evaluate | UX review with heuristic scoring | [reference/critique.md](reference/critique.md) |
-| `audit [target]` | Evaluate | Technical quality checks | [reference/audit.md](reference/audit.md) |
-| `polish [target]` | Refine | Final quality pass | [reference/polish.md](reference/polish.md) |
-| `bolder [target]` | Refine | Amplify bland designs | [reference/bolder.md](reference/bolder.md) |
-| `quieter [target]` | Refine | Tone down aggressive designs | [reference/quieter.md](reference/quieter.md) |
-| `distill [target]` | Refine | Strip to essence | [reference/distill.md](reference/distill.md) |
-| `harden [target]` | Refine | Production-ready: errors, i18n, edge cases | [reference/harden.md](reference/harden.md) |
-| `onboard [target]` | Refine | First-run flows, empty states | [reference/onboard.md](reference/onboard.md) |
-| `animate [target]` | Enhance | Add purposeful motion | [reference/animate.md](reference/animate.md) |
-| `colorize [target]` | Enhance | Add strategic color | [reference/colorize.md](reference/colorize.md) |
-| `typeset [target]` | Enhance | Improve typography | [reference/typeset.md](reference/typeset.md) |
-| `layout [target]` | Enhance | Fix spacing, rhythm, hierarchy | [reference/layout.md](reference/layout.md) |
-| `delight [target]` | Enhance | Add personality | [reference/delight.md](reference/delight.md) |
-| `overdrive [target]` | Enhance | Push past conventional limits | [reference/overdrive.md](reference/overdrive.md) |
-| `clarify [target]` | Fix | Improve UX copy and labels | [reference/clarify.md](reference/clarify.md) |
-| `adapt [target]` | Fix | Adapt for devices/screens | [reference/adapt.md](reference/adapt.md) |
-| `optimize [target]` | Fix | Fix UI performance | [reference/optimize.md](reference/optimize.md) |
-| `live` | Iterate | Browser-based variant generation | [reference/live.md](reference/live.md) |
+| `craft [feature]` | Build | Shape, then build end-to-end | [~/.maestro/workflows/impeccable/craft.md](~/.maestro/workflows/impeccable/craft.md) |
+| `shape [feature]` | Build | Plan UX/UI before code | [~/.maestro/workflows/impeccable/shape.md](~/.maestro/workflows/impeccable/shape.md) |
+| `teach` | Build | Set up PRODUCT.md and DESIGN.md | [~/.maestro/workflows/impeccable/teach.md](~/.maestro/workflows/impeccable/teach.md) |
+| `document` | Build | Generate DESIGN.md from code | [~/.maestro/workflows/impeccable/document.md](~/.maestro/workflows/impeccable/document.md) |
+| `extract [target]` | Build | Pull tokens/components into design system | [~/.maestro/workflows/impeccable/extract.md](~/.maestro/workflows/impeccable/extract.md) |
+| `critique [target]` | Evaluate | UX review with heuristic scoring | [~/.maestro/workflows/impeccable/critique.md](~/.maestro/workflows/impeccable/critique.md) |
+| `audit [target]` | Evaluate | Technical quality checks | [~/.maestro/workflows/impeccable/audit.md](~/.maestro/workflows/impeccable/audit.md) |
+| `polish [target]` | Refine | Final quality pass | [~/.maestro/workflows/impeccable/polish.md](~/.maestro/workflows/impeccable/polish.md) |
+| `bolder [target]` | Refine | Amplify bland designs | [~/.maestro/workflows/impeccable/bolder.md](~/.maestro/workflows/impeccable/bolder.md) |
+| `quieter [target]` | Refine | Tone down aggressive designs | [~/.maestro/workflows/impeccable/quieter.md](~/.maestro/workflows/impeccable/quieter.md) |
+| `distill [target]` | Refine | Strip to essence | [~/.maestro/workflows/impeccable/distill.md](~/.maestro/workflows/impeccable/distill.md) |
+| `harden [target]` | Refine | Production-ready: errors, i18n, edge cases | [~/.maestro/workflows/impeccable/harden.md](~/.maestro/workflows/impeccable/harden.md) |
+| `onboard [target]` | Refine | First-run flows, empty states | [~/.maestro/workflows/impeccable/onboard.md](~/.maestro/workflows/impeccable/onboard.md) |
+| `animate [target]` | Enhance | Add purposeful motion | [~/.maestro/workflows/impeccable/animate.md](~/.maestro/workflows/impeccable/animate.md) |
+| `colorize [target]` | Enhance | Add strategic color | [~/.maestro/workflows/impeccable/colorize.md](~/.maestro/workflows/impeccable/colorize.md) |
+| `typeset [target]` | Enhance | Improve typography | [~/.maestro/workflows/impeccable/typeset.md](~/.maestro/workflows/impeccable/typeset.md) |
+| `layout [target]` | Enhance | Fix spacing, rhythm, hierarchy | [~/.maestro/workflows/impeccable/layout.md](~/.maestro/workflows/impeccable/layout.md) |
+| `delight [target]` | Enhance | Add personality | [~/.maestro/workflows/impeccable/delight.md](~/.maestro/workflows/impeccable/delight.md) |
+| `overdrive [target]` | Enhance | Push past conventional limits | [~/.maestro/workflows/impeccable/overdrive.md](~/.maestro/workflows/impeccable/overdrive.md) |
+| `clarify [target]` | Fix | Improve UX copy and labels | [~/.maestro/workflows/impeccable/clarify.md](~/.maestro/workflows/impeccable/clarify.md) |
+| `adapt [target]` | Fix | Adapt for devices/screens | [~/.maestro/workflows/impeccable/adapt.md](~/.maestro/workflows/impeccable/adapt.md) |
+| `optimize [target]` | Fix | Fix UI performance | [~/.maestro/workflows/impeccable/optimize.md](~/.maestro/workflows/impeccable/optimize.md) |
+| `live` | Iterate | Browser-based variant generation | [~/.maestro/workflows/impeccable/live.md](~/.maestro/workflows/impeccable/live.md) |
 
 ### Routing rules
 
@@ -158,6 +158,6 @@ After every command execution (except `live`), harvest design decisions into `.w
 2. **Extract** from output files (document, critique) or conversation context (others).
 3. **Write knowhow**:
    - DCS-/TIP-/REF- → `store_knowhow` MCP: `{operation: "add", type, title: "maestro-impeccable <cmd>: <description>", body, tags: ["impeccable", "<cmd>", ...]}`
-   - AST- → Write to `.workflow/knowhow/AST-impeccable-<slug>-<YYYYMMDD>.md` with YAML frontmatter
-4. **Spec index** (DCS-/AST- only): `maestro spec add coding "<title>" "<summary>" --keywords impeccable,<cmd>,... --ref knowhow/<file>`
+   - AST- → Write to `.workflow/knowhow/AST-impeccable-<slug>-<YYYYMMDD>.md` with YAML frontmatter (`category: ui`)
+4. **Spec index** (DCS-/AST- only): `maestro spec add ui "<title>" "<summary>" --keywords impeccable,<cmd>,... --ref knowhow/<file>`
 5. **Report**: one-line summary with knowhow ID.

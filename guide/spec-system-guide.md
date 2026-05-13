@@ -56,6 +56,7 @@ Each spec file is the **primary document** for a category. `spec load --category
 | `debug-notes.md` | debug | analyze | Debug tips, root cause records, known issues |
 | `test-conventions.md` | test | test | Test framework, patterns, coverage requirements |
 | `learnings.md` | learning | implement | Bugs, pitfalls, lessons learned |
+| `ui-conventions.md` | ui | implement | UI/UX conventions, design tokens, visual patterns |
 
 **Category → implicit delegate role**: each category maps to a delegate system role. This mapping is internal — users only interact with `category`, the role resolution is transparent.
 
@@ -63,6 +64,7 @@ Each spec file is the **primary document** for a category. `spec load --category
 coding   → implement    arch     → plan
 review   → review       debug    → analyze
 test     → test         learning → implement
+ui       → implement
 ```
 
 ### Entry Format
@@ -81,7 +83,7 @@ Revoked column must be set rather than deleting tokens.
 
 | Attribute | Required | Format | Description |
 |-----------|----------|--------|-------------|
-| `category` | Yes | Single value | One of: coding, arch, review, debug, test, learning |
+| `category` | Yes | Single value | One of: coding, arch, review, debug, test, learning, ui |
 | `keywords` | Yes | Comma-separated, lowercase | Searchable keywords for cross-category discovery |
 | `date` | Yes | `YYYY-MM-DD` | Creation date |
 | `source` | No | String | Origin (manual / agent / phase) |
@@ -334,10 +336,10 @@ Use when implementing OAuth 2.0 login for public clients. Complete PKCE flow des
 
 ### Category-Based Retrieval
 
-Wiki entries support `category` annotation, aligned with the 6 spec categories:
+Wiki entries support `category` annotation, aligned with the spec categories:
 
 ```
-coding | arch | review | debug | test | learning
+coding | arch | review | debug | test | learning | ui
 ```
 
 Each category implicitly maps to a delegate role for agent auto-injection.

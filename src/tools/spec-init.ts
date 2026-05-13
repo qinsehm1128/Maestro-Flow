@@ -153,6 +153,31 @@ Add entries with: \`/spec-add learning <description>\`
 `,
   },
   {
+    filename: 'ui-conventions.md',
+    frontmatter: {
+      title: 'UI Conventions',
+      readMode: 'optional',
+      priority: 'medium',
+      category: 'ui',
+      keywords: ['ui', 'design', 'color', 'typography', 'layout', 'animation', 'component'],
+    },
+    body: `# UI Conventions
+
+## Color & Theme
+
+## Typography
+
+## Layout & Spacing
+
+## Motion & Animation
+
+## Component Patterns
+
+## Entries
+
+`,
+  },
+  {
     filename: 'review-standards.md',
     frontmatter: {
       title: 'Review Standards',

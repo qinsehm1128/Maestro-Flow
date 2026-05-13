@@ -34,10 +34,10 @@ export interface SpecInjectionResult {
 
 const AGENT_CATEGORY_MAP: Record<string, SpecCategory[]> = {
   // Execution agents → coding specs
-  'code-developer':      ['coding', 'learning'],
+  'code-developer':      ['coding', 'learning', 'ui'],
   'tdd-developer':       ['coding', 'test'],
   'workflow-executor':   ['coding'],
-  'universal-executor':  ['coding'],
+  'universal-executor':  ['coding', 'ui'],
   'test-fix-agent':      ['coding', 'test'],
 
   // Planning agents → arch specs

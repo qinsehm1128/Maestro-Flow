@@ -9,7 +9,7 @@ $ARGUMENTS: "[--scope <scope>] [--uid <uid>] <category> <content>"
 
 --scope  -- target scope: project (default) | global | team | personal
 --uid    -- user id for personal scope (auto-detected from git if omitted)
-category -- one of: coding, arch, quality, debug, test, review, learning
+category -- one of: coding, arch, quality, debug, test, review, learning, ui
 content  -- free-text description of the entry
 ```
 
@@ -33,6 +33,7 @@ content  -- free-text description of the entry
 | `test` | `test-conventions.md` |
 | `review` | `review-standards.md` |
 | `learning` | `learnings.md` |
+| `ui` | `ui-conventions.md` |
 
 ## Prerequisites
 
@@ -54,7 +55,7 @@ Parse $ARGUMENTS:
   4. content = remaining text
 Validate:
   - scope ∈ {project, global, team, personal}
-  - category ∈ {coding, arch, quality, debug, test, review, learning}
+  - category ∈ {coding, arch, quality, debug, test, review, learning, ui}
   - content non-empty
   - personal scope requires uid (resolve from `maestro collab whoami` if --uid not given)
 On failure: show usage `/spec-add [--scope <scope>] <category> <content>`, exit

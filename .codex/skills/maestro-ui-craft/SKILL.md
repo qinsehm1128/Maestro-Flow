@@ -1,18 +1,18 @@
 ---
 name: maestro-ui-craft
-description: Chain impeccable commands with intelligent routing and quality gate loops for automated UI production
+description: Chain maestro-impeccable commands with intelligent routing and quality gate loops for automated UI production
 argument-hint: "<intent|target> [--chain build|improve|enhance|harden|live] [--enhance <cmd>] [--threshold <score>] [--max-loops <n>] [-y]"
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep, Agent, request_user_input
 ---
 <purpose>
-Orchestrate impeccable skill commands via intelligent intent routing + quality gate auto-iteration.
+Orchestrate maestro-impeccable skill commands via intelligent intent routing + quality gate auto-iteration.
 Chain: Build → Evaluate → Auto-Refine → Re-evaluate → Verify.
 
 Core innovation: critique/audit scores drive automatic command selection and iteration loops.
-Impeccable has 23 commands across 6 categories -- this command chains them into automated pipelines
+maestro-impeccable has 23 commands across 6 categories -- this command chains them into automated pipelines
 with quality gates that loop until design quality meets the threshold.
 
-Prerequisite: impeccable skill available (auto-discovered by harness).
+Prerequisite: maestro-impeccable skill available (auto-discovered by harness).
 </purpose>
 
 <context>
@@ -33,7 +33,7 @@ $maestro-ui-craft -y "create pricing page --chain build"
 - `--enhance <cmd>` -- Specific enhance command (animate|colorize|typeset|layout|delight|overdrive|bolder)
 - `--threshold <score>` -- Critique pass threshold (default: 26/40). Audit threshold auto-computed as threshold*0.5
 - `--max-loops <n>` -- Maximum quality gate iterations (default: 3)
-- `-y` -- Auto mode: auto-select at ambiguous routing, skip confirmations where impeccable allows
+- `-y` -- Auto mode: auto-select at ambiguous routing, skip confirmations where maestro-impeccable allows
 </context>
 
 <chains>
@@ -85,16 +85,16 @@ Explicit `--chain` overrides routing. Ambiguous + no `-y` → `request_user_inpu
 
 ## 2. Setup Context
 
-1. If chain starts with `teach` → execute it first, impeccable handles context loading internally
-2. Otherwise → invoke `$impeccable` with no args to trigger setup (context + register)
-3. If impeccable reports PRODUCT.md missing → prepend teach, execute, then resume
+1. If chain starts with `teach` → execute it first, maestro-impeccable handles context loading internally
+2. Otherwise → invoke `$maestro-impeccable` with no args to trigger setup (context + register)
+3. If maestro-impeccable reports PRODUCT.md missing → prepend teach, execute, then resume
 
 ## 3. Execute Chain
 
 For each step in chain, sequentially:
 
 ```
-Step {n}/{total}: $impeccable {command} {target}
+Step {n}/{total}: $maestro-impeccable {command} {target}
 ```
 
 **Rules:**
@@ -110,11 +110,11 @@ When chain reaches a gate step (critique or audit):
 ### 5a. Execute Gate Command
 
 ```
-$impeccable critique {target}
+$maestro-impeccable critique {target}
 ```
 or
 ```
-$impeccable audit {target}
+$maestro-impeccable audit {target}
 ```
 
 ### 5b. Parse Score
@@ -123,7 +123,7 @@ From critique output, extract:
 - **score**: Nielsen's total (N/40) -- from "**Total** | | **N/40**" row
 - **P0_count**: count of `[P0]` tagged findings
 - **P1_count**: count of `[P1]` tagged findings
-- **suggested_commands**: list of "/impeccable <cmd>" from "Suggested command" fields
+- **suggested_commands**: list of "/maestro-impeccable <cmd>" from "Suggested command" fields
 
 From audit output, extract:
 - **score**: dimension total (N/20) -- from "**Total** | | **N/20**" row
@@ -146,7 +146,7 @@ audit_pass    = (score >= threshold * 0.5) AND (P0_count == 0)
 2. If no suggestions found → use fallback mapping (see quality_gate_routing)
 3. De-duplicate, cap at 3 commands per iteration
 4. Sort: P0-suggested first
-5. Execute each: `$impeccable {cmd} {target}`
+5. Execute each: `$maestro-impeccable {cmd} {target}`
 6. Re-run gate command (critique/audit)
 7. Increment loop_count
 
@@ -203,7 +203,7 @@ When critique/audit findings lack explicit "Suggested command", map by category:
 <error_codes>
 | Code | Severity | Description |
 |------|----------|-------------|
-| E001 | error | Impeccable skill not found |
+| E001 | error | maestro-impeccable skill not found |
 | E002 | error | No intent or target specified |
 | E003 | error | Invalid --chain type |
 | E004 | error | Invalid --enhance command |
@@ -215,7 +215,7 @@ When critique/audit findings lack explicit "Suggested command", map by category:
 <success_criteria>
 - [ ] Intent classified and chain type selected
 - [ ] Context loaded (PRODUCT.md present or taught)
-- [ ] All chain steps executed via $impeccable
+- [ ] All chain steps executed via $maestro-impeccable
 - [ ] Quality gate evaluated with parsed scores
 - [ ] Refine loop executed when gate failed (if applicable)
 - [ ] Final report with scores and trend presented

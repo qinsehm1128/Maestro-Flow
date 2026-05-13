@@ -9,7 +9,7 @@ $ARGUMENTS: "[--scope <scope>] [--uid <uid>] [--category <category>] [keyword]"
 
 --scope     -- load scope: project (default) | global | team | personal
 --uid       -- user id for personal scope (auto-detected from git if omitted)
---category  -- filter by category: coding | arch | test | review | debug | quality | learning
+--category  -- filter by category: coding | arch | test | review | debug | quality | learning | ui
                Loads category's primary doc in full + cross-file entries with matching category attr
 keyword     -- optional, grep within loaded specs for matching sections
 ```
@@ -29,6 +29,7 @@ Each category loads exactly one file per layer. Same mapping as spec-add.
 | `debug-notes.md` | debug |
 | `quality-rules.md` | quality |
 | `learnings.md` | learning |
+| `ui-conventions.md` | ui |
 
 ## Layer Order by Scope
 

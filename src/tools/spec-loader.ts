@@ -15,7 +15,7 @@ import { paths } from '../config/paths.js';
 // Types
 // ============================================================================
 
-export type SpecCategory = 'coding' | 'arch' | 'debug' | 'test' | 'review' | 'learning';
+export type SpecCategory = 'coding' | 'arch' | 'debug' | 'test' | 'review' | 'learning' | 'ui';
 
 export type SpecScope = 'project' | 'global' | 'team' | 'personal';
 
@@ -37,6 +37,7 @@ export const CATEGORY_MAP: Record<string, SpecCategory> = {
   'review-standards.md':        'review',
   'quality-rules.md':           'review',
   'learnings.md':               'learning',
+  'ui-conventions.md':          'ui',
 };
 
 const SPECS_DIR = '.workflow/specs';
