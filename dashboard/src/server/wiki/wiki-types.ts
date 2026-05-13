@@ -51,7 +51,7 @@ export interface WikiEntry {
   // ── Enrichment fields ────────────────────────────────────────────────
   /** Spec scope: project (default), global, team, personal. Null for non-spec types. */
   scope: WikiScope | null;
-  /** Content category: arch|coding|debug|learning|quality|execution|design|security|decision|... */
+  /** Content category: coding|arch|review|debug|test|learning (spec categories). Knowhow uses type-derived categories. */
   category: string | null;
   /** Command/skill that created this entry, e.g. "manage-harvest", "memory-capture", "manual". */
   createdBy: string | null;
@@ -82,6 +82,8 @@ export interface WikiFilters {
   category?: string;
   /** Filter by creating command/skill. */
   createdBy?: string;
+  /** Filter for tool documents only (ext.tool === true). */
+  tool?: boolean;
 }
 
 // ── Persisted index (written to .workflow/wiki-index.json) ────────────

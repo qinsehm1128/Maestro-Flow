@@ -352,6 +352,15 @@ export function registerDelegateCommand(program: Command): void {
       const workDir = resolve(opts.cd ?? process.cwd());
       const config = await loadCliToolsConfig(workDir);
 
+      // Validate config: tools must be a non-empty object
+      if (!config.tools || Object.keys(config.tools).length === 0) {
+        console.error(
+          'Error: cli-tools.json is missing or has no "tools" configured.\n' +
+          'Run "maestro config delegate reset" to regenerate with auto-detected tools.',
+        );
+        process.exit(1);
+      }
+
       // Tool resolution priority: --to > --role > first-enabled fallback
       let selected;
       if (opts.to) {
@@ -457,7 +466,7 @@ export function registerDelegateCommand(program: Command): void {
         // In sync mode, output the final result after completion
         if (syncMode) {
           const store = new CliHistoryStore();
-          const output = store.getOutput(execId);
+          const output = store.getOutput(execId, { lastReply: true });
           if (output) {
             process.stderr.write('\n--- Output ---\n');
             process.stdout.write(output);
@@ -552,9 +561,10 @@ export function registerDelegateCommand(program: Command): void {
     .description('Get assistant output for a delegated execution')
     .option('--verbose', 'Show full metadata and raw output')
     .option('--all', 'Include thinking/reasoning entries in output')
+    .option('--full', 'Return full output instead of just the last reply')
     .option('--offset <n>', 'Character offset to start from (for pagination)')
     .option('--limit <n>', 'Max characters to return (for pagination)')
-    .action((id: string, opts: { verbose?: boolean; all?: boolean; offset?: string; limit?: string }) => {
+    .action((id: string, opts: { verbose?: boolean; all?: boolean; full?: boolean; offset?: string; limit?: string }) => {
       const store = new CliHistoryStore();
       const meta = store.loadMeta(id);
 
@@ -583,7 +593,7 @@ export function registerDelegateCommand(program: Command): void {
         console.log('---');
       }
 
-      const output = store.getOutput(id, { includeAll: opts.all, offset, limit });
+      const output = store.getOutput(id, { includeAll: opts.all, lastReply: !opts.full, offset, limit });
       if (!output) {
         const status = statusLabel(meta);
         if (status === 'running') {

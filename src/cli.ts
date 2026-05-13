@@ -1,3 +1,14 @@
+// Suppress Node.js experimental feature warnings (e.g. SQLite)
+const _origEmit = process.emit;
+// @ts-expect-error — override emit to filter ExperimentalWarning
+process.emit = function (event: string, ...args: unknown[]) {
+  if (event === 'warning' && (args[0] as { name?: string })?.name === 'ExperimentalWarning') {
+    return false;
+  }
+  // @ts-expect-error — spread to original emit
+  return _origEmit.call(process, event, ...args);
+};
+
 import { Command } from 'commander';
 import { getPackageVersion } from './utils/get-version.js';
 

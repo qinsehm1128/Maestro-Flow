@@ -27,6 +27,14 @@ Parse for:
 - `--full` flag -- Enables plan-checking (max 2 iterations) and post-execution verification
 - `--discuss` flag -- Decision extraction before planning (gray areas, Locked/Free/Deferred classification)
 - Remaining text as task description
+
+### Pre-load context
+
+1. **Coding specs + tools**: Run `maestro spec load --category coding` to load coding conventions and discoverable tools. Apply to implementation.
+2. **Role Knowledge**:
+   - Browse: `maestro wiki list --category coding`
+   - Load task-relevant entries: `maestro wiki load <id1> [id2...]`
+3. All are optional — proceed without if unavailable.
 </context>
 
 <execution>

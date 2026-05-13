@@ -105,7 +105,7 @@ Add entries with: \`/spec-add learning <description>\`
       title: 'Quality Rules',
       readMode: 'required',
       priority: 'medium',
-      category: 'quality',
+      category: 'review',
       keywords: ['quality', 'lint', 'rule', 'enforcement'],
     },
     body: `# Quality Rules

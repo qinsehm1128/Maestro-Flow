@@ -6,13 +6,14 @@ allowed-tools: spawn_agents_on_csv, Read, Write, Edit, Bash, Glob, Grep, AskUser
 ---
 
 <purpose>
-Wave-based pipeline coordinator. All skill execution happens exclusively in spawned sub-agents
-via `spawn_agents_on_csv` — the coordinator never executes skills directly.
+Wave-based pipeline coordinator. Classify intent → resolve chain → wave-by-wave spawn → report.
+All skill execution via `spawn_agents_on_csv` — coordinator never executes skills directly.
 
-Coordinator loop: classify intent → resolve chain → build wave CSV → spawn → read results →
-(barrier: read artifacts, update context, assemble next skill_call args) → next wave → report.
-
-Each wave = 1 barrier task (solo) or N parallel non-barrier tasks.
+Entry points:
+- **`$maestro "intent"`** — Classify → chain → execute
+- **`$maestro --continue`** — Resume from last incomplete wave
+- **`$maestro --dry-run "intent"`** — Show chain, no execution
+- **`$maestro --super "intent"`** — Production-ready mode (read maestro-super.md)
 </purpose>
 
 <required_reading>
@@ -30,284 +31,248 @@ $ARGUMENTS — user intent text, or special flags.
 - `-y, --yes` — Auto mode: skip all prompts; propagate `-y` to each skill
 - `--continue` — Resume latest paused session from last incomplete wave
 - `--dry-run` — Display planned chain without executing
-- `--super` — Super mode: deliver production-ready complete software system. Read `maestro-super.md` from deferred_reading, then follow it completely.
+- `--super` — Read and follow `maestro-super.md` completely
 
 **Session state**: `.workflow/.maestro/{session-id}/`
-**Core output**: `tasks.csv` (master) + `wave-{N}-results.csv` (per wave) + `context.md` (report)
 </context>
 
 <invariants>
-1. **ALL skills via spawn_agents_on_csv**: Every skill invocation — barrier or non-barrier — MUST go through `spawn_agents_on_csv`. Coordinator NEVER directly executes any skill. No exceptions.
-2. **Coordinator = prompt assembler only**: Classify intent → build CSV → spawn → read results → assemble next CSV. It never runs skill logic itself.
-3. **Barrier ≠ execution**: Barrier designation only means the coordinator **pauses after the wave** to read artifacts and assemble the next wave's prompt args. Coordinator role at barrier: **discover artifacts → read → update context → assemble next skill_call args**. Nothing more.
-4. **Barrier = solo wave**: A barrier skill always executes alone in its wave (wave size = 1).
-5. **Non-barriers can parallel**: Consecutive non-barrier skills grouped into one wave (`max_workers = N`).
-6. **Wave-by-wave**: Never start wave N+1 before wave N results are read and analyzed.
-7. **Coordinator owns context**: Sub-agents never read prior results — coordinator assembles the full `skill_call` with resolved args.
-8. **Simple instruction**: Sub-agent instruction is minimal — just "execute {skill_call}, report result".
-9. **Abort on failure**: Failed step → mark remaining as skipped → report.
-10. **Resume from wave**: `--continue` finds last completed wave, resumes from next pending step.
+1. **ALL skills via spawn_agents_on_csv** — coordinator NEVER directly executes any skill logic
+2. **Coordinator = prompt assembler** — classify → build CSV → spawn → read results → assemble next
+3. **Barrier = solo wave** — barrier skills always execute alone (wave size = 1)
+4. **Non-barriers can parallel** — consecutive non-barrier skills grouped into one wave
+5. **Wave-by-wave** — never start wave N+1 before wave N results are read
+6. **Coordinator owns context** — sub-agents never read prior results; coordinator assembles full `skill_call`
+7. **Abort on failure** — failed step → mark remaining skipped → report
 </invariants>
 
-<chain_map>
-| Intent keywords | Chain | Steps (skills, in order) |
-|----------------|-------|--------------------------|
-| fix, bug, error, broken, crash | `quality-fix` | $maestro-analyze --gaps → $maestro-plan --gaps → $maestro-execute → $maestro-verify |
-| test, spec, coverage | `quality-test` | $quality-test |
-| refactor, cleanup, debt | `quality-refactor` | $quality-refactor |
-| feature, implement, add, build | `feature` | $maestro-plan → $maestro-execute → $maestro-verify |
-| review, check, audit | `quality-review` | $quality-review |
-| deploy, release, ship | `deploy` | $maestro-verify → $maestro-milestone-release |
-| brainstorm, explore, ideate | `brainstorm-driven` | $maestro-brainstorm → $maestro-plan → $maestro-execute → $maestro-verify |
-| plan, design, architect | `plan` | $maestro-plan |
-| debug, diagnose, troubleshoot | `debug` | $quality-debug |
-| continue, next, go | `state_continue` | (from project state) |
-| status, dashboard | `status` | $manage-status |
+<state_machine>
 
-Full chain map with 40+ chains: see `@~/.maestro/workflows/maestro.codex.md` §3c
-</chain_map>
+<states>
+S_PARSE         — 解析参数、检测 flags              PERSIST: —
+S_CONTINUE      — 加载已有 session，定位 resume 点   PERSIST: session (loaded)
+S_CLASSIFY      — 意图分类、解析 chain               PERSIST: —
+S_CREATE        — 创建 session + status.json         PERSIST: session.status, session.steps[]
+S_DRY_RUN       — 显示 chain 后结束                  PERSIST: —
+S_CONFIRM       — 用户确认（auto_mode 跳过）          PERSIST: —
+S_WAVE_LOOP     — 构建 wave → spawn → 读结果 → 循环  PERSIST: session.waves[], session.current_step, session.context
+S_COMPLETE      — 标记完成、释放目标                  PERSIST: session.status = "completed"
+S_ABORTED       — 失败中止、标记剩余 skipped          PERSIST: session.status = "aborted"
+S_FALLBACK      — 意图无法分类，请求输入              PERSIST: —
+</states>
 
-<barrier_skills>
-Skills that produce artifacts the coordinator must read before assembling the next wave.
-After a barrier skill completes **in its spawned sub-agent**, coordinator reads output and updates `state.context`.
+<transitions>
 
-| Skill | Artifacts to Read | Context Updates |
-|-------|------------------|-----------------|
-| `maestro-analyze` | `.workflow/.csv-wave/*/context.md`, `state.json` | `gaps`, `phase`, `analysis_dir` |
-| `maestro-plan` | `{artifact_dir}/plan.json`, `{artifact_dir}/.task/TASK-*.json` | `plan_dir`, `task_count`, `wave_count` |
-| `maestro-brainstorm` | `.workflow/.csv-wave/*/.brainstorming/` | `brainstorm_dir`, `features` |
-| `maestro-roadmap` | `.workflow/.csv-wave/*/specs/` | `spec_session_id` |
-| `maestro-execute` | `.workflow/.csv-wave/*/results.csv` | `exec_status`, `completed_tasks`, `failed_tasks` |
+S_PARSE:
+  → S_CONTINUE    WHEN: --continue flag
+  → S_CLASSIFY    WHEN: intent text present
+  → S_FALLBACK    WHEN: no intent AND no flags
 
-**Non-barrier skills** (groupable into multi-task waves): `maestro-verify`, `quality-review`, `quality-test`, `quality-debug`, `quality-refactor`, `quality-sync`, `manage-*`
+S_CONTINUE:
+  → S_WAVE_LOOP   WHEN: session found, has pending steps     DO: A_RESUME_SESSION
+  → S_FALLBACK    WHEN: no session found
 
-### Barrier Analysis Logic
+S_CLASSIFY:
+  → S_CREATE      WHEN: chain resolved (keyword match or maestro.codex.md lookup)
+  → S_FALLBACK    WHEN: no match AND auto_mode
+  → S_CLASSIFY    WHEN: no match AND not auto_mode          DO: A_CLARIFY_INTENT
+                   GUARD: max 1 clarification attempt → S_FALLBACK
 
-After each barrier skill completes, read its artifacts and update `state.context`:
+S_CREATE:
+  → S_DRY_RUN     WHEN: --dry-run flag                      DO: A_CREATE_SESSION
+  → S_CONFIRM     WHEN: not auto_mode                       DO: A_CREATE_SESSION
+  → S_WAVE_LOOP   WHEN: auto_mode                           DO: A_CREATE_SESSION
 
-| Barrier Skill | Read | Context Updates |
-|---------------|------|-----------------|
-| `maestro-analyze` | `{artifacts}/context.md` | `analysis_dir`, `gaps` (extracted), `phase` (if unset) |
-| `maestro-plan` | `{artifacts}/plan.json` | `plan_dir`, `task_count`, `wave_count` from plan JSON |
-| `maestro-brainstorm` | `{artifacts}/` | `brainstorm_dir` |
-| `maestro-roadmap` | `{artifacts}/` | `spec_session_id` (extracted) |
-| `maestro-execute` | `{artifacts}/results.csv` | `exec_completed`, `exec_failed` (counted by status) |
-</barrier_skills>
+S_DRY_RUN:
+  → END           DO: display chain with [BARRIER] markers
 
-<execution>
+S_CONFIRM:
+  → S_WAVE_LOOP   WHEN: user confirms
+  → S_ABORTED     WHEN: user cancels
 
-### Phase 1: Resolve Intent and Chain
+S_WAVE_LOOP:
+  → S_WAVE_LOOP   WHEN: pending steps remain                DO: A_BUILD_AND_SPAWN_WAVE
+  → S_COMPLETE    WHEN: no pending steps
+  → S_ABORTED     WHEN: step failed
+                   GUARD: wave order is sacred — never skip ahead
 
-**`--continue`**: Glob `.workflow/.maestro/maestro-*/status.json` sorted desc; load most recent; resume from first pending wave.
+S_COMPLETE:
+  → END           DO: A_FINALIZE
 
-**Fresh mode**:
-1. Read `.workflow/state.json` for project context (derive current phase from artifact registry, `workflow_name`)
-2. Classify intent via keyword heuristics (see chain_map)
-4. No match + not AUTO_YES → one clarifying question via `AskUserQuestion`
-5. Resolve chain's skill list
-6. Create session dir `.workflow/.maestro/maestro-{YYYYMMDD-HHMMSS}/` and write `status.json`:
+S_ABORTED:
+  → END           DO: A_ABORT_REPORT
 
-```json
-{
-  "session_id": "maestro-{YYYYMMDD-HHMMSS}",
-  "source": "maestro",
-  "created_at": "ISO",
-  "updated_at": "ISO",
-  "intent": "...",
-  "task_type": "...",
-  "chain_name": "...",
-  "phase": null,
-  "milestone": null,
-  "auto_mode": false,
-  "exec_mode": "auto",
-  "cli_tool": "codex",
-  "lifecycle_position": null,
-  "target": null,
-  "context": {
-    "issue_id": null,
-    "milestone_num": null,
-    "spec_session_id": null,
-    "scratch_dir": null,
-    "plan_dir": null,
-    "analysis_dir": null,
-    "brainstorm_dir": null
-  },
-  "waves": [],
-  "steps": [{ "index": 0, "skill": "...", "args": "", "type": "skill", "status": "pending", "started_at": null, "completed_at": null, "error": null, "wave_n": null }],
-  "current_step": 0,
-  "status": "running"
-}
-```
+S_FALLBACK:
+  → S_CLASSIFY    WHEN: user provides new intent            DO: AskUserQuestion
+  → END           WHEN: user cancels
 
-7. **Initialize tracking** (goal constraint → plan sub-items):
+</transitions>
 
-```
-// Goal = outer constraint — ensures entire chain completes
-functions.create_goal({
-  objective: `Maestro ${chain_name}: ${steps.length} steps [${steps.map(s => s.skill).join(' → ')}]`
-})
+<actions>
 
-// Plan = inner tracking — sub-step progress
-functions.update_plan({
-  plan: steps.map((step, i) => ({
-    id: `step-${i}`,
-    title: `[${i + 1}/${steps.length}] ${step.skill}${barrier(step) ? ' [BARRIER]' : ''}`,
-    status: "open"
-  }))
-})
-```
+### A_CREATE_SESSION
 
-**`--dry-run`**: Display chain with `[BARRIER]` markers, stop.
-
-**User confirmation** (skip if AUTO_YES): Display plan, prompt `Proceed? (yes/no)`.
-
-**`--continue` plan rebuild**: When resuming, rebuild `update_plan` from status.json — completed steps → `"completed"`, current → `"in_progress"`, rest → `"open"`.
-
-### Phase 2: Wave Execution Loop
-
-**While pending steps remain**, increment `waveNum` and repeat:
-
-1. **Build wave**: Select next wave steps via `buildNextWave` (barrier = solo, non-barriers = grouped)
-2. **Write CSV**: `{sessionDir}/wave-{N}.csv` with columns `id,skill_call,topic` — one row per step, skill_call assembled with resolved context
-3. **Spawn**:
+1. Read `.workflow/state.json` for project context (current phase, milestone, workflow_name)
+2. Resolve chain's skill list from chain_map or maestro.codex.md
+3. Create `.workflow/.maestro/maestro-{YYYYMMDD-HHMMSS}/status.json`:
+   ```json
+   { "session_id", "source": "maestro", "intent", "task_type", "chain_name",
+     "phase", "milestone", "auto_mode", "context": { "issue_id", "scratch_dir",
+     "plan_dir", "analysis_dir", "brainstorm_dir" },
+     "steps": [{ "index", "skill", "args", "status": "pending", "wave_n": null }],
+     "waves": [], "current_step": 0, "status": "running" }
    ```
-   spawn_agents_on_csv({
-     csv_path: "{sessionDir}/wave-{N}.csv",
-     id_column: "id", instruction: WAVE_INSTRUCTION,
-     max_workers: <wave size>, max_runtime_seconds: 3600,
-     output_csv_path: "{sessionDir}/wave-{N}-results.csv",
-     output_schema: RESULT_SCHEMA
-   })
-   ```
-4. **Read results**: Update each step's `status`, `wave_n` from results CSV
-5. **Barrier check**: If wave was a barrier skill, run barrier analysis logic (read artifacts, update context)
-6. **Dual-track persist**:
-   - status.json: Append wave to `state.waves[]`, update step statuses, write `status.json`
-   - update_plan: Sync plan items from status.json step statuses:
-     ```
-     functions.update_plan({
-       plan: steps.map((step, i) => ({
-         id: `step-${i}`,
-         title: `[${i + 1}/${steps.length}] ${step.skill}`,
-         status: step.status === 'completed' ? 'completed'
-               : step.status === 'pending' && i === nextPendingIndex ? 'in_progress'
-               : step.status
-       }))
-     })
-     ```
-7. **Abort on failure**: If any result `status === 'failed'` → mark remaining steps `skipped` in both status.json and update_plan, set `state.status = 'aborted'`, break
+4. Initialize tracking:
+   - `create_goal({ objective: "Maestro {chain}: {N} steps [{skill list}]" })`
+   - `update_plan({ plan: steps.map(step => { step, status: "pending" }) })`
 
-### Skill Call Assembly
+### A_RESUME_SESSION
 
-**Barrier skills**: `maestro-analyze`, `maestro-plan`, `maestro-brainstorm`, `maestro-roadmap`, `maestro-execute`
+1. Glob `.workflow/.maestro/maestro-*/status.json` sorted desc, load most recent
+2. Find first pending step → set as resume point
+3. Rebuild `update_plan` from status.json (completed→"completed", current→"in_progress", rest→"open")
 
-**Auto-yes flag map** (appended when `status.auto_mode` is true):
+### A_CLARIFY_INTENT
+
+1. `AskUserQuestion` with available chain types
+2. Re-classify with user response
+
+### A_BUILD_AND_SPAWN_WAVE
+
+1. **buildNextWave**: first pending step; barrier → solo wave; non-barrier → collect consecutive non-barriers
+2. **buildSkillCall** per step:
+   - Replace placeholders: `{phase}`, `{plan_dir}`, `{analysis_dir}`, `{brainstorm_dir}`, `{spec_session_id}`
+   - Append auto-yes flag if `auto_mode` (see Appendix: Auto-Yes Flag Map)
+3. Write `{sessionDir}/wave-{N}.csv` (columns: id, skill_call, topic)
+4. `spawn_agents_on_csv({ csv_path, id_column: "id", instruction: WAVE_INSTRUCTION, max_workers, max_runtime_seconds: 3600, output_csv_path, output_schema: RESULT_SCHEMA })`
+5. Read results → update step statuses in status.json
+6. **Barrier analysis** (if barrier skill): read artifacts, update `session.context`
+   | Barrier Skill | Read | Context Updates |
+   |---------------|------|-----------------|
+   | maestro-analyze | context.md, state.json | analysis_dir, gaps, phase |
+   | maestro-plan | plan.json, .task/TASK-*.json | plan_dir, task_count, wave_count |
+   | maestro-brainstorm | .brainstorming/ | brainstorm_dir, features |
+   | maestro-roadmap | specs/ | spec_session_id |
+   | maestro-execute | results.csv | exec_completed, exec_failed |
+7. Persist: write status.json + sync update_plan
+
+### A_FINALIZE
+
+1. Set `session.status = "completed"`, write status.json
+2. Sync update_plan: all steps → "completed"
+3. `update_goal({ status: "complete" })` — release goal constraint
+4. Generate completion report (see Appendix: Report Format)
+
+### A_ABORT_REPORT
+
+1. Mark remaining steps as `skipped` in status.json
+2. Set `session.status = "aborted"`, write status.json
+3. Sync update_plan (skipped steps marked)
+4. Do NOT call update_goal — goal stays for `--continue` resume
+5. Display abort report with failure details
+
+</actions>
+
+</state_machine>
+
+<appendix>
+
+### Chain Map (Quick Reference)
+
+| Intent keywords | Chain | Steps |
+|----------------|-------|-------|
+| fix, bug, error, broken | `quality-fix` | analyze --gaps → plan --gaps → execute → verify |
+| test, spec, coverage | `quality-test` | quality-test |
+| refactor, cleanup, debt | `quality-refactor` | quality-refactor |
+| feature, implement, add | `feature` | plan → execute → verify |
+| review, check, audit | `quality-review` | quality-review |
+| deploy, release, ship | `deploy` | verify → milestone-release |
+| brainstorm, explore, ideate | `brainstorm-driven` | brainstorm → plan → execute → verify |
+| plan, design, architect | `plan` | plan |
+| debug, diagnose | `debug` | quality-debug |
+| continue, next | `state_continue` | (from project state) |
+| status, dashboard | `status` | manage-status |
+
+Full chain map (40+ chains): `@~/.maestro/workflows/maestro.codex.md` §3c
+
+### Auto-Yes Flag Map
 
 | Skill | Flag |
 |-------|------|
-| `maestro-init`, `maestro-analyze`, `maestro-brainstorm`, `maestro-ui-design`, `maestro-roadmap` | `-y` |
-| `maestro-plan`, `maestro-execute`, `maestro-milestone-complete` | `-y` |
-| `quality-auto-test`, `quality-retrospective` | `-y` |
-| `quality-test` | `-y --auto-fix` |
+| maestro-init, maestro-analyze, maestro-brainstorm, maestro-ui-design, maestro-roadmap | `-y` |
+| maestro-plan, maestro-execute, maestro-milestone-complete | `-y` |
+| quality-auto-test, quality-retrospective | `-y` |
+| quality-test | `-y --auto-fix` |
 
-**`buildSkillCall(step, ctx)`**: Replace placeholders `{phase}`, `{description}`, `{issue_id}`, `{plan_dir}`, `{analysis_dir}`, `{brainstorm_dir}`, `{spec_session_id}` in `step.args` with corresponding `ctx` values. Append auto-yes flag if applicable. Return `$<skill> <args>`.
+### Barrier Skills
 
-**`buildNextWave(steps)`**: Take first pending step. If it is a barrier skill, return it solo. Otherwise, collect consecutive non-barrier pending steps into one wave (stop at first barrier).
+`maestro-analyze`, `maestro-plan`, `maestro-brainstorm`, `maestro-roadmap`, `maestro-execute`
 
-### Sub-Agent Instruction Template
+Non-barrier (groupable): `maestro-verify`, `quality-review`, `quality-test`, `quality-debug`, `quality-refactor`, `quality-sync`, `manage-*`
 
+### Worker Contract
+
+**Instruction template:**
 ```
 你是 CSV job 子 agent。
-
-先原样执行这一段技能调用：
-{skill_call}
-
-然后基于结果完成这一行任务说明：
-{topic}
-
-限制：
-- 不要修改 .workflow/.maestro/ 下的 status 文件
-- skill 内部有自己的 session 管理，按 skill SKILL.md 执行即可
-
+先原样执行这一段技能调用：{skill_call}
+然后基于结果完成这一行任务说明：{topic}
+限制：不要修改 .workflow/.maestro/ 下的 status 文件
 最后必须调用 `report_agent_job_result`，返回 JSON：
-{"status":"completed|failed","skill_call":"{skill_call}","summary":"一句话结果","artifacts":"产物路径或空字符串","error":"失败原因或空字符串"}
+{"status":"completed|failed","skill_call":"{skill_call}","summary":"一句话结果","artifacts":"产物路径","error":"失败原因"}
 ```
 
-### Result Schema
+**Result schema:** `{ status, skill_call, summary, artifacts, error }` — all string, all required
 
-Object with all fields required: `status` ("completed"|"failed"), `skill_call` (string), `summary` (string), `artifacts` (path or ""), `error` (reason or "").
+### CSV Schema
 
-### Phase 3: Completion Report
-
-Finalize tracking:
-- status.json: `state.status = 'completed'`
-- update_plan: all steps → `"completed"` (skipped steps also marked completed)
-- **update_goal**: `functions.update_goal({ status: "complete" })` — release goal constraint
-
-**Note**: Abort path (Phase 2 step 7) does NOT call `update_goal` — goal stays running for `--continue` resume.
-
-```
-=== COORDINATE COMPLETE ===
-Session:  <sessionId>
-Chain:    <chain>
-Waves:    <N> executed
-Steps:    <completed>/<total>
-
-WAVE RESULTS:
-  [W1] $maestro-analyze --gaps  →  ✓  found 3 gaps
-  [W2] $maestro-plan --gaps     →  ✓  12 tasks in 3 waves
-  [W3] $maestro-execute         →  ✓  12/12 tasks done
-  [W4] $maestro-verify          →  ✓  all criteria met
-
-State:    .workflow/.maestro/<sessionId>/status.json
-Resume:   $maestro --continue
-```
-</execution>
-
-<csv_schema>
-### wave-{N}.csv (Per-Wave Input)
-
+**wave-{N}.csv:**
 ```csv
 id,skill_call,topic
 "1","$maestro-analyze --gaps \"fix auth\" -y","Chain \"quality-fix\" step 1/4"
 ```
 
-| Column | Description |
-|--------|-------------|
-| `id` | Step number from chain (string) |
-| `skill_call` | Full skill invocation assembled by coordinator with resolved context |
-| `topic` | Brief description for the agent |
+**Session status.json:** see A_CREATE_SESSION for full schema
 
-### tasks.csv (Master State)
+### Error Codes
 
-```csv
-id,skill,args,wave_n,status,findings,artifacts,error
-```
-
-Accumulated across all waves. Updated after each wave completes.
-</csv_schema>
-
-<error_codes>
 | Code | Severity | Condition | Recovery |
 |------|----------|-----------|----------|
 | E001 | error | Intent unclassifiable after clarification | Default to `feature` chain |
-| E002 | error | Intent unresolvable after retry | List available chains, abort |
-| E003 | error | Wave timeout (max_runtime_seconds) | Mark step `failed`, abort chain |
+| E002 | error | Intent unresolvable after retry | List chains, abort |
+| E003 | error | Wave timeout | Mark step failed, abort chain |
 | E004 | error | Barrier artifact not found | Retry wave once, then abort |
-| E005 | error | `--continue`: no session found | List sessions, prompt |
+| E005 | error | --continue: no session found | List sessions, prompt |
 | W001 | warning | Barrier artifact partial | Continue with available context |
-</error_codes>
 
-<success_criteria>
-- [ ] Intent classified and chain resolved (keyword heuristics or `--chain`)
-- [ ] Session dir initialized with `status.json` before first wave
-- [ ] Every skill invocation goes through `spawn_agents_on_csv` — none executed in coordinator
-- [ ] Barrier skills execute solo in their wave; coordinator only reads artifacts afterward
-- [ ] Non-barrier skills grouped into parallel waves where possible
-- [ ] Each wave: CSV built → spawned → results read → state updated
-- [ ] Barrier artifacts read and context updated before assembling next wave's skill_call args
-- [ ] Failed step → remaining marked skipped → abort reported
-- [ ] Completion report with per-wave status written to `context.md`
-- [ ] `--dry-run` shows chain with [BARRIER] markers, no execution
-- [ ] `--continue` resumes from last incomplete wave
-</success_criteria>
+### Success Criteria
+
+- [ ] Intent classified and chain resolved
+- [ ] Session dir initialized with status.json before first wave
+- [ ] Every skill goes through spawn_agents_on_csv
+- [ ] Barrier skills solo wave; non-barriers grouped parallel
+- [ ] Each wave: CSV → spawn → results → state updated
+- [ ] Barrier artifacts read before assembling next wave args
+- [ ] Failed step → remaining skipped → abort reported
+- [ ] --dry-run shows chain with [BARRIER], no execution
+- [ ] --continue resumes from last incomplete wave
+
+### Report Format
+
+```
+=== COORDINATE COMPLETE ===
+Session:  {sessionId}
+Chain:    {chain}
+Waves:    {N} executed
+Steps:    {completed}/{total}
+
+WAVE RESULTS:
+  [W1] $maestro-analyze --gaps  →  ✓  found 3 gaps
+  [W2] $maestro-plan --gaps     →  ✓  12 tasks in 3 waves
+  ...
+
+State:    .workflow/.maestro/{sessionId}/status.json
+Resume:   $maestro --continue
+```
+
+</appendix>

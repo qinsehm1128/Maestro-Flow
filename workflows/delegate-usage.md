@@ -230,8 +230,9 @@ maestro delegate tail <id>                         # recent events + history
 maestro delegate tail <id> --events 20 --history 20
 
 # Get result
-maestro delegate output <id>                       # assistant output
-maestro delegate output <id> --verbose             # include timestamps
+maestro delegate output <id>                       # last reply only (after last tool call)
+maestro delegate output <id> --full                # full output (all turns)
+maestro delegate output <id> --verbose             # include start/end timestamps
 
 # Lifecycle control
 maestro delegate cancel <id>                       # request cancellation

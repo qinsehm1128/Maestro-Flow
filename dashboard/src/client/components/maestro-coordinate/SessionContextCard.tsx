@@ -1,5 +1,5 @@
 import type { SessionDetail } from '@/client/store/maestro-coordinate-store.js';
-import type { CoordinateWalkerState } from '@/shared/maestro-session-types.js';
+import type { RalphStatusJson, CoordinateWalkerState } from '@/shared/maestro-session-types.js';
 import { MetaField } from './SessionDetailPanel.js';
 
 // ---------------------------------------------------------------------------
@@ -20,9 +20,8 @@ export function SessionContextCard({ detail }: { detail: SessionDetail }) {
 // Ralph Context
 // ---------------------------------------------------------------------------
 
-function RalphContextCard({ data }: { data: SessionDetail extends { source: 'ralph' } ? infer _ : never }) {
-  // We know detail.source === 'ralph', data is RalphStatusJson
-  const ralph = data as import('@/shared/maestro-session-types.js').RalphStatusJson;
+function RalphContextCard({ data }: { data: RalphStatusJson }) {
+  const ralph = data;
 
   return (
     <div>

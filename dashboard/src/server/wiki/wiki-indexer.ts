@@ -613,6 +613,7 @@ export function filterEntries(entries: WikiEntry[], filters: WikiFilters): WikiE
     if (filters.status && d.status !== filters.status) return false;
     if (filters.category && d.category !== filters.category) return false;
     if (filters.createdBy && d.createdBy !== filters.createdBy) return false;
+    if (filters.tool && d.ext?.tool !== true && d.ext?.tool !== 'true') return false;
     if (filters.q) {
       const q = filters.q.toLowerCase();
       if (!d.title.toLowerCase().includes(q) && !d.summary.toLowerCase().includes(q)) {

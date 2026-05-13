@@ -146,10 +146,10 @@ Route priority:
   2. object == 'team' → route by action: review→team_review, test→team_test, debug/analyze→team_qa, refactor→team_tech_debt, execute→team_lifecycle; default→team_coordinate
   3. action × object matrix lookup (fallback per action via '_default', global fallback 'quick'):
 
-  fix:        bug/code/performance/security/test→debug, issue→issue; default→debug
-  create:     feature→quick, issue→issue, test→test_gen, spec→spec_generate, ui→ui_design, config→init; default→quick
+  fix:        bug/code/performance/security/test→debug, issue→issue, ui→ui_craft_improve; default→debug
+  create:     feature→quick, issue→issue, test→test_gen, spec→spec_generate, ui→ui_craft_build, config→init; default→quick
   analyze:    bug/code/performance/security/feature→analyze, issue→issue_analyze, codebase→spec_map; default→analyze
-  explore:    issue→issue_discover, feature→brainstorm, ui→ui_design; default→brainstorm
+  explore:    issue→issue_discover, feature→brainstorm, ui→ui_craft; default→brainstorm
   plan:       issue→issue_plan, spec→spec_generate, phase/milestone→plan; default→plan
   execute:    issue→issue_execute; default→execute
   verify:     default→verify
@@ -319,6 +319,9 @@ const chainMap = {
   'analyze':            [{ cmd: 'maestro-analyze', args: '{phase}' }],
   'analyze-quick':      [{ cmd: 'maestro-analyze', args: '{phase} -q' }],
   'ui_design':          [{ cmd: 'maestro-ui-design', args: '{phase}' }],
+  'ui_craft':           [{ cmd: 'maestro-ui-craft', args: '"{description}"' }],
+  'ui_craft_build':     [{ cmd: 'maestro-ui-craft', args: '"{description}" --chain build' }],
+  'ui_craft_improve':   [{ cmd: 'maestro-ui-craft', args: '"{description}" --chain improve' }],
   'plan':               [{ cmd: 'maestro-plan', args: '{phase}' }],
   'execute':            [{ cmd: 'maestro-execute', args: '{phase}' }],
   'verify':             [{ cmd: 'maestro-verify', args: '{phase}' }],
@@ -368,6 +371,7 @@ const chainMap = {
   'roadmap-driven':       [{ cmd: 'maestro-init' }, { cmd: 'maestro-roadmap', args: '"{description}"' }, { cmd: 'maestro-plan', args: '{phase}' }, { cmd: 'maestro-execute', args: '{phase}' }, { cmd: 'maestro-verify', args: '{phase}' }],
   'brainstorm-driven':    [{ cmd: 'maestro-brainstorm', args: '"{description}"' }, { cmd: 'maestro-plan', args: '{phase}' }, { cmd: 'maestro-execute', args: '{phase}' }, { cmd: 'maestro-verify', args: '{phase}' }],
   'ui-design-driven':     [{ cmd: 'maestro-ui-design', args: '{phase}' }, { cmd: 'maestro-plan', args: '{phase}' }, { cmd: 'maestro-execute', args: '{phase}' }, { cmd: 'maestro-verify', args: '{phase}' }],
+  'ui-craft-driven':      [{ cmd: 'maestro-ui-craft', args: '"{description}" --chain build' }, { cmd: 'maestro-verify', args: '{phase}' }],
   'analyze-plan-execute': [{ cmd: 'maestro-analyze', args: '"{description}" -q' }, { cmd: 'maestro-plan', args: '--dir {scratch_dir}' }, { cmd: 'maestro-execute', args: '--dir {scratch_dir}' }],
   'execute-verify':       [{ cmd: 'maestro-execute', args: '{phase}' }, { cmd: 'maestro-verify', args: '{phase}' }],
   'quality-loop':         [{ cmd: 'maestro-verify', args: '{phase}' }, { cmd: 'quality-review', args: '{phase}' }, { cmd: 'quality-auto-test', args: '{phase}' }, { cmd: 'quality-test', args: '{phase}' }, { cmd: 'quality-debug', args: '--from-uat {phase}' }, { cmd: 'maestro-plan', args: '{phase} --gaps' }, { cmd: 'maestro-execute', args: '{phase}' }],

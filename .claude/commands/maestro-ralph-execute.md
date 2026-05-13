@@ -13,281 +13,238 @@ allowed-tools:
 ---
 <purpose>
 Single-step executor for ralph (adaptive) and maestro (static) sessions.
-Sessions stored at `.workflow/.maestro/*/status.json`.
-
-Each invocation: locate session → find next pending step → resolve args → execute → update status → hand off to next iteration.
+Each invocation: locate session → find next step → resolve args → execute → update → self-invoke next.
 
 Mutual invocation with `/maestro-ralph` forms a self-perpetuating work loop.
+Session: `.workflow/.maestro/*/status.json`
 </purpose>
 
 <context>
 $ARGUMENTS — optional `-y` flag + optional session ID.
 
-**Flag parsing:**
+**Parse:**
 ```
--y / --yes → auto = true (remove from remaining args)
-Remaining  → session_id (if matches maestro-* or ralph-* pattern)
+-y / --yes → auto = true
+Remaining  → session_id (if matches maestro-* or ralph-*)
 ```
-
-Also read `session.auto_mode` from status.json — if `true`, treat as `-y` even without flag.
-
-**Session sources:**
-- **ralph** — Adaptive chain with decision nodes (primary)
-- **maestro** — Static chain, internal/external only, no decision callbacks
+Also read `session.auto_mode` from status.json — if true, treat as `-y`.
 
 **Node types:**
 
 | Type | Execution | Flow after |
 |------|-----------|------------|
-| decision (ralph-only) | `Skill("maestro-ralph")` — ralph re-evaluates, may expand chain | Ralph handles handoff, this execution ends |
-| internal | `Skill({ skill, args })` — synchronous in-session | Self-invoke next |
-| external | `maestro delegate --to claude` — new Claude Code session | STOP → callback → self-invoke next |
+| decision (ralph-only) | `Skill("maestro-ralph")` — ralph re-evaluates | Execution ends here |
+| internal | `Skill({ skill, args })` — synchronous | Self-invoke next |
+| external | `maestro delegate --to claude --mode write` | STOP → callback → self-invoke |
 
-**Auto flag map** (appended to skill args when auto mode is active):
-
-All lifecycle skills: `-y`. Exception: `quality-test` → `-y --auto-fix`.
-
-Fallback for unlisted skills: internal → no flag, external → `-y`.
-
-HARD RULE: External nodes ALWAYS append `-y` **to the skill's args inside the prompt** (not as a `maestro delegate` CLI argument), regardless of auto mode — delegate sessions are non-interactive and cannot confirm prompts.
+HARD RULE: External nodes ALWAYS append `-y` to skill args inside the prompt — delegate sessions are non-interactive.
+HARD RULE: External nodes ALWAYS delegate to `claude` — only Claude Code can execute slash-command skills.
 </context>
 
-<execution>
+<invariants>
+1. **Every step via Skill() or delegate** — never simulate or inline a skill's work
+2. **External → claude only** — `session.cli_tool` is for analysis delegates, NOT execution
+3. **Self-invocation chain** — continues until all steps complete or session paused
+4. **Status.json updated after every change** — resume-safe
+</invariants>
 
-## Step 1: Locate Session + Find Next Step
+<state_machine>
 
-```
-If session_id provided (matches maestro-* or ralph-*):
-  session_path = .workflow/.maestro/{session_id}/status.json
-Else:
-  Scan .workflow/.maestro/*/status.json
-  Filter: status == "running"
-  Sort: updated_at DESC (or dir mtime DESC)
-  Take first
+<states>
+S_LOCATE        — 定位 session + 找下一个 pending step   PERSIST: —
+S_RESOLVE_ARGS  — 解析占位符 + 丰富参数                  PERSIST: step.args (enriched)
+S_EXECUTE       — 执行当前 step                          PERSIST: step.status = "running", session.current_step
+S_POST_EXEC     — 标记完成 + 传播上下文                   PERSIST: step.status, session.context
+S_HANDLE_FAIL   — 处理失败（重试/跳过/中止）              PERSIST: step.status, session.status
+S_COMPLETE      — 所有 step 完成                         PERSIST: session.status = "completed"
+S_FALLBACK      — 无 session 可执行                      PERSIST: —
+</states>
 
-If no session found:
-  Output: "无运行中的会话。使用 /maestro 或 /maestro-ralph 创建新会话。"
-  End.
-```
+<transitions>
 
-Read status.json → extract: `session_id`, `source`, `steps[]`, `current_step`, `status`, `phase`, `milestone`, `intent`, `auto_mode`, `context`, `cli_tool`.
+S_LOCATE:
+  → S_RESOLVE_ARGS  WHEN: pending step found                DO: A_LOCATE_SESSION
+  → S_COMPLETE      WHEN: no pending steps
+  → S_FALLBACK      WHEN: no running session
 
-```
-next = steps.find(step => step.status == "pending")
-If no pending step → Step 5 (Complete Session)
-```
+S_RESOLVE_ARGS:
+  → S_EXECUTE       DO: A_RESOLVE_ARGS
 
-## Step 2: Resolve Args
+S_EXECUTE:
+  → END             WHEN: step.type == "decision"           DO: A_EXEC_DECISION
+  → S_POST_EXEC     WHEN: step.type == "internal" + success DO: A_EXEC_INTERNAL
+  → S_HANDLE_FAIL   WHEN: step.type == "internal" + failure DO: A_EXEC_INTERNAL
+  → END             WHEN: step.type == "external"           DO: A_EXEC_EXTERNAL
+                     (STOP after background delegate; on callback → S_POST_EXEC or S_HANDLE_FAIL)
 
-Enrich `next.args` with session context before execution.
+S_POST_EXEC:
+  → S_LOCATE        DO: A_MARK_COMPLETE + Skill("maestro-ralph-execute")
+
+S_HANDLE_FAIL:
+  → S_LOCATE        WHEN: auto + not retried               DO: A_RETRY
+  → END             WHEN: auto + retried                    DO: A_PAUSE_SESSION
+  → S_LOCATE        WHEN: interactive + user selects retry  DO: A_RETRY
+  → S_LOCATE        WHEN: interactive + user selects skip   DO: A_SKIP_STEP
+  → END             WHEN: interactive + user selects abort  DO: A_PAUSE_SESSION
+
+S_COMPLETE:
+  → END             DO: A_COMPLETE_SESSION
+
+S_FALLBACK:
+  → END             DO: display "无运行中的会话。使用 /maestro 或 /maestro-ralph 创建。"
+
+</transitions>
+
+<actions>
+
+### A_LOCATE_SESSION
+
+1. If session_id provided → load `.workflow/.maestro/{session_id}/status.json`
+2. Else: scan `.workflow/.maestro/*/status.json`, filter `status == "running"`, sort DESC, take first
+3. Extract: session_id, source, steps[], current_step, phase, milestone, intent, auto_mode, context, cli_tool
+4. Find first step with `status == "pending"` → next step
+
+### A_RESOLVE_ARGS
 
 **Placeholder substitution:**
 
 | Placeholder | Source |
 |-------------|--------|
-| `{phase}` | status.phase |
-| `{milestone}` | status.milestone |
-| `{intent}` | status.intent |
-| `{description}` | status.intent (alias) |
-| `{scratch_dir}` | status.context.scratch_dir or latest artifact path |
-| `{plan_dir}` | status.context.plan_dir |
-| `{analysis_dir}` | status.context.analysis_dir |
-| `{issue_id}` | status.context.issue_id |
-| `{milestone_num}` | status.context.milestone_num |
+| `{phase}` | session.phase |
+| `{milestone}` | session.milestone |
+| `{intent}` | session.intent |
+| `{description}` | session.intent (alias) |
+| `{scratch_dir}` | session.context.scratch_dir or latest artifact path |
+| `{plan_dir}` | session.context.plan_dir |
+| `{analysis_dir}` | session.context.analysis_dir |
+| `{issue_id}` | session.context.issue_id |
+| `{milestone_num}` | session.context.milestone_num |
 
-**Per-skill enrichment** (when args is empty or only has phase number):
+**Per-skill enrichment** (when args empty or minimal):
 
 | Skill | Required context | Source |
 |-------|-----------------|--------|
-| maestro-brainstorm | topic description | `"{intent}"` |
-| maestro-roadmap | description + context | `"{intent}"` |
-| maestro-analyze | phase or topic | `{phase}` or `"{intent}"` if no phase |
+| maestro-brainstorm | topic | `"{intent}"` |
+| maestro-roadmap | description | `"{intent}"` |
+| maestro-analyze | phase or topic | `{phase}` or `"{intent}"` |
 | maestro-plan | phase or --dir | `{phase}`, or `--dir {scratch_dir}` if standalone |
 | maestro-execute | phase or --dir | `{phase}`, or `--dir {scratch_dir}` if standalone |
-| maestro-verify | phase | `{phase}` |
-| quality-debug | gap context | Read previous step's error/gap summary from artifact dir |
+| quality-debug | gap context | Read previous step's error/gap from artifact dir |
 | quality-* | phase | `{phase}` |
 
-**Artifact dir resolution for --dir args:**
+**Artifact dir resolution for --dir:**
 ```
-Read .workflow/state.json
-Filter artifacts: milestone == session.milestone, phase == session.phase
-For plan commands: find latest type=="analyze" artifact → --dir .workflow/scratch/{path}
-For execute commands: find latest type=="plan" artifact → --dir .workflow/scratch/{path}
+Read state.json → filter artifacts by milestone + phase
+plan commands: latest type=="analyze" → --dir .workflow/scratch/{path}
+execute commands: latest type=="plan" → --dir .workflow/scratch/{path}
 ```
 
 Write enriched args back to status.json (resume-safe).
 
-## Step 3: Execute
+### A_EXEC_DECISION
 
-Mark step as running:
-```
-next.status = "running"
-next.started_at = ISO timestamp
-status.current_step = next.index
-status.updated_at = ISO timestamp
-Write status.json
-```
+1. Mark step running, write status.json
+2. Display: `[{index}/{total}] ◆ {skill} [decision] Retry: {retry}/{max}`
+3. `Skill({ skill: "maestro-ralph" })` — ralph detects running decision → evaluates → handoff
+4. **This execution ends here** — ralph handles the handoff back
 
-Display banner:
-```
-------------------------------------------------------------
-  [{next.index}/{steps.length - 1}] {next.skill} [{next.type}]
-------------------------------------------------------------
-  Session: {session_id} [{source}]
-  Args: {next.args}
-```
-If decision node: also show `Retry: {retry_count}/{max_retries}`.
+### A_EXEC_INTERNAL
 
-### decision node
+1. Mark step running, write status.json
+2. Display: `[{index}/{total}] {skill} [internal]`
+3. Resolve auto flag: `auto ? (flag_map[skill] || "") : ""`
+4. `Skill({ skill: next.skill, args: effective_args })`
+5. Return success/failure
 
-```
-Skill({ skill: "maestro-ralph" })
-```
+**Auto flag map:** all lifecycle skills → `-y`; `quality-test` → `-y --auto-fix`; unlisted internal → no flag
 
-Ralph detects the running decision → evaluates → optionally expands steps[] → marks completed → calls ralph-execute. **This execution ends here — ralph handles the handoff.**
+### A_EXEC_EXTERNAL
 
-### internal node
+1. Mark step running, write status.json
+2. Display: `[{index}/{total}] ⚡ {skill} [external]`
+3. Always append `-y` to skill args (delegates are non-interactive): `flag = flag_map[skill] || "-y"`
+4. Execute:
+   ```
+   Bash({
+     command: `maestro delegate "/${skill} ${effective_args}" --to claude --mode write`,
+     run_in_background: true, timeout: 600000
+   })
+   STOP — wait for callback.
+   ```
+5. On callback: retrieve output → S_POST_EXEC or S_HANDLE_FAIL
 
-HARD RULE: Every step MUST be executed via `Skill({ skill, args })`. Never simulate or inline a skill's work.
+### A_MARK_COMPLETE
 
-```
-flag = auto ? (auto_flag_map[next.skill] || "") : ""
-effective_args = flag ? `${next.args} ${flag}` : next.args
+1. `step.status = "completed"`, `step.completed_at = now`
+2. Scan output for context signals:
+   - `PHASE: N` → session.phase
+   - `scratch_dir: path` → context.scratch_dir
+   - `SPEC-xxx` → context.spec_session_id
+3. Write status.json
+4. Display: `[{index}/{total}] ✓ {skill} completed`
 
-Skill({ skill: next.skill, args: effective_args })
-```
+### A_RETRY
 
-→ On success: Step 4a. On failure: Step 4b.
+1. `step.retried = true`, `step.status = "pending"`, `step.error = null`
+2. Write status.json
 
-### external node
+### A_SKIP_STEP
 
-HARD RULE: External nodes ALWAYS delegate to `claude` — only Claude Code can execute slash-command skills. `session.cli_tool` is for analysis-mode delegates (e.g., decision evaluation in ralph), NOT for external node execution.
+1. `step.status = "skipped"`
+2. Write status.json
 
-```
-// Always append -y to skill args inside the prompt — delegate sessions cannot confirm
-flag = auto_flag_map[next.skill] || "-y"
-effective_args = `${next.args} ${flag}`
+### A_PAUSE_SESSION
 
-Bash({
-  command: `maestro delegate "/${next.skill} ${effective_args}" --to claude --mode write`,
-  run_in_background: true,
-  timeout: 600000
-})
+1. `session.status = "paused"`, write status.json
+2. Display: `[{index}/{total}] ✗ {skill} 失败，会话已暂停。/maestro-ralph continue 恢复。`
 
-STOP — wait for background callback.
-```
+### A_COMPLETE_SESSION
 
-On callback: retrieve output via `maestro delegate output <exec_id>`.
-→ On success: Step 4a. On failure: Step 4b.
+1. `session.status = "completed"`, write status.json
+2. Display completion report:
+   ```
+   ============================================================
+     SESSION COMPLETE
+   ============================================================
+     Session:  {session_id} [{source}]
+     Steps:    {completed}/{total}
 
-## Step 4: Post-Execution
+     [✓] 0.   maestro-plan 1            [internal]
+     [✓] 1. ⚡ maestro-execute 1         [external]
+     [✓] 2.   maestro-verify 1          [internal]
+     [✓] 3. ◆ post-verify               [decision]
+     ...
+   ============================================================
+   ```
+   Icons: `✓` completed, `—` skipped, `✗` failed, `◆` decision, `⚡` external
 
-### 4a. Mark Complete
+</actions>
 
-```
-next.status = "completed"
-next.completed_at = ISO timestamp
+</state_machine>
 
-Scan output for context propagation signals:
-  PHASE: N         → status.phase
-  scratch_dir: path → context.scratch_dir
-  SPEC-xxx         → context.spec_session_id
+<appendix>
 
-Write status.json
-Display: [{next.index}/{total}] ✓ {next.skill} completed {next.type == "external" ? "[external]" : ""}
-```
+### Error Codes
 
-→ `Skill({ skill: "maestro-ralph-execute" })` (next iteration)
-
-### 4b. Handle Failure
-
-```
-next.status = "failed"
-next.error = "{error message}"
-next.completed_at = ISO timestamp
-Write status.json
-
-Display: [{next.index}/{total}] ✗ {next.skill} failed: {error}
-```
-
-**Auto mode:**
-```
-If not next.retried:
-  next.retried = true, next.status = "pending", next.error = null
-  Write status.json → Skill("maestro-ralph-execute")  // retry once
-Else:
-  status.status = "paused"
-  Write status.json
-  Display: [{next.index}/{total}] ✗ {next.skill} 重试后仍失败，会话已暂停。请检查后 /maestro-ralph continue 恢复。
-  End.
-```
-
-**Interactive mode:**
-```
-AskUserQuestion: "retry / skip / abort"
-  retry → next.status = "pending", next.error = null → Skill("maestro-ralph-execute")
-  skip  → next.status = "skipped" → Skill("maestro-ralph-execute")
-  abort → status.status = "paused" → Write status.json → End.
-```
-
-## Step 5: Complete Session
-
-When no pending steps remain:
-
-```
-status.status = "completed"
-status.updated_at = ISO timestamp
-Write status.json
-```
-
-Display completion report:
-```
-============================================================
-  SESSION COMPLETE
-============================================================
-  Session:  {session_id} [{source}]
-  Chain:    {chain_name}
-  Phase:    {phase}
-  Steps:    {completed}/{total}
-
-  [✓] 0.   maestro-plan 1            [internal]
-  [✓] 1. ⚡ maestro-execute 1         [external]
-  [✓] 2.   maestro-verify 1          [internal]
-  [✓] 3. ◆ post-verify               [decision]
-  [—] 4.   quality-auto-test 1       [internal]  (skipped)
-  ...
-============================================================
-```
-
-Status icons: `✓` completed, `—` skipped, `✗` failed, ` ` pending.
-Type badges: `◆` decision, `⚡` external, (none) internal.
-
-**End.**
-
-</execution>
-
-<error_codes>
 | Code | Severity | Description | Recovery |
 |------|----------|-------------|----------|
 | E001 | error | No running session found | Suggest /maestro or /maestro-ralph |
-| E002 | error | Session status.json corrupt | Show path, suggest manual check |
-| E003 | error | CLI delegate failed + user abort | Mark paused, suggest resume |
+| E002 | error | status.json corrupt | Show path, suggest manual check |
+| E003 | error | Delegate failed + user abort | Mark paused, suggest resume |
 | W001 | warning | Step completed with warnings | Log and continue |
-</error_codes>
 
-<success_criteria>
-- [ ] Session discovery scans .workflow/.maestro/ (covers both maestro-* and ralph-*)
-- [ ] `-y` flag parsed from args OR inherited from session.auto_mode
-- [ ] Placeholder substitution resolves all `{...}` tokens from session context
-- [ ] Per-skill enrichment provides correct args when empty/minimal
-- [ ] Artifact dir resolution finds latest artifact for --dir args
-- [ ] decision nodes hand off to maestro-ralph via Skill() (ralph sessions only)
-- [ ] internal nodes execute via Skill() with auto flag propagation
-- [ ] external nodes delegate to claude with `-y` in prompt args (not CLI args), run_in_background + STOP
-- [ ] Context propagation: output signals update status.json.context
-- [ ] status.json updated after every status change (resume-safe)
-- [ ] Auto mode: retry once then pause; interactive: AskUserQuestion retry/skip/abort
-- [ ] Completion report shows all steps with status icons and type badges
-- [ ] Self-invocation chain continues until all steps complete or session paused
-</success_criteria>
+### Success Criteria
+
+- [ ] Session discovery covers both maestro-* and ralph-*
+- [ ] `-y` parsed from args OR inherited from session.auto_mode
+- [ ] Placeholders resolved from session context
+- [ ] Per-skill enrichment provides correct args
+- [ ] Decision nodes hand off to maestro-ralph via Skill()
+- [ ] Internal nodes execute via Skill() with auto flag
+- [ ] External nodes delegate to claude with `-y` in prompt args, run_in_background + STOP
+- [ ] Context signals propagate to status.json
+- [ ] Auto mode: retry once then pause
+- [ ] Interactive: AskUserQuestion retry/skip/abort
+- [ ] Self-invocation continues until complete or paused
+
+</appendix>

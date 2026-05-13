@@ -35,6 +35,7 @@ export const CATEGORY_MAP: Record<string, SpecCategory> = {
   'debug-notes.md':             'debug',
   'test-conventions.md':        'test',
   'review-standards.md':        'review',
+  'quality-rules.md':           'review',
   'learnings.md':               'learning',
 };
 

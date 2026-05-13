@@ -14,24 +14,35 @@ allowed-tools:
 ---
 <purpose>
 Closed-loop decision engine for the maestro workflow lifecycle.
+Reads project state → infers position → builds adaptive chain → delegates execution.
 
-Reads project state → infers lifecycle position → builds adaptive command chain → delegates execution.
+Entry points:
+- **`/maestro-ralph "intent"`** — New session: infer → build → execute
+- **`/maestro-ralph continue`** — Resume via maestro-ralph-execute
+- **`/maestro-ralph status`** — Display session progress
 
 Three node types:
-- **internal**: In-session `Skill()` call (synchronous, lightweight)
-- **external**: New Claude Code session via `maestro delegate --to claude` executing `/{skill} {args}` (context-isolated, heavy computation)
+- **internal**: `Skill()` call (synchronous, lightweight)
+- **external**: `maestro delegate --to claude` (context-isolated, heavy computation)
 - **decision**: Hand back to ralph for re-evaluation (adaptive branching)
 
 Key difference from maestro coordinator:
-- maestro: static chain → one-time selection → runs all steps sequentially
-- ralph: living chain → decision nodes re-evaluate after critical steps → chain grows/shrinks dynamically
+- maestro: static chain → one-time selection → runs all steps
+- ralph: living chain → decision nodes re-evaluate → chain grows/shrinks dynamically
 
-Session path: `.workflow/.maestro/ralph-{YYYYMMDD-HHmmss}/status.json`
+Session: `.workflow/.maestro/ralph-{YYYYMMDD-HHmmss}/status.json`
 Mutual invocation with `/maestro-ralph-execute` forms a self-perpetuating work loop.
 </purpose>
 
 <context>
-$ARGUMENTS — user intent text, flags, or keywords.
+$ARGUMENTS — intent text, flags, or keywords.
+
+**Parse:**
+```
+-y flag       → auto_confirm = true
+.md/.txt path → input_doc (supplementary context only, NEVER substitutes lifecycle stages)
+Remaining     → intent
+```
 
 **State files:**
 - `.workflow/state.json` — artifact registry, milestones, phases
@@ -39,137 +50,149 @@ $ARGUMENTS — user intent text, flags, or keywords.
 - `.workflow/.maestro/ralph-*/status.json` — ralph session state
 </context>
 
-<execution>
+<invariants>
+1. **Ralph never executes steps** — only creates sessions and evaluates decisions
+2. **Handoff via Skill("maestro-ralph-execute")** — at session creation and after decision evaluation
+3. **Decision delegates read-only** — `maestro delegate --role analyze --mode analysis`
+4. **External ≠ CLI call** — external spawns full Claude Code session executing the skill command
+5. **Delegate sessions non-interactive** — all external skills MUST append `-y` to args inside the prompt
+</invariants>
 
-## Step 1: Parse & Route
+<state_machine>
 
-```
-Parse $ARGUMENTS:
-  -y flag       → auto_confirm = true (skip confirmation, NOT ambiguity resolution)
-  .md/.txt path → input_doc (supplementary context for downstream commands)
-  Remaining     → intent
+<states>
+S_PARSE_ROUTE     — 解析参数、路由入口                  PERSIST: —
+S_STATUS          — 显示 session 进度                   PERSIST: —
+S_CONTINUE        — 恢复执行                            PERSIST: —
+S_INFER           — 读 state.json、推断生命周期位置      PERSIST: session.lifecycle_position
+S_RESOLVE_PHASE   — 解析目标 phase                      PERSIST: session.phase
+S_BUILD_CHAIN     — 构建步骤链                           PERSIST: session.steps[]
+S_CREATE_SESSION  — 写 status.json                      PERSIST: session (全量)
+S_CONFIRM         — 用户确认                             PERSIST: —
+S_DISPATCH        — 移交 maestro-ralph-execute           PERSIST: —
+S_DECISION_EVAL   — 委托评估质量门                       PERSIST: —
+S_APPLY_VERDICT   — 应用裁决 + 插入命令                  PERSIST: session.steps[], session.passed_gates[]
+S_FALLBACK        — 请求用户输入                         PERSIST: —
+</states>
 
-Route:
-  intent == "status"   → handleStatus()
-  intent == "continue" → handleContinue()
-  
-  Check running ralph session (.workflow/.maestro/ralph-*/status.json, session status=="running"):
-    If found AND steps[current_step].type == "decision" AND steps[current_step].status == "running":
-      → Step 3: Decision Evaluation Mode
-    Else if intent is non-empty:
-      → Step 2: New Session Mode
-    Else:
-      → AskUserQuestion: "请描述目标，或输入 status/continue"
-```
+<transitions>
 
-### handleStatus()
-```
-Find latest ralph session (by created_at).
-Display:
-  Session:  {id}
-  Status:   {status}
-  Position: {lifecycle_position}
-  Progress: {completed}/{total} commands
-  Current:  [{current_step}] {steps[current_step].skill} [{type}]
-  
-  Commands:
-    [✓] 0. maestro-analyze 1         [external]
-    [▸] 1. maestro-plan 1            [internal]
-    [ ] 2. maestro-execute 1         [external]
-    ...
-End.
-```
+S_PARSE_ROUTE:
+  → S_STATUS        WHEN: intent == "status"
+  → S_CONTINUE      WHEN: intent == "continue"
+  → S_DECISION_EVAL WHEN: running session with decision step in "running" status
+  → S_INFER         WHEN: intent is non-empty
+  → S_FALLBACK      WHEN: no intent AND no running session
 
-### handleContinue()
-```
-Find latest running ralph session.
-If not found → "无运行中的 ralph 会话". End.
-Skill({ skill: "maestro-ralph-execute" }). End.
-```
+S_STATUS:
+  → END             DO: A_SHOW_STATUS
 
----
+S_CONTINUE:
+  → S_DISPATCH      WHEN: running session found
+  → S_FALLBACK      WHEN: no running session               DO: display "无运行中的 ralph 会话"
 
-## Step 2: New Session Mode
+S_INFER:
+  → S_RESOLVE_PHASE WHEN: position resolved                 DO: A_INFER_POSITION
+  → S_FALLBACK      WHEN: cannot infer
 
-### 2.1: Read project state
+S_RESOLVE_PHASE:
+  → S_BUILD_CHAIN   WHEN: phase resolved or null            DO: A_RESOLVE_PHASE
+  → S_FALLBACK      WHEN: ambiguous
+                     GUARD: auto_confirm does NOT skip phase ambiguity
 
-Read `.workflow/state.json` schema:
-```json
-{
-  "current_milestone": "MVP",
-  "milestones": [{ "id": "M1", "name": "MVP", "status": "active", "phases": [1, 2] }],
-  "artifacts": [{
-    "id": "ANL-001", "type": "analyze|plan|execute|verify",
-    "milestone": "MVP", "phase": 1, "scope": "phase|milestone|adhoc|standalone",
-    "path": "phases/01-auth-multi-tenant",  // relative to .workflow/scratch/
-    "status": "completed", "depends_on": "PLN-001", "harvested": true
-  }],
-  "accumulated_context": { "key_decisions": [], "deferred": [] }
-}
-```
+S_BUILD_CHAIN:
+  → S_CREATE_SESSION DO: A_BUILD_STEPS
 
-Also check: `.workflow/roadmap.md` existence, `.workflow/scratch/` for result files.
+S_CREATE_SESSION:
+  → S_CONFIRM       WHEN: not auto_confirm                  DO: A_CREATE_SESSION
+  → S_DISPATCH      WHEN: auto_confirm                      DO: A_CREATE_SESSION
 
-### 2.2: Infer lifecycle position
+S_CONFIRM:
+  → S_DISPATCH      WHEN: user selects "Proceed"
+  → S_BUILD_CHAIN   WHEN: user selects "Edit"
+  → END             WHEN: user selects "Cancel"
 
-**Phase 0 — Intent-based override:**
+S_DISPATCH:
+  → END             DO: Skill({ skill: "maestro-ralph-execute" })
 
-If intent matches brainstorm pattern (contains "brainstorm", "头脑风暴", "探索", "ideate", or "设计思路"), position = `brainstorm` regardless of project state.
+S_DECISION_EVAL:
+  → S_APPLY_VERDICT WHEN: quality-gate (post-verify, post-business-test, post-review, post-test)
+                     DO: A_DELEGATE_EVALUATE
+  → S_APPLY_VERDICT WHEN: structural (post-milestone, post-debug-escalate)
+                     DO: A_STRUCTURAL_EVALUATE
 
-Chain for existing project: `brainstorm → roadmap → analyze → ...` (skip init if `.workflow/state.json` exists).
+S_APPLY_VERDICT:
+  → S_DISPATCH      WHEN: verdict == "proceed"              DO: A_APPLY_PROCEED
+  → S_DISPATCH      WHEN: verdict == "fix"                  DO: A_APPLY_FIX
+  → S_DISPATCH      WHEN: verdict == "escalate"             DO: A_APPLY_ESCALATE
+  → S_DISPATCH      WHEN: post-milestone + next milestone   DO: A_ADVANCE_MILESTONE
+  → END             WHEN: post-milestone + no next milestone DO: mark completed
+  → END             WHEN: post-debug-escalate (always STOP)  DO: A_PAUSE_ESCALATE
+  GUARD: retry_count >= max_retries → force escalate
+  GUARD: confidence_score < 60 AND proceed → override to fix
+  GUARD: confidence_score > 95 AND fix AND retry > 0 → suggest proceed
+  GUARD: auto_confirm → skip user prompt, apply adjusted verdict
+  GUARD: not auto_confirm → AskUserQuestion with override options
 
-**Phase 1 — Bootstrap detection:**
+S_FALLBACK:
+  → S_PARSE_ROUTE   WHEN: user provides input               DO: AskUserQuestion
+  → END             WHEN: user cancels
 
-| Condition | Position | Chain starts at |
-|-----------|----------|-----------------|
-| No `.workflow/` + no source files (empty project) | `brainstorm` | brainstorm → init → roadmap → ... |
-| No `.workflow/` + has source files (existing code) | `init` | init → roadmap → ... |
-| Has `.workflow/` but no `state.json` | `init` | init → roadmap → ... |
-| Has `state.json` | → Phase 2 below | — |
+</transitions>
 
-HARD RULE: `input_doc` is supplementary context only. It NEVER substitutes for lifecycle stages.
+<actions>
 
-**Phase 2 — Artifact-based inference (when state.json exists):**
+### A_SHOW_STATUS
 
-Filter artifacts by `milestone == current_milestone`, group by target phase. Find latest completed artifact type:
+1. Find latest ralph session (by created_at)
+2. Display: Session, Status, Position, Progress, Current step
+3. List steps: [✓] completed, [▸] current, [ ] pending, [◆] decision
 
-| State | Position |
-|-------|----------|
-| No milestones[] or no roadmap.md | `roadmap` |
-| No artifacts for target phase | `analyze` |
-| Latest type == "analyze" | `plan` |
-| Latest type == "plan" | `execute` |
-| Latest type == "execute" | `verify` |
-| Latest type == "verify" | → Refine by result files below |
+### A_INFER_POSITION
 
-**Refine from verify results** (read `{artifact_dir}/` files):
+**Intent-based override:** brainstorm/头脑风暴/探索/ideate/设计思路 → position = `brainstorm`
+
+**Bootstrap detection:**
 
 | Condition | Position |
 |-----------|----------|
-| verification.json: `passed==false` or `gaps[]` non-empty | `verify-failed` |
-| verification.json: `passed==true`, no review.json | `business-test` |
-| review.json: `verdict=="BLOCK"` | `review-failed` |
-| review.json: `verdict!="BLOCK"` | `test` |
+| No `.workflow/` + no source files | `brainstorm` |
+| No `.workflow/` + has source files | `init` |
+| Has `.workflow/` but no state.json | `init` |
+| Has state.json | → artifact-based inference |
+
+**Artifact-based inference:** Filter by current_milestone + target phase:
+
+| Latest artifact type | Position |
+|---------------------|----------|
+| no milestones or no roadmap.md | `roadmap` |
+| none for phase | `analyze` |
+| analyze | `plan` |
+| plan | `execute` |
+| execute | `verify` |
+| verify | → refine from result files |
+
+**Refine from verify results:**
+
+| Condition | Position |
+|-----------|----------|
+| verification.json: passed==false or gaps[] | `verify-failed` |
+| passed==true, no review.json | `business-test` |
+| review.json: verdict=="BLOCK" | `review-failed` |
+| review.json: verdict!="BLOCK" | `test` |
 | uat.md: all passed | `milestone-audit` |
 | uat.md: has failures | `test-failed` |
 
-### 2.3: Resolve phase number
+### A_RESOLVE_PHASE
 
-Priority order:
-1. Regex from intent: `phase\s*(\d+)` or bare number
-2. Latest in-progress artifact's phase field
-3. First incomplete phase in current milestone's `phases[]`
-4. `null` if position is brainstorm/init/roadmap (deferred to post-roadmap)
-5. AskUserQuestion if ambiguous (auto_confirm does NOT skip this)
+Priority: 1) regex from intent 2) latest artifact's phase 3) first incomplete phase 4) null if brainstorm/init/roadmap 5) AskUserQuestion if ambiguous
 
-### 2.4: Build command sequence
+### A_BUILD_STEPS
 
-Generate steps from `lifecycle_position` to target (default: `milestone-complete`).
+Generate steps from lifecycle_position to milestone-complete:
 
-**Lifecycle stages reference:**
-
-| Stage | Skill command | Type | Decision after |
-|-------|--------------|------|----------------|
+| Stage | Skill | Type | Decision after |
+|-------|-------|------|----------------|
 | brainstorm | `maestro-brainstorm "{intent}"` | external | — |
 | init | `maestro-init` | internal | — |
 | roadmap | `maestro-roadmap "{intent}"` | internal | — |
@@ -184,275 +207,131 @@ Generate steps from `lifecycle_position` to target (default: `milestone-complete
 | milestone-audit | `maestro-milestone-audit` | internal | — |
 | milestone-complete | `maestro-milestone-complete` | internal | `post-milestone` |
 
-**Type rationale:**
-- `internal` = in-session `Skill()` call, needs user interaction or is lightweight (plan, verify, quality-*, milestone-*)
-- `external` = new Claude Code session via `maestro delegate --to claude` executing `/{skill} {args}`, context-isolated heavy computation (analyze, execute, brainstorm)
+Type rationale: `internal` = Skill(), lightweight/interactive; `external` = delegate --to claude, context-isolated heavy computation
 
-IMPORTANT: `external` ≠ single CLI tool call. It spawns a full Claude Code session that executes the skill command — the delegate session has complete skill access.
+Build rules: start from position, skip completed, insert decision nodes with `{ retry_count: 0, max_retries: 2 }`, args use placeholders resolved at execution time by ralph-execute
 
-HARD RULE: Delegate sessions are non-interactive. All skills executed via delegate MUST always append `-y` **to the skill's args inside the prompt** (not as a `maestro delegate` CLI argument). This is enforced by ralph-execute in Step 5c — ralph does not preset flags in steps.
+### A_CREATE_SESSION
 
-**Build rules:**
-1. Start from inferred position, skip completed stages
-2. After each decision-triggering stage, insert a decision node with `{ decision, retry_count: 0, max_retries: 2 }`
-3. Args use placeholders resolved at execution time by ralph-execute:
-   - `{phase}` → session.phase
-   - `{intent}` → session.intent
-   - `{scratch_dir}` → latest artifact path
-4. Phase-independent commands (brainstorm, roadmap, init) use `"{intent}"` as args
-5. Commands needing prior output (analyze→plan, plan→execute) have args resolved via artifact lookup at execution time by ralph-execute
+1. Write `.workflow/.maestro/ralph-{YYYYMMDD-HHmmss}/status.json` (see Appendix: Session Schema)
+2. Display chain overview with step list
 
-**Example — from "plan" position:**
-```json
-[
-  { "index": 0, "type": "internal", "skill": "maestro-plan", "args": "{phase}" },
-  { "index": 1, "type": "external", "skill": "maestro-execute", "args": "{phase}" },
-  { "index": 2, "type": "internal", "skill": "maestro-verify", "args": "{phase}" },
-  { "index": 3, "type": "decision", "skill": "maestro-ralph", "args": "{\"decision\":\"post-verify\",\"retry_count\":0,\"max_retries\":2}" },
-  { "index": 4, "type": "internal", "skill": "quality-auto-test", "args": "{phase}" },
-  { "index": 5, "type": "decision", "skill": "maestro-ralph", "args": "{\"decision\":\"post-business-test\",\"retry_count\":0,\"max_retries\":2}" },
-  { "index": 6, "type": "internal", "skill": "quality-review", "args": "{phase}" },
-  { "index": 7, "type": "decision", "skill": "maestro-ralph", "args": "{\"decision\":\"post-review\",\"retry_count\":0,\"max_retries\":2}" },
-  { "index": 8, "type": "internal", "skill": "quality-auto-test", "args": "{phase}" },
-  { "index": 9, "type": "internal", "skill": "quality-test", "args": "{phase}" },
-  { "index": 10, "type": "decision", "skill": "maestro-ralph", "args": "{\"decision\":\"post-test\",\"retry_count\":0,\"max_retries\":2}" },
-  { "index": 11, "type": "internal", "skill": "maestro-milestone-audit", "args": "" },
-  { "index": 12, "type": "internal", "skill": "maestro-milestone-complete", "args": "" },
-  { "index": 13, "type": "decision", "skill": "maestro-ralph", "args": "{\"decision\":\"post-milestone\"}" }
-]
-```
+### A_DELEGATE_EVALUATE
 
-### 2.5: Create session
+1. Resolve artifact dir: `.workflow/scratch/{artifact.path}/` with fallback glob
+2. Parse decision metadata: `{ decision, retry_count, max_retries }`
+3. Map result files:
+   | Decision | Files |
+   |----------|-------|
+   | post-verify | verification.json |
+   | post-business-test | .tests/auto-test/report.json |
+   | post-review | review.json |
+   | post-test | uat.md, .tests/test-results.json |
+4. Check artifact for confidence section → include as signal
+5. Execute delegate (run_in_background, STOP, wait for callback):
+   ```
+   maestro delegate "PURPOSE: 评估 {decision} 质量门结果
+   TASK: 读取结果 | 分析状态 | 评估严重性 | 给出建议
+   EXPECTED: ---VERDICT--- STATUS/REASON/GAP_SUMMARY/CONFIDENCE(high|medium|low)/CONFIDENCE_SCORE(0-100)/WEAKEST_DIMENSION ---END---
+   CONSTRAINTS: 只评估 | 置信度<60% 倾向 fix | retry {n}/{max} 达上限必须 escalate"
+   --role analyze --mode analysis
+   ```
+6. On callback: parse verdict; if parse fails → fallback STATUS="fix"
+7. Confidence adjustment: <60 + proceed → fix; >95 + fix + retry>0 → suggest proceed
+
+### A_STRUCTURAL_EVALUATE
+
+**post-milestone:** Read state.json → next milestone? → insert lifecycle steps / complete
+**post-debug-escalate:** Always STOP → set paused, display "请人工介入"
+
+### A_APPLY_PROCEED
+
+1. Mark decision completed, write status.json
+2. Display: ◆ Decision: {type} → proceed ({reason})
+
+### A_APPLY_FIX
+
+1. Insert fix-loop commands after current step (see Appendix: Fix-Loop Templates)
+2. Reindex steps, increment retry_count, write status.json
+3. Display: ◆ Decision: {type} → fix, +{N} commands inserted
+
+### A_APPLY_ESCALATE
+
+1. Insert `[quality-debug "{gap_summary}", decision:post-debug-escalate]`
+2. Increment retry_count, reindex, write status.json
+
+### A_ADVANCE_MILESTONE
+
+1. Update session: milestone, phase, reset passed_gates
+2. Insert full lifecycle steps for next milestone
+3. Reindex, write status.json
+
+### A_PAUSE_ESCALATE
+
+1. Set session status = "paused", write status.json
+2. Display: ◆ 已达最大重试次数，debug 已执行。请人工介入。
+3. Display: /maestro-ralph continue 恢复
+
+</actions>
+
+</state_machine>
+
+<appendix>
+
+### Session Schema
 
 ```json
 {
   "session_id": "ralph-{YYYYMMDD-HHmmss}",
-  "source": "ralph",
-  "created_at": "{ISO}", "updated_at": "{ISO}",
-  "intent": "{user_intent}",
-  "status": "running",
-  "chain_name": "ralph-lifecycle",
-  "task_type": "lifecycle",
-  "lifecycle_position": "{position}",
-  "target": "milestone-complete",
-  "phase": null | N,
-  "milestone": "{M}",
-  "auto_mode": auto_confirm,
-  "cli_tool": "claude",
-  "quality_mode": "standard",
-  "passed_gates": [],
-  "context": {
-    "issue_id": null, "milestone_num": null, "spec_session_id": null,
-    "scratch_dir": null, "plan_dir": null, "analysis_dir": null, "brainstorm_dir": null
-  },
-  "steps": [...],
-  "waves": [],
-  "current_step": 0
+  "source": "ralph", "status": "running",
+  "intent": "", "lifecycle_position": "",
+  "phase": null, "milestone": "",
+  "auto_mode": false, "quality_mode": "standard",
+  "cli_tool": "claude", "passed_gates": [],
+  "context": { "issue_id": null, "scratch_dir": null, "plan_dir": null,
+    "analysis_dir": null, "brainstorm_dir": null },
+  "steps": [{ "index": 0, "type": "internal|external|decision",
+    "skill": "", "args": "", "status": "pending" }],
+  "waves": [], "current_step": 0
 }
 ```
 
-Write to `.workflow/.maestro/{session_id}/status.json`.
+### Fix-Loop Templates
 
-### 2.6: Display plan + confirm
-
-```
-============================================================
-  RALPH DECISION
-============================================================
-  Position:  {lifecycle_position} (Phase {N}, {milestone})
-  Target:    {target}
-  Commands:  {total} steps ({decision_count} decision points)
-
-  [ ] 0. maestro-plan 1                  [internal]
-  [ ] 1. maestro-execute 1               [external]
-  [ ] 2. maestro-verify 1                [internal]
-  [ ] 3. ◆ post-verify                   [decision]
-  ...
-============================================================
-```
-
-- If auto_confirm (`-y`): proceed directly
-- Else: AskUserQuestion → Proceed / Edit / Cancel
-
-### 2.7: Launch execution
-
-HARD RULE: Ralph's job ends at session creation. Do NOT execute steps, read project files for execution, or update step statuses directly.
-
-```
-Skill({ skill: "maestro-ralph-execute" })
-End.
-```
-
----
-
-## Step 3: Decision Evaluation Mode
-
-Triggered when ralph-execute encounters a decision node and hands back to ralph.
-
-### 3.1: Load session + resolve artifact dir
-
-Read session status.json. Identify decision node at `steps[current_step]`.
-
-**Artifact dir resolution:**
-```
-Read .workflow/state.json
-Filter: milestone == session.milestone, phase == session.phase
-Sort: created_at DESC
-
-artifact_dir = .workflow/scratch/{artifact.path}/
-
-Fallback if path not found:
-  glob .workflow/scratch/*-P{phase}-*/ sorted by date DESC, take first
-```
-
-### 3.2: Parse decision metadata
-
-```
-meta = JSON.parse(decision_node.args)
-// { decision: "post-verify", retry_count: 0, max_retries: 2 }
-```
-
-### 3.3: Delegate evaluation
-
-For quality-gate decisions (post-verify, post-business-test, post-review, post-test), delegate analysis to external CLI. For structural decisions (post-milestone, post-debug-escalate), evaluate directly.
-
-**Structural decisions → Step 3.5 (direct evaluation)**
-**Quality-gate decisions → delegate below:**
-
-NOTE: This delegate uses `--mode analysis` (read-only) — the CLI tool won't trigger interactive prompts, so no extra `-y` needed. If this ever changes to write-mode delegate, ensure the target skill appends `-y`.
-
-**Result file mapping** (for delegate CONTEXT):
-
-| Decision type | Files to include |
-|---------------|-----------------|
-| post-verify | `{artifact_dir}/verification.json` |
-| post-business-test | `{artifact_dir}/.tests/auto-test/report.json` |
-| post-review | `{artifact_dir}/review.json` |
-| post-test | `{artifact_dir}/uat.md`, `{artifact_dir}/.tests/test-results.json` |
-
-**Confidence-aware evaluation**:
-
-Before delegating, check if artifact contains a confidence section (added by downstream commands):
-- `verification.json` → `confidence.overall` (from maestro-verify)
-- `report.json` → `confidence.overall` (from quality-auto-test)
-- `review.json` → may contain dimension confidence (from quality-review)
-- `uat.md` → confidence summary section (from quality-test)
-
-If confidence data found, include in delegate prompt as additional signal:
-```
-已有置信度评估: 整体 {overall}%, 最弱维度: {weakest} ({score}%)
-```
-
-**Confidence-based verdict bias**: When artifact confidence is available:
-- confidence < 60% → bias toward "fix" even if surface status looks clean (hidden quality gaps)
-- confidence 60-95% → use delegate verdict as-is
-- confidence > 95% → bias toward "proceed" (strong evidence of quality)
-
-```
-Bash({
-  command: `maestro delegate "PURPOSE: 评估 ${meta.decision} 质量门结果，判断是否通过
-TASK: 读取结果文件 | 分析通过/失败状态 | 评估问题严重性 | 检查置信度评分 | 给出下一步建议
-MODE: analysis
-CONTEXT: @${result_files}
-EXPECTED: 严格按以下格式输出:
----VERDICT---
-STATUS: proceed | fix | escalate
-REASON: 一句话解释
-GAP_SUMMARY: 具体问题描述（仅 fix/escalate 时填写，用于传递给 quality-debug）
-CONFIDENCE: high | medium | low
-CONFIDENCE_SCORE: 0-100（从结果文件中读取置信度分数，无则估算）
-WEAKEST_DIMENSION: 最弱维度名称
----END---
-CONSTRAINTS: 只评估不修改 | STATUS 三选一 | 置信度 < 60% 倾向 fix | 如果 retry ${meta.retry_count}/${meta.max_retries} 已达上限且仍有问题则必须 escalate" --role analyze --mode analysis`,
-  run_in_background: true
-})
-STOP — wait for callback.
-```
-
-### 3.4: Parse verdict + apply
-
-**On callback:** retrieve output via `maestro delegate output <exec_id>`.
-
-Parse structured response:
-```
-Extract between ---VERDICT--- and ---END---:
-  verdict.status           = "proceed" | "fix" | "escalate"
-  verdict.reason           = string
-  verdict.gap_summary      = string (context for quality-debug)
-  verdict.confidence       = "high" | "medium" | "low"
-  verdict.confidence_score = 0-100 (numeric, from artifact or estimated)
-  verdict.weakest_dimension = string (weakest confidence dimension)
-
-If parse fails → fallback: treat as "fix" with generic gap_summary
-
-Confidence-based verdict adjustment (after parse, before apply):
-  If verdict.confidence_score < 60 AND verdict.status == "proceed":
-    → Override to "fix", reason += " (置信度不足: {score}%，{weakest_dimension} 需加强)"
-  If verdict.confidence_score > 95 AND verdict.status == "fix" AND retry_count > 0:
-    → Suggest "proceed" override, reason += " (置信度充分: {score}%，建议通过)"
-```
-
-**Apply verdict:**
-
-| Mode | Behavior |
-|------|----------|
-| `-y` (auto_confirm) | Follow verdict directly — no user confirmation |
-| Interactive + confidence == "high" | Display recommendation, AskUserQuestion: "按建议执行 / 覆盖 / 取消" |
-| Interactive + confidence != "high" | Display recommendation with warning, AskUserQuestion: "按建议执行 / 覆盖 / 取消" |
-
-User override options (interactive only):
-- **按建议执行** → apply verdict as-is
-- **覆盖 proceed** → force proceed regardless of verdict
-- **覆盖 fix** → force fix loop
-- **取消** → pause session, End.
-
-**Verdict → action mapping:**
-
-| Verdict | Action |
-|---------|--------|
-| `proceed` | No insertion, continue to next step |
-| `fix` | Insert fix-loop commands (see 3.4a) |
-| `escalate` | Insert `[quality-debug "{gap_summary}", decision:post-debug-escalate]` |
-
-### 3.4a: Fix-loop templates (by decision type)
-
-When verdict == "fix", insert pre-defined fix-loop based on decision type.
-The delegate's `gap_summary` is passed as context to `quality-debug`.
-
-#### post-verify fix-loop
+**post-verify:**
 ```
 quality-debug "{gap_summary}"
 maestro-plan --gaps {phase}
-maestro-execute {phase}                    [external]
+maestro-execute {phase}                [external]
 maestro-verify {phase}
-decision:post-verify {retry_count + 1}
+decision:post-verify {retry+1}
 ```
 
-#### post-business-test fix-loop
+**post-business-test:**
 ```
 quality-debug --from-business-test "{gap_summary}"
 maestro-plan --gaps {phase}
-maestro-execute {phase}                    [external]
+maestro-execute {phase}                [external]
 maestro-verify {phase}
 decision:post-verify {retry: 0}
 quality-auto-test {phase}
-decision:post-business-test {retry_count + 1}
+decision:post-business-test {retry+1}
 ```
 
-#### post-review fix-loop
+**post-review:**
 ```
 quality-debug "{gap_summary}"
 maestro-plan --gaps {phase}
-maestro-execute {phase}                    [external]
+maestro-execute {phase}                [external]
 quality-review {phase}
-decision:post-review {retry_count + 1}
+decision:post-review {retry+1}
 ```
 
-#### post-test fix-loop
+**post-test:**
 ```
 quality-debug --from-uat "{gap_summary}"
 maestro-plan --gaps {phase}
-maestro-execute {phase}                    [external]
+maestro-execute {phase}                [external]
 maestro-verify {phase}
 decision:post-verify {retry: 0}
 quality-auto-test {phase}
@@ -461,91 +340,31 @@ quality-review {phase}
 decision:post-review {retry: 0}
 quality-auto-test {phase}
 quality-test {phase}
-decision:post-test {retry_count + 1}
+decision:post-test {retry+1}
 ```
 
-### 3.5: Structural decisions (direct evaluation)
+### Error Codes
 
-These don't need delegate analysis — evaluated directly by ralph.
-
-#### post-milestone
-
-```
-Read .workflow/state.json — check for next milestone (status "pending" or "active")
-
-If next milestone found:
-  Update session: milestone = next_m.name, phase = first_phase
-  Insert full lifecycle for next milestone (analyze through milestone-complete + decision nodes)
-  Display: ◆ post-milestone: {completed} done → advancing to {next_m.name} Phase {first_phase}
-
-If no next milestone:
-  Proceed — session completes naturally
-  Display: ◆ post-milestone: all milestones complete!
-```
-
-#### post-debug-escalate
-
-Terminal escalation — max retries exceeded after debug.
-
-```
-Set session status = "paused"
-Display: ◆ 已达最大重试次数，debug 已执行。请人工介入检查结果。
-Display: 使用 /maestro-ralph continue 在处理后恢复
-End.
-```
-
-### 3.6: Insert commands + update session
-
-```
-Insert new_commands at position (current_step + 1)
-Reindex all steps: step.index = array position
-Mark current decision node: status = "completed", completed_at = now
-Write status.json
-
-Display: ◆ Decision: {type} → {verdict.status} ({verdict.reason}), +{N} commands inserted
-```
-
-### 3.7: Resume execution
-
-```
-Skill({ skill: "maestro-ralph-execute" })
-End.
-```
-
-</execution>
-
-<error_codes>
 | Code | Severity | Description | Recovery |
 |------|----------|-------------|----------|
 | E001 | error | No intent and no running session | Prompt for intent |
-| E002 | error | Cannot infer lifecycle position | Show raw state, ask user |
-| E003 | error | Artifact dir not found for decision evaluation | Show glob results, ask user |
-| E004 | error | Delegate verdict parse failed | Fallback: treat as "fix" |
-| E005 | error | Delegate execution failed | Fallback: treat as "fix" with generic summary |
-| W001 | warning | Decision node expanded chain | Auto-handled, log expansion |
-| W002 | warning | Max retries reached, escalating | Auto-handled |
-| W003 | warning | Multiple running sessions found | Use latest, warn user |
-| W004 | warning | Delegate confidence == "low" | Show warning in interactive mode |
-</error_codes>
+| E002 | error | Cannot infer lifecycle position | Show raw state, ask |
+| E003 | error | Artifact dir not found for decision | Show glob, ask |
+| E004 | error | Delegate verdict parse failed | Fallback: "fix" |
+| E005 | error | Delegate execution failed | Fallback: "fix" |
+| W001 | warning | Decision expanded chain | Auto-handled |
+| W002 | warning | Max retries, escalating | Auto-handled |
+| W003 | warning | Multiple running sessions | Use latest, warn |
+| W004 | warning | Low delegate confidence | Show warning |
 
-<success_criteria>
-- [ ] state.json parsed with correct schema (type, path, scope, milestone, artifacts[])
-- [ ] Lifecycle position inferred from bootstrap state + artifact chain + result files
-- [ ] Artifact dir resolved: `.workflow/scratch/{artifact.path}/` with fallback glob
-- [ ] Full quality pipeline generated: verify → business-test → review → test-gen → test
-- [ ] Decision nodes inserted after: post-verify, post-business-test, post-review, post-test, post-milestone
-- [ ] Quality-gate decisions delegated via `maestro delegate --role analyze --mode analysis`
-- [ ] Delegate verdict parsed: STATUS / REASON / GAP_SUMMARY / CONFIDENCE / CONFIDENCE_SCORE / WEAKEST_DIMENSION
-- [ ] Confidence-based verdict adjustment applied (< 60% bias fix, > 95% bias proceed)
-- [ ] Artifact confidence sections read when available (verification.json, report.json, uat.md)
-- [ ] `-y` mode: auto-follow adjusted verdict without user confirmation
-- [ ] Interactive mode: display recommendation with confidence score + AskUserQuestion with override options
-- [ ] Delegate failure fallback: treat as "fix" verdict
-- [ ] gap_summary from delegate passed to quality-debug as context
-- [ ] Fix-loop templates applied per decision type with retry_count increment
-- [ ] retry_count tracked per decision, max_retries enforced, escalation to post-debug-escalate
-- [ ] Structural decisions (post-milestone, post-debug-escalate) evaluated directly without delegate
-- [ ] Command insertion + reindex preserves step integrity
+### Success Criteria
+
+- [ ] State parsed, position inferred from bootstrap + artifacts + result files
+- [ ] Quality pipeline generated: verify → business-test → review → test-gen → test
+- [ ] Decision nodes delegate-evaluated via maestro delegate --role analyze
+- [ ] Verdict parsed with confidence adjustment
+- [ ] Fix-loop templates applied with retry tracking
 - [ ] Ralph never executes steps — only creates sessions and evaluates decisions
-- [ ] Handoff to maestro-ralph-execute via Skill() at session creation and after decision evaluation
-</success_criteria>
+- [ ] Handoff to maestro-ralph-execute via Skill() at creation and after decisions
+
+</appendix>

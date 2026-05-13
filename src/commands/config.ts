@@ -329,6 +329,22 @@ export function registerConfigCommand(program: Command): void {
       console.log(`✓ ${tool}: reasoning effort = ${level}`);
     });
 
+  delegate.command('reset')
+    .description('Reset cli-tools.json to defaults with auto-detected tools')
+    .action(async () => {
+      const { resetCliToolsConfig } = await import('../config/cli-tools-config.js');
+      const config = await resetCliToolsConfig();
+      const enabled = Object.entries(config.tools)
+        .filter(([, e]) => e.enabled)
+        .map(([n]) => n);
+      const disabled = Object.entries(config.tools)
+        .filter(([, e]) => !e.enabled)
+        .map(([n]) => n);
+      console.log('✓ cli-tools.json reset to defaults.');
+      if (enabled.length) console.log(`  Enabled:  ${enabled.join(', ')}`);
+      if (disabled.length) console.log(`  Disabled: ${disabled.join(', ')} (not found in PATH)`);
+    });
+
   delegate.command('config')
     .description('Config sources (global/workspace) (TUI)')
     .action(async () => {

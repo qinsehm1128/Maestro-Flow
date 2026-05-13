@@ -558,9 +558,7 @@ export class CliAgentRunner {
     const bridgeConnected = bridgeEnabled
       ? await bridge.tryConnect(CliAgentRunner.getDashboardWsUrl(), 1000)
       : false;
-    if (!bridgeConnected) {
-      process.stderr.write('[Dashboard not connected — real-time view unavailable]\n');
-    }
+    // Dashboard connection is optional — no warning when unavailable
 
     const config: AgentConfig = {
       type: agentType,

@@ -488,5 +488,75 @@
       "detail_caption_2": "Centered overlay with two-column layout",
       "detail_caption_3": "Full-screen takeover with breadcrumb navigation"
     }
+  },
+  "workflow_config": {
+    "title": "Workflow Config",
+    "btn_aria": "Open workflow configuration",
+    "loading": "Loading...",
+    "empty": "No workflow initialized. Run maestro-init first.",
+    "save": "Save",
+    "saving": "Saving...",
+    "discard": "Discard",
+    "top": {
+      "title": "Profile",
+      "mode": "Mode",
+      "granularity": "Granularity",
+      "model_profile": "Model Profile"
+    },
+    "workflow": {
+      "title": "Workflow Agents",
+      "research": "Research",
+      "plan_check": "Plan Check",
+      "verify_after_execute": "Verify After Execute",
+      "nyquist_validation": "Nyquist Validation",
+      "auto_sync": "Auto Sync",
+      "reflection": "Reflection",
+      "decision_protocol": "Decision Protocol",
+      "auto_advance": "Auto Advance"
+    },
+    "execution": {
+      "title": "Execution",
+      "method": "Method",
+      "parallel": "Parallel",
+      "max_concurrent": "Max Concurrent",
+      "auto_commit": "Auto Commit",
+      "lazy_loading": "Lazy Loading"
+    },
+    "git": {
+      "title": "Git",
+      "branching": "Branching",
+      "commit_docs": "Commit Docs"
+    },
+    "gates": {
+      "title": "Confirmation Gates",
+      "confirm_project": "Project",
+      "confirm_roadmap": "Roadmap",
+      "confirm_plan": "Plan",
+      "confirm_execute": "Execute",
+      "confirm_transition": "Transition"
+    },
+    "safety": {
+      "title": "Safety",
+      "always_confirm_destructive": "Confirm Destructive",
+      "always_confirm_external_services": "Confirm External Services"
+    },
+    "specs": {
+      "title": "Specs",
+      "auto_setup_on_init": "Auto Setup on Init",
+      "extract_learnings_on_complete": "Extract Learnings"
+    },
+    "codebase": {
+      "title": "Codebase",
+      "doc_index": "Doc Index",
+      "auto_sync_after_execute": "Auto Sync After Execute",
+      "action_log": "Action Log"
+    },
+    "worktree": {
+      "title": "Worktree",
+      "enabled": "Enabled",
+      "root": "Root",
+      "branch_prefix": "Branch Prefix",
+      "auto_cleanup": "Auto Cleanup"
+    }
   }
 }

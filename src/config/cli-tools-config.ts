@@ -98,7 +98,8 @@ export async function loadCliToolsConfig(workDir?: string): Promise<CliToolsConf
   let global: CliToolsConfig = DEFAULT_CONFIG;
   try {
     const raw = await readFile(globalPath, 'utf-8');
-    global = JSON.parse(raw) as CliToolsConfig;
+    const parsed = JSON.parse(raw) as Partial<CliToolsConfig>;
+    global = { ...DEFAULT_CONFIG, ...parsed, tools: { ...parsed.tools } };
   } catch {
     // No global config — use defaults
   }
@@ -140,13 +141,15 @@ export function selectTool(
   name: string | undefined,
   config: CliToolsConfig,
 ): SelectedTool | undefined {
+  const tools = config.tools ?? {};
+
   // Exact match by name
-  if (name && config.tools[name]?.enabled) {
-    return { name, entry: config.tools[name] };
+  if (name && tools[name]?.enabled) {
+    return { name, entry: tools[name] };
   }
 
   // Fallback: first enabled tool in config order
-  for (const [toolName, entry] of Object.entries(config.tools)) {
+  for (const [toolName, entry] of Object.entries(tools)) {
     if (entry.enabled) {
       return { name: toolName, entry };
     }
@@ -180,10 +183,11 @@ export function selectToolByRole(
   }
 
   // Fallback chain: try each named tool in order
+  const tools = config.tools ?? {};
   if (mapping.fallbackChain) {
     for (const toolName of mapping.fallbackChain) {
-      if (config.tools[toolName]?.enabled) {
-        return { name: toolName, entry: config.tools[toolName] };
+      if (tools[toolName]?.enabled) {
+        return { name: toolName, entry: tools[toolName] };
       }
     }
   }
@@ -257,7 +261,7 @@ export function rankToolsByDomain(
   const fullstack: SelectedTool[] = [];
   const rest: SelectedTool[] = [];
 
-  for (const [name, entry] of Object.entries(config.tools)) {
+  for (const [name, entry] of Object.entries(config.tools ?? {})) {
     if (!entry.enabled) continue;
     const tool: SelectedTool = { name, entry };
     if (entry.tags.includes(domain)) {

@@ -383,7 +383,7 @@ maestro wiki load <id1> [id2...] [--json]
 maestro wiki get <id>
 maestro wiki search <query>
 maestro wiki create --type knowhow --slug <slug> --title <title>
-maestro wiki append <containerId> --body <text> --keywords <kw>
+maestro wiki append <containerId> --body <text> [--category <cat>] [--keywords <kw>]
 maestro wiki remove-entry <subEntryId>
 
 # Knowhow CLI
@@ -549,7 +549,7 @@ maestro wiki search <query> [--json]
 
 # ── Wiki Write ────────────────────────────────────────────────
 maestro wiki create --type <spec|knowhow> --slug <slug> --title <title> [--body <text>]
-maestro wiki append <containerId> --body <text> [--keywords <kw>]
+maestro wiki append <containerId> --body <text> [--category <cat>] [--keywords <kw>]
 maestro wiki remove-entry <subEntryId>
 maestro wiki update <id> [--title <title>] [--frontmatter <json>]
 maestro wiki delete <id>

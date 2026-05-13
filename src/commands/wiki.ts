@@ -74,6 +74,7 @@ export function registerWikiCommand(program: Command): void {
         if (opts.keyword) qs.set('tag', opts.keyword);
         if (opts.createdBy) qs.set('createdBy', opts.createdBy);
         if (opts.query) qs.set('q', opts.query);
+        if (opts.tool) qs.set('tool', 'true');
         if (opts.group) qs.set('group', 'true');
         const data = await apiGet(base, `/api/wiki?${qs.toString()}`);
         if (opts.json) {
@@ -105,6 +106,7 @@ export function registerWikiCommand(program: Command): void {
       if (opts.keyword) filters.tag = opts.keyword;
       if (opts.createdBy) filters.createdBy = opts.createdBy;
       if (opts.query) filters.q = opts.query;
+      if (opts.tool) filters.tool = true;
 
       if (opts.group) {
         const groups = await indexer.groups(Object.keys(filters).length ? filters : undefined);
@@ -539,7 +541,7 @@ export function registerWikiCommand(program: Command): void {
   wiki
     .command('append <containerId>')
     .description('Append a <spec-entry> to a container file (e.g. spec-learnings)')
-    .requiredOption('--category <cat>', 'Entry category (coding, arch, debug, learning, ...)')
+    .option('--category <cat>', 'Entry category (coding, arch, debug, learning, ...) — inherits from container if omitted')
     .requiredOption('--body <text>', 'Entry content')
     .option('--keywords <kw>', 'Comma-separated keywords')
     .action(async (containerId, opts, cmd) => {

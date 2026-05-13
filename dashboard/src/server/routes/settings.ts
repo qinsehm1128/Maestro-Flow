@@ -473,5 +473,65 @@ export function createSettingsRoutes(workflowRoot: string | (() => string)): Hon
     }
   });
 
+  // -----------------------------------------------------------------------
+  // Workflow config — exclude keys managed by other settings sections
+  // -----------------------------------------------------------------------
+
+  /** Keys owned by dashboard settings / commander — never exposed via workflow-config API */
+  const DASHBOARD_OWNED_KEYS = new Set(['settings', 'dashboard', 'commander']);
+
+  function isWorkflowKey(key: string): boolean {
+    return !DASHBOARD_OWNED_KEYS.has(key);
+  }
+
+  // -----------------------------------------------------------------------
+  // GET /api/workflow-config — read all workflow configuration dynamically
+  // -----------------------------------------------------------------------
+  app.get('/api/workflow-config', async (c) => {
+    const p = getPaths();
+    try {
+      const raw = await readFile(p.dashboardConfig, 'utf-8');
+      const json = JSON.parse(raw) as Record<string, unknown>;
+      const result: Record<string, unknown> = {};
+      for (const key of Object.keys(json)) {
+        if (isWorkflowKey(key)) result[key] = json[key];
+      }
+      return c.json(result);
+    } catch {
+      return c.json({});
+    }
+  });
+
+  // -----------------------------------------------------------------------
+  // PUT /api/workflow-config — write workflow configuration (dynamic keys)
+  // -----------------------------------------------------------------------
+  app.put('/api/workflow-config', async (c) => {
+    try {
+      const p = getPaths();
+      const body = (await c.req.json()) as Record<string, unknown>;
+
+      let config: Record<string, unknown> = {};
+      try {
+        const raw = await readFile(p.dashboardConfig, 'utf-8');
+        config = JSON.parse(raw) as Record<string, unknown>;
+      } catch {
+        // Start with empty config
+      }
+
+      // Merge only workflow keys from body, preserve dashboard-owned keys
+      for (const key of Object.keys(body)) {
+        if (isWorkflowKey(key)) {
+          config[key] = body[key];
+        }
+      }
+
+      await writeFile(p.dashboardConfig, JSON.stringify(config, null, 2), 'utf-8');
+      return c.json({ ok: true });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Write failed';
+      return c.json({ ok: false, error: message }, 500);
+    }
+  });
+
   return app;
 }

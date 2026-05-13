@@ -35,9 +35,15 @@ maestro delegate "<PROMPT>" [options]
 
 ### Tool Resolution Priority
 
-1. `--to <tool>` — explicit tool selection (backward compat, highest priority)
+1. `--to <tool>` — explicit tool selection (highest priority)
 2. `--role <role>` — capability-based auto-selection via config
 3. No flag — first enabled tool in config
+
+### Caller Decision Rule
+
+- **User names a tool** (e.g. "用 gemini 分析", "ask codex") → **must use `--to <tool>`**
+- **User names a capability** (e.g. "分析一下", "review this") → use `--role <role>` or omit
+- **Never use `--role` when user has explicitly named a tool** — `--role` may route to a different tool
 
 ### Role-Based Tool Selection
 
@@ -229,7 +235,8 @@ Resume auto-assembles previous conversation context. Warning emitted when contex
 ```bash
 maestro delegate show                     # recent 20 executions
 maestro delegate show --all               # up to 100
-maestro delegate output <id>              # assistant output
+maestro delegate output <id>              # last reply only (after last tool call)
+maestro delegate output <id> --full       # full output (all turns)
 maestro delegate output <id> --verbose    # include start/end timestamps
 maestro delegate status <id>              # broker + history + snapshot preview
 maestro delegate tail <id>                # recent events + history
@@ -257,6 +264,6 @@ Proactively invoke `maestro delegate` when these conditions are met — no user 
 
 - Default `--mode analysis` (safe, read-only)
 - Wait for results before next action
-- Use `--role` for capability-based tool selection; fallback chain is config-driven
+- User named a tool → `--to <tool>`; user didn't → `--role` or omit (see Caller Decision Rule)
 - Rule suggestions are guidelines — choose the best fit
 </execution>
