@@ -137,39 +137,81 @@ S_FALLBACK:
 
 If matched, skip to chain resolution.
 
-**Layer 2: Structured intent extraction**
+**Layer 2: Semantic intent matching**
 
-Extract tuple from intent using LLM semantic understanding:
+Directly match user intent to the best `task_type` (maps to chain in Chain Map). Use LLM semantic understanding — no rigid keyword lookup.
+
+Extract:
 ```json
 {
-  "action":    "<create|fix|analyze|plan|execute|verify|review|test|debug|refactor|explore|manage|transition|continue|sync|learn|retrospect>",
-  "object":    "<feature|bug|issue|code|test|spec|phase|milestone|doc|performance|security|ui|memory|codebase|config>",
+  "task_type": "<from chain catalog below>",
   "scope":     "<module/file/area or null>",
-  "issue_id":  "<ISS-XXXXXXXX-NNN or null>",
-  "phase_ref": "<integer or null>",
+  "issue_id":  "<ISS-XXXXXXXX-NNN if mentioned, else null>",
+  "phase_ref": "<integer if mentioned, else null>",
   "urgency":   "<low|normal|high>"
 }
 ```
 
-Disambiguation: "问题"/"issue"/"problem" as broken → `object: "bug"` (→ debug); as tracked item (with ISS-ID or management context) → `object: "issue"` (→ issue management). When ambiguous, prefer `"bug"`.
+**Chain catalog — select by best semantic fit:**
 
-**Layer 3: action × object routing matrix**
+| task_type | When user intent is about... |
+|-----------|---------------------------|
+| `quick` | Simple/small task, add a feature, quick change |
+| `plan` | Plan, design, architect a phase |
+| `execute` | Implement, develop, code a phase |
+| `analyze` | Understand, investigate, evaluate code |
+| `verify` | Check goals met, validate results |
+| `review` | Code quality review |
+| `test` | Run or create tests, UAT |
+| `test_gen` | Generate tests for coverage gaps |
+| `debug` | Diagnose, troubleshoot, fix broken behavior |
+| `refactor` | Restructure, clean up, reduce tech debt |
+| `init` | Initialize project |
+| `sync` | Update/sync documentation |
+| `retrospective` | Phase review, post-mortem, 复盘 |
+| `learn` | Capture insights, record learnings |
+| `release` | Publish, ship, tag version |
+| `amend` | Revise workflow commands |
+| `compose` | Design/compose reusable workflows |
+| `overlay` | Create/edit command overlays |
+| `update` | Update maestro itself |
+| `harvest` | Extract knowledge from artifacts |
+| `wiki` | Manage wiki graph |
+| `knowhow` | Manage knowhow entries |
+| `ui_design` | UI design, build new UI |
+| `issue` | Issue CRUD — create, list, close, query |
+| `issue_discover` | Discover/find issues in codebase |
+| `issue_analyze` | Analyze a specific issue |
+| `issue_plan` | Plan fix for an issue |
+| `issue_execute` | Fix issue end-to-end (auto-upgrades to issue-full) |
+| `feature` | Standard feature: plan→execute→verify |
+| `full-lifecycle` | Complete phase: plan→execute→verify→review→test→audit→complete |
+| `brainstorm-driven` | Start from exploration/brainstorm |
+| `spec-driven` | From spec/requirements (heavy, with init) |
+| `roadmap-driven` | From requirements (light, with init) |
+| `analyze-plan-execute` | Fast track: analyze→plan→execute |
+| `execute-verify` | Resume after planning |
+| `review-fix` | Fix review-blocked issues |
+| `quality-loop` | Full quality improvement cycle |
+| `quality-loop-partial` | Partial quality fix |
+| `quality-fix` | Analyze gaps→plan→execute→verify |
+| `deploy` | Verify then release |
+| `milestone-close` | Close/transition milestone |
+| `milestone-release` | Release milestone with version tag |
+| `phase_transition` | Transition phase: audit→complete |
+| `next-milestone` | Advance to next milestone |
+| `state_continue` | Continue from current project state |
 
-If `issue_id` present → issue pipeline directly.
+**Selection priorities:**
+1. `issue_id` present → prefer issue chains
+2. UI/design/界面/页面/原型 → prefer `ui_design`
+3. Multiple lifecycle steps implied → prefer multi-step chains
+4. Single specific action → prefer single-step chains
+5. "问题" describing broken behavior → `debug`; tracked item with ISS-ID → `issue`; ambiguous → `debug`
+6. Simple task, no lifecycle context → `quick`
+7. Global fallback → `quick`
 
-| action | object-specific overrides | default |
-|--------|--------------------------|---------|
-| fix | bug/code/perf/security→`debug`, issue→`issue` | `debug` |
-| create | feature→`quick`, issue→`issue`, test→`test_gen`, spec→`spec_generate`, ui→`ui_design`, config→`init` | `quick` |
-| analyze | bug/code→`analyze`, issue→`issue_analyze`, codebase→`spec_map` | `analyze` |
-| explore | issue→`issue_discover`, feature/ui→`brainstorm`/`ui_design` | `brainstorm` |
-| plan | issue→`issue_plan`, spec→`spec_generate` | `plan` |
-| execute | issue→`issue_execute` | `execute` |
-| manage | issue→`issue`, milestone→`milestone_audit`, phase→`phase_transition`, memory/doc/codebase→`memory`/`sync`/`codebase_refresh` | `status` |
-| transition | phase→`phase_transition`, milestone→`milestone_complete` | `phase_transition` |
-| verify, review, test, debug, refactor, continue, sync, learn, retrospect, release, amend, compose | — | self-named |
-
-**Clarity scoring**: 3=action+object+scope, 2=action+object, 1=action only, 0=empty.
+**Clarity scoring**: 3=task_type+scope+phase, 2=task_type+scope, 1=task_type only, 0=empty.
 If `clarity < 2` and not `auto_mode` → transition to A_CLARIFY_INTENT.
 
 **Layer 4: State-based routing** (when `taskType === 'state_continue'`)

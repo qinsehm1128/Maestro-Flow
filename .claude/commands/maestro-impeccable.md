@@ -32,7 +32,8 @@ $ARGUMENTS first word determines mode:
 | Chain name: build, redesign, improve, enhance, launch, harden, foundation, live | Chain |
 | continue / next / -c | Resume |
 | search | Search: `maestro impeccable search "$REST"` |
-| Free text | Intent → classify → chain |
+| Free text (concrete task) | Direct craft — has specific target + specs/reference |
+| Free text (project intent) | Intent → classify → chain |
 | (empty) | Menu: show commands by category |
 
 ## Command Routing
@@ -90,16 +91,61 @@ responsive-design.md, spatial-design.md, typography.md, ux-writing.md
 
 Chain flags: --threshold <N> (default 26/40), --max-loops <N> (default 3), --skip-design, --styles <N>, -y
 
-## Intent → Chain
+## Free Text Routing
+
+Free text 按优先级三层匹配。命中即停，不继续向下。
+
+### Layer 1: 意图匹配单个命令 → Direct
+
+将用户描述与 Command Routing 表的 Description 列语义匹配。匹配最接近的**一个**命令。
+
+| Intent signal | Command |
+|---------------|---------|
+| 评审, review, 检查UX, 评分, heuristic | critique |
+| 审计, a11y, 可访问性, 技术检查, performance audit, 代码质量 | audit |
+| 加动画, 动效, transitions, micro-interactions, 过渡 | animate |
+| 配色, 颜色, palette, 色彩, OKLCH, contrast | colorize |
+| 字体, 排版, typography, font, 字号, 行高 | typeset |
+| 布局, 间距, spacing, grid, 对齐, alignment, 视觉层次 | layout |
+| 太花, 太吵, tone down, 视觉噪音, 简洁点 | quieter |
+| 太平淡, 加强, 更大胆, more personality, 更有个性 | bolder |
+| 太复杂, 简化, strip, 去掉多余, cognitive load | distill |
+| 打磨, 微调, pixel perfect, final pass, 最终润色 | polish |
+| 文案, copy, 标签, 错误提示, UX writing, microcopy | clarify |
+| 响应式, mobile, 适配, breakpoints, touch targets | adapt |
+| 性能, loading, bundle, 卡顿, jank, 速度 | optimize |
+| 边界, error states, i18n, 溢出, 空状态加固 | harden |
+| 引导, 新手, 首次使用, onboarding, empty state, 激活 | onboard |
+| 趣味, 惊喜, personality, memorable, joy | delight |
+| 炫酷, 极限, extraordinary, 超常规, 技术极限 | overdrive |
+| 规划, plan UX, wireframe, 信息架构, 视觉方向 | shape |
+| 多风格, 变体, variants, compare styles, 风格对比 | explore |
+| 品牌定义, PRODUCT.md, 产品上下文 | teach |
+| 提取设计, DESIGN.md, 设计文档化 | document |
+| 提取组件, pull tokens, 设计系统提取 | extract |
+| 实时, browser iteration, 浏览器迭代 | live |
+
+### Layer 2: 具体构建任务 → Direct craft
+
+Layer 1 未命中，但意图是"构建/创建某个具体东西"：
+- 包含具体文件路径或目标（`d:\path`, `src/pages/`, `index.html`）
+- 包含详细视觉规格（布局、风格、配色方案）
+- 包含参考素材（`参考...`, `based on...`, `like...`）
+
+→ 路由到 **craft**（Direct）
+
+### Layer 3: 项目意图 → Chain
+
+Layer 1+2 未命中，意图是泛泛的项目方向：
 
 | Pattern | Chain |
 |---------|-------|
-| 新建, create, build, new, landing, page | build |
+| 新建, create, build, new, 从零开始 | build |
 | 重做, redesign, 重新设计, rethink, 换风格, 改版 | redesign |
-| 改进, improve, fix, iterate, better | improve |
-| 动画, 颜色, 排版, animate, color, bold, delight | enhance |
+| 改进, improve, iterate, better, 迭代 | improve |
+| 增强, enhance, 视觉升级, visual upgrade | enhance |
 | 上线, launch, deploy, ship, 发布准备, production-ready | launch |
-| 加固, harden, edge case, i18n, 边界 | harden |
+| 加固, harden, 生产化, 边界情况 | harden |
 | 设计系统, design system, tokens, 设计规范, 设计基建 | foundation |
 | 实时, live, browser | live |
 
@@ -116,30 +162,62 @@ Before reading any command workflow:
 ## Direct Execution
 
 1. Prerequisites ✓
-2. Read `~/.maestro/workflows/impeccable/{command}.md`
-3. Follow workflow file instructions
-4. TodoWrite: track steps within command
-5. Post: suggest logical next command (teach→shape, shape→craft, craft→critique, etc.)
+2. **显示执行信息**：
+   ```
+   ── Command: {command} ────────────────────
+   Category: {category} | Target: {target}
+   ─────────────────────────────────────────
+   ```
+3. Read `~/.maestro/workflows/impeccable/{command}.md`
+4. **TodoWrite 跟踪**：按 workflow 文件中的主要阶段创建 todo 项
+   - 格式：`[{command}] {phase description}`
+   - 每个阶段完成后立即标记 completed
+5. Follow workflow file instructions
+6. Post: suggest logical next command (teach→shape, shape→craft, craft→critique, etc.)
 
 ## Chain Execution
 
 1. Prerequisites ✓
-2. Create session: `.workflow/.maestro/ui-craft-{YYYYMMDD-HHmmss}/status.json`
+2. **显示执行链**：解析 chain 定义，输出完整步骤预览：
+   ```
+   ── Chain: build ──────────────────────────
+    1. teach        (conditional: PRODUCT.md missing)
+    2. explore      (conditional: DESIGN.md missing)
+    3. shape
+    4. craft
+    5. critique     ◆ quality gate (threshold: 26/40)
+    6. [refine]     ↺ auto-fix loop (max: 3)
+    7. audit        ◆ quality gate (threshold: 14/20)
+    8. polish
+   ─────────────────────────────────────────
+   Target: {target}
+   ```
+   - `◆` 标记 quality gate 步骤，显示阈值
+   - `↺` 标记 refine loop，显示最大循环次数
+   - conditional 步骤注明触发条件
+   - 跳过的 conditional 步骤标记 `(skipped)`
+3. Create session: `.workflow/.maestro/ui-craft-{YYYYMMDD-HHmmss}/status.json`
    ```json
    { "chain_type": "...", "target": "...", "steps": [...], "current_step": 0,
      "gate_history": [], "loop_count": 0, "status": "running" }
    ```
-3. TodoWrite: one item per chain step
-4. For each step:
+4. **TodoWrite 初始化**：为 chain 所有步骤创建 todo 项
+   - 每步一项，格式：`[chain] step N: {command} — {description}`
+   - conditional 步骤若跳过，立即标记 completed
+   - quality gate 步骤标注阈值：`[chain] step 5: critique ◆ gate ≥26/40`
+5. For each step:
    - Read `~/.maestro/workflows/impeccable/{command}.md` → execute
-   - Update status.json (`current_step`, step `status`) + TodoWrite
-5. **Quality gate** (critique/audit steps):
+   - **步骤开始**：TodoWrite 标记当前步骤 in_progress
+   - **步骤完成**：TodoWrite 标记 completed + update status.json (`current_step`, step `status`)
+   - **步骤失败**：TodoWrite 标记 completed(with note) + 记录原因
+6. **Quality gate** (critique/audit steps):
    - Parse score: critique `**Total** | | **N/40**`, audit `**Total** | | **N/20**`
    - Count `[P0]` / `[P1]` tags
    - Pass: score ≥ threshold AND P0 == 0 → advance
    - Fail: collect suggested commands from findings → execute → re-gate
    - Max loops exceeded → force advance with warning
-6. Final report: scores + trend + commands executed
+   - TodoWrite：gate 结果记入当前步骤备注（score, P0/P1 count, pass/fail）
+7. Final report: scores + trend + commands executed
 
 ## Resume
 

@@ -119,8 +119,8 @@ S_FALLBACK:
 ### A_CLASSIFY_INTENT
 
 1. Read `~/.maestro/workflows/maestro.md` from deferred_reading
-2. Classify intent via keyword heuristics + detectTaskType/detectNextAction
-3. Select/compose command chain from chainMap
+2. Match intent to best task_type via chain catalog (semantic, AI-driven)
+3. Select chain from chainMap
 4. Determine per-step type: `internal` (Skill) or `external` (delegate)
 
 ### A_CLARIFY

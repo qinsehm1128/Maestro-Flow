@@ -70,14 +70,14 @@ Short-circuit (execute immediately, no chain):
   status/状态/dashboard → Skill({ skill: "manage-status" }). **End.**
 ```
 
-### 2b: Structured intent extraction (LLM-native)
+### 2b: Semantic intent matching
 
-Extract a structured intent tuple from user input. Leverages LLM semantic understanding to disambiguate polysemous words (e.g., "问题" as bug vs. issue-tracker item).
+Directly match user intent to the best `task_type` (maps to chain in chainMap). Use LLM semantic understanding — no rigid keyword lookup.
 
+**Output:**
 ```json
 {
-  "action":    "<from action enum>",
-  "object":    "<from object enum>",
+  "task_type": "<from chain catalog below>",
   "scope":     "<module/file/area or null>",
   "issue_id":  "<ISS-XXXXXXXX-NNN if mentioned, else null>",
   "phase_ref": "<integer if mentioned, else null>",
@@ -85,86 +85,73 @@ Extract a structured intent tuple from user input. Leverages LLM semantic unders
 }
 ```
 
-**Action enum:**
+**Chain catalog — select by best semantic fit:**
 
-| action | Triggered by (semantic) |
-|--------|------------------------|
-| `create` | Build new — feature, component, spec, project |
-| `fix` | Repair broken — fix bug, resolve error, 修复, 解决 |
-| `analyze` | Understand — analyze, evaluate, investigate, 分析, 评估 |
-| `plan` | Design approach — plan, break down, architect, 规划, 分解 |
-| `execute` | Implement — execute, implement, develop, code, 实现, 开发 |
-| `verify` | Check goals — verify, validate, 验证 |
-| `review` | Code quality — review code, 代码审查 |
-| `test` | Run/create tests — test, UAT, 测试, 验收 |
-| `debug` | Diagnose — debug, troubleshoot, 调试, 排查 |
-| `refactor` | Restructure — refactor, clean up, tech debt, 重构 |
-| `explore` | Discover — brainstorm, ideate, explore, 头脑风暴, 发散 |
-| `manage` | CRUD/lifecycle — list, create issue, close, track, 管理 |
-| `transition` | Advance — next phase, complete milestone |
-| `continue` | Resume — continue, next, go on, 继续 |
-| `sync` | Update docs — sync, refresh, 同步 |
-| `fork` | Worktree — fork, parallel, 分叉, 并行 |
-| `merge` | Merge back — merge worktree, 合并工作树 |
-| `learn` | Capture — learn, insight, eureka, 记录洞察 |
-| `retrospect` | Post-mortem — retrospective, retro, 复盘 |
-| `release` | Publish — release, publish, ship, tag, 发布 |
-| `amend` | Revise — amend workflow, fix command, 修正流程 |
-| `compose` | Design workflow — compose, build workflow, 编排流程 |
+| task_type | When user intent is about... |
+|-----------|---------------------------|
+| `quick` | Simple/small task, add a feature, quick change |
+| `plan` | Plan, design, architect a phase |
+| `execute` | Implement, develop, code a phase |
+| `analyze` | Understand, investigate, evaluate code |
+| `verify` | Check goals met, validate results |
+| `review` | Code quality review |
+| `test` | Run or create tests, UAT |
+| `test_gen` | Generate tests for coverage gaps |
+| `debug` | Diagnose, troubleshoot, fix broken behavior |
+| `refactor` | Restructure, clean up, reduce tech debt |
+| `init` | Initialize project |
+| `sync` | Update/sync documentation |
+| `retrospective` | Phase review, post-mortem, 复盘 |
+| `learn` | Capture insights, record learnings |
+| `release` | Publish, ship, tag version |
+| `fork` | Create worktree for parallel dev |
+| `merge` | Merge worktree back |
+| `amend` | Revise workflow commands |
+| `compose` | Design/compose reusable workflows |
+| `overlay` | Create/edit command overlays |
+| `update` | Update maestro itself |
+| `harvest` | Extract knowledge from artifacts |
+| `wiki` | Manage wiki graph |
+| `knowhow` | Manage knowhow entries |
+| `impeccable_chain` | UI design — explore, general |
+| `impeccable_build` | Build new UI from scratch |
+| `impeccable_improve` | Improve/fix existing UI |
+| `issue` | Issue CRUD — create, list, close, query |
+| `issue_discover` | Discover/find issues in codebase |
+| `issue_analyze` | Analyze a specific issue |
+| `issue_plan` | Plan fix for an issue |
+| `issue_execute` | Fix issue end-to-end (auto-upgrades to issue-full) |
+| `team_coordinate` | Team multi-agent coordination (general) |
+| `team_review` | Team code review |
+| `team_test` | Team testing |
+| `team_qa` | Team QA, debugging |
+| `team_tech_debt` | Team tech debt remediation |
+| `team_lifecycle` | Team full lifecycle (plan+dev+test+review) |
+| `full-lifecycle` | Complete phase: plan→execute→verify→review→test→audit |
+| `brainstorm-driven` | Start from exploration/brainstorm |
+| `spec-driven` | From spec/requirements (heavy, with init) |
+| `roadmap-driven` | From requirements (light, with init) |
+| `analyze-plan-execute` | Fast track: analyze→plan→execute |
+| `execute-verify` | Resume after planning |
+| `review-fix` | Fix review-blocked issues |
+| `quality-loop` | Full quality improvement cycle |
+| `quality-loop-partial` | Partial quality fix |
+| `milestone-close` | Close/transition milestone |
+| `milestone-release` | Release milestone with version tag |
+| `next-milestone` | Advance to next milestone |
+| `state_continue` | Continue from current project state |
 
-**Object enum:**
+**Selection priorities:**
+1. `issue_id` present → prefer issue chains
+2. "team" context → prefer team chains
+3. UI/design/界面/页面/原型 → prefer impeccable chains
+4. Multiple lifecycle steps implied → prefer multi-step chains
+5. Single specific action → prefer single-step chains
+6. "问题" describing broken behavior → `debug`; tracked item with ISS-ID → `issue`; ambiguous → `debug`
+7. Simple task, no lifecycle context → `quick`
+8. Global fallback → `quick`
 
-| object | Meaning |
-|--------|---------|
-| `feature` | New functionality or enhancement |
-| `bug` | Defect, error, broken behavior |
-| `issue` | Issue-tracker item |
-| `code` | Source code in general |
-| `test` | Tests, test suite, coverage |
-| `spec` | Specification, PRD, requirements |
-| `phase` | Workflow phase |
-| `milestone` | Workflow milestone |
-| `doc` | Documentation |
-| `performance` | Performance characteristics |
-| `security` | Security concerns |
-| `ui` | User interface, design, prototype |
-| `memory` | Memory/knowledge management |
-| `codebase` | Codebase documentation/mapping |
-| `team` | Team-based multi-agent execution |
-| `config` | Configuration, setup, initialization |
-
-**Disambiguation ("问题" / "issue" / "problem"):**
-- Describing **something broken** → `object: "bug"` (route to debug/fix)
-- Referring to **a tracked item** (with ISS-ID, or "create/manage issue" context) → `object: "issue"`
-- When ambiguous → prefer `"bug"` (more actionable)
-
-### 2c: Route via action × object matrix
-
-```
-Route priority:
-  1. issue_id present → route by action: analyze→issue_analyze, plan→issue_plan, fix/execute→issue_execute, debug→issue_analyze, manage→issue; default→issue
-  2. object == 'team' → route by action: review→team_review, test→team_test, debug/analyze→team_qa, refactor→team_tech_debt, execute→team_lifecycle; default→team_coordinate
-  3. action × object matrix lookup (fallback per action via '_default', global fallback 'quick'):
-
-  fix:        bug/code/performance/security/test→debug, issue→issue, ui→impeccable_improve; default→debug
-  create:     feature→quick, issue→issue, test→test_gen, spec→spec_generate, ui→impeccable_build, config→init; default→quick
-  analyze:    bug/code/performance/security/feature→analyze, issue→issue_analyze, codebase→spec_map; default→analyze
-  explore:    issue→issue_discover, feature→brainstorm, ui→impeccable_chain; default→brainstorm
-  plan:       issue→issue_plan, spec→spec_generate, phase/milestone→plan; default→plan
-  execute:    issue→issue_execute; default→execute
-  verify:     default→verify
-  review:     default→review
-  test:       feature/code→test; default→test
-  debug:      default→debug
-  refactor:   default→refactor
-  manage:     issue→issue, milestone→milestone_audit, phase→milestone_close, memory→knowhow, doc→sync, codebase→codebase_refresh, config→spec_setup, team→team_coordinate; default→status
-  transition: phase→milestone_close, milestone→milestone_complete; default→milestone_close
-  continue:   default→state_continue
-  sync:       doc→sync, codebase→codebase_refresh; default→sync
-  fork/merge/learn/retrospect/release/amend/compose: default→same name (retrospect→retrospective)
-```
-
-### 2d: Chain upgrade & clarity
+### 2c: Chain upgrade & clarity
 
 **State-aware chain upgrade:**
 - `issue_execute` → auto-upgrade to `issue-full` (appends review gate)
@@ -454,31 +441,34 @@ detectNextAction(state):
 
 ### Pipeline Examples
 
-| Input | Extraction | Route | Chain |
-|-------|-----------|-------|-------|
-| `"continue"` | *(exact match)* | state_continue | (from state) |
-| `"status"` | *(exact match)* | status | manage-status |
-| `"Add API endpoint"` | `{create, feature}` | quick | maestro-quick |
-| `"plan phase 2"` | `{plan, phase, ref:2}` | plan | maestro-plan 2 |
-| `"execute"` | `{execute, code}` | execute | maestro-execute |
-| `"run tests"` | `{test, test}` | test | quality-test |
-| `"debug auth crash"` | `{debug, bug, scope:"auth"}` | debug | quality-debug |
-| `"修复登录问题"` | `{fix, bug, scope:"登录"}` | debug | quality-debug |
-| `"fix issue ISS-abc-001"` | `{fix, issue, ISS-abc-001}` | issue_execute | issue-full |
-| `"这个问题需要看看"` | `{analyze, bug}` | analyze | maestro-analyze |
-| `"创建一个 issue 跟踪"` | `{manage, issue}` | issue | manage-issue |
-| `"discover issues"` | `{explore, issue}` | issue_discover | manage-issue-discover |
-| `"brainstorm notifications"` | `{explore, feature}` | brainstorm | brainstorm-driven |
-| `"spec generate auth"` | `{create, spec}` | spec_generate | spec-driven |
-| `"ui design landing"` | `{create, ui}` | ui_design | impeccable-build |
-| `"refactor auth module"` | `{refactor, code}` | refactor | quality-refactor |
-| `"复盘 phase 2"` | `{retrospect, phase}` | retrospective | quality-retrospective |
-| `"team review code"` | `{review, team}` | team_review | team-review |
-| `"next phase"` | `{transition, milestone}` | milestone_close | audit → complete |
-| `-y "implement X"` | `{execute, feature}` | execute | maestro-execute (auto) |
-| `"release v1.2"` | `{release, milestone}` | release | maestro-milestone-release |
-| `"amend plan command"` | `{amend, config}` | amend | maestro-amend |
-| `"compose deploy flow"` | `{compose, config}` | compose | maestro-composer |
+| Input | task_type | Chain |
+|-------|-----------|-------|
+| `"continue"` | *(2a exact)* state_continue | (from state) |
+| `"status"` | *(2a exact)* status | manage-status |
+| `"plan phase 2"` | plan | maestro-plan 2 |
+| `"execute"` | execute | maestro-execute |
+| `"Add API endpoint"` | quick | maestro-quick |
+| `"run tests"` | test | quality-test |
+| `"debug auth crash"` | debug | quality-debug "auth crash" |
+| `"修复登录问题"` | debug | quality-debug "登录" |
+| `"fix issue ISS-abc-001"` | issue_execute | issue-full |
+| `"这个问题需要看看"` | analyze | maestro-analyze |
+| `"创建一个 issue 跟踪"` | issue | manage-issue |
+| `"discover issues"` | issue_discover | manage-issue-discover |
+| `"brainstorm notifications"` | brainstorm-driven | brainstorm→plan→execute→verify |
+| `"spec generate auth"` | spec-driven | init→spec→plan→execute→verify |
+| `"ui design landing"` | impeccable_build | maestro-impeccable --chain build |
+| `"优化界面交互"` | impeccable_improve | maestro-impeccable --chain improve |
+| `"refactor auth module"` | refactor | quality-refactor "auth module" |
+| `"复盘 phase 2"` | retrospective | quality-retrospective 2 |
+| `"team review code"` | team_review | team-review |
+| `"next phase"` | milestone-close | audit→complete |
+| `-y "implement X"` | execute | maestro-execute (auto) |
+| `"release v1.2"` | release | maestro-milestone-release |
+| `"从需求开始做完整个项目"` | spec-driven | init→spec→plan→execute→verify |
+| `"分析完直接改"` | analyze-plan-execute | analyze→plan→execute |
+| `"review 有问题需要修"` | review-fix | plan --gaps→execute→review |
+| `"全面质量检查"` | quality-loop | verify→review→test→debug→plan→execute |
 
 ### Error Codes
 
