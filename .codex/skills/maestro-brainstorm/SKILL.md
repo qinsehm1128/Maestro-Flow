@@ -111,7 +111,7 @@ ui-designer agents in Wave 2 then focus on UX analysis only (interaction flows, 
 2. Generate context.md (summary, guidance, per-role findings, synthesis, feature index, next steps)
 3. Confidence scoring: 5 dimensions (role_coverage, cross_role_consistency, feature_completeness, spec_quality, design_feasibility). Quality gate: >3 UNRESOLVED → warn.
 4. Copy artifacts to target .brainstorming/
-5. Next-step routing: DESIGN.md established → `maestro-impeccable <feature> --chain build`; else UI features detected → `maestro-impeccable <feature> --chain build`; else → maestro-analyze / maestro-plan / maestro-roadmap
+5. Next-step routing: DESIGN.md established → `maestro-impeccable build <feature>`; else UI features detected → `maestro-impeccable build <feature>`; else → maestro-analyze / maestro-plan / maestro-roadmap
 
 </actions>
 </state_machine>
