@@ -1,14 +1,14 @@
 ---
 name: maestro-impeccable
-description: Production-grade UI design with knowhow accumulation -- 23 commands for build, evaluate, refine, enhance, fix
-argument-hint: "[craft|shape · audit|critique · animate|bolder|colorize|delight|layout|overdrive|quieter|typeset · adapt|clarify|distill · harden|onboard|optimize|polish · teach|document|extract|live] [target] [--skip-harvest] [-y]"
+description: Production-grade UI design with knowhow accumulation -- 24 commands for build, evaluate, refine, enhance, fix
+argument-hint: "[craft|shape|explore · audit|critique · animate|bolder|colorize|delight|layout|overdrive|quieter|typeset · adapt|clarify|distill · harden|onboard|optimize|polish · teach|document|extract|live] [target] [--skip-harvest] [-y] [--styles N]"
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep, request_user_input
 ---
 <purpose>
 Designs and iterates production-grade frontend interfaces. Real working code, committed design choices, exceptional craft.
 After each command, automatically harvests design knowledge to `.workflow/knowhow/` (category: ui) for cross-session accumulation.
 
-Replaces the standalone impeccable skill. 23 commands covering the full design lifecycle.
+Replaces the standalone impeccable skill. 24 commands covering the full design lifecycle.
 
 Includes integrated `search` subcommand for querying UI/UX design knowledge base (BM25 + CSV):
 ```bash
@@ -23,11 +23,11 @@ Stacks: react, nextjs, vue, svelte, astro, swiftui, react-native, flutter, html-
 <context>
 $ARGUMENTS -- sub-command + target + optional flags.
 
-**Sub-commands** (23):
+**Sub-commands** (24):
 
 | Category | Commands |
 |----------|----------|
-| Build | craft, shape, teach, document, extract |
+| Build | craft, shape, teach, document, extract, explore |
 | Evaluate | critique, audit |
 | Refine | polish, bolder, quieter, distill, harden, onboard |
 | Enhance | animate, colorize, typeset, layout, delight, overdrive |
@@ -37,6 +37,7 @@ $ARGUMENTS -- sub-command + target + optional flags.
 **Flags:**
 - `--skip-harvest` -- Execute command without knowhow capture
 - `-y` -- Auto-confirm where the skill allows
+
 </context>
 
 <execution>
@@ -80,6 +81,7 @@ After command completes (except `live`), unless `--skip-harvest`:
 | shape | decision | DCS- |
 | teach | reference | REF- |
 | document, extract | asset | AST- |
+| explore | decision + asset | DCS- + AST- |
 | critique, audit, polish, harden, onboard, clarify, adapt, optimize | tip | TIP- |
 | colorize, typeset, layout, animate, bolder, quieter, distill, delight, overdrive | decision | DCS- |
 
@@ -87,6 +89,14 @@ Write knowhow with `category: ui`. For DCS-/AST- types, also create spec index:
 ```bash
 maestro spec add ui "<title>" "<summary>" --keywords impeccable,<cmd>,... --ref knowhow/<file>
 ```
+
+## Post-Execution Routing
+
+After harvest, determine whether this command was invoked as part of a larger pipeline by checking conversation context (e.g., brainstorm Step 3.5, ui-craft chain step).
+
+**Pipeline context detected** (called via Skill from brainstorm, ui-craft, etc.): Report result and stop. Do NOT suggest next-step commands — the calling flow owns what happens next.
+
+**Standalone invocation** (user directly ran the command): Show next-step suggestions based on command executed (teach→explore/shape, explore→shape→craft, craft→critique, etc.).
 
 </execution>
 

@@ -1,6 +1,6 @@
 ---
 name: maestro-impeccable
-description: Production-grade UI design with knowhow accumulation — 23 commands + integrated design search for build, evaluate, refine, enhance, fix
+description: Production-grade UI design with knowhow accumulation — 24 commands + integrated design search for build, evaluate, refine, enhance, fix
 argument-hint: "<command> [target] [--skip-harvest] [-y] | search <query> [-d <domain>] [--design-system]"
 allowed-tools:
   - Read
@@ -13,8 +13,8 @@ allowed-tools:
   - AskUserQuestion
 ---
 <purpose>
-Replaces impeccable as the primary UI design entry point. 23 commands covering the full design lifecycle:
-Build (craft, shape, teach, document, extract), Evaluate (critique, audit), Refine (polish, bolder, quieter, distill, harden, onboard),
+Replaces impeccable as the primary UI design entry point. 24 commands covering the full design lifecycle:
+Build (craft, shape, teach, document, extract, explore), Evaluate (critique, audit), Refine (polish, bolder, quieter, distill, harden, onboard),
 Enhance (animate, colorize, typeset, layout, delight, overdrive), Fix (clarify, adapt, optimize), Iterate (live).
 
 Core innovation over impeccable: after each command execution, automatically harvests design decisions
@@ -33,11 +33,11 @@ Search is invoked directly via `maestro impeccable search`, not through the Skil
 <context>
 $ARGUMENTS — sub-command + target + optional flags.
 
-**Sub-commands** (23):
+**Sub-commands** (24):
 
 | Category | Commands |
 |----------|----------|
-| Build | craft, shape, teach, document, extract |
+| Build | craft, shape, teach, document, extract, explore |
 | Evaluate | critique, audit |
 | Refine | polish, bolder, quieter, distill, harden, onboard |
 | Enhance | animate, colorize, typeset, layout, delight, overdrive |
@@ -89,12 +89,29 @@ Skip harvest if:
 - Sub-command is `live` (interactive, no harvestable output)
 - Sub-command is unrecognized
 
+## 4. Post-Execution Routing
+
+After harvest (or skip), determine whether this command was invoked as part of a larger pipeline by checking conversation context (e.g., brainstorm Step 3.5, ui-craft chain step).
+
+**Pipeline context detected** (called via Skill from brainstorm, ui-craft, etc.):
+- Report command result (output, scores, artifacts produced) and **stop**
+- Do NOT suggest next-step commands — the calling flow owns what happens next
+
+**Standalone invocation** (user directly ran `/maestro-impeccable`):
+- Show next-step suggestions based on what was executed:
+  - `teach` → suggest `explore` or `shape`
+  - `explore` → suggest `shape` → `craft`
+  - `shape` → suggest `craft`
+  - `craft` → suggest `critique`
+  - `critique`/`audit` → suggest commands from findings
+  - Enhancement/fix commands → suggest `critique` to re-evaluate
+
 </execution>
 
 <error_codes>
 | Code | Severity | Description |
 |------|----------|-------------|
-| E001 | error | Invalid sub-command (not in 23 valid commands) |
+| E001 | error | Invalid sub-command (not in 24 valid commands) |
 | E002 | error | No intent or target specified |
 | W001 | warning | Harvest failed — design knowledge not captured (command still succeeded) |
 | W002 | warning | PRODUCT.md missing — skill will auto-trigger teach |

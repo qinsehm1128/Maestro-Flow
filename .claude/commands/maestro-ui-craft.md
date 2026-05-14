@@ -66,15 +66,14 @@ $ARGUMENTS — intent description or target path, with optional flags.
 
 | Chain | Sequence | Gate Condition |
 |-------|----------|----------------|
-| **build** | teach? → **design_explore?** → **bridge?** → shape → craft → **critique** → [refine loop] → audit → polish | critique ≥ threshold AND P0 == 0 |
+| **build** | teach? → **design_explore?** → shape → craft → **critique** → [refine loop] → audit → polish | critique ≥ threshold AND P0 == 0 |
 | **improve** | **critique** → [refine loop] → polish → audit | critique ≥ threshold AND P0 == 0 |
 | **enhance** | {cmd} → **critique** → polish (if needed) | critique ≥ threshold |
 | **harden** | harden → **audit** → polish | audit ≥ threshold×0.5 |
 | **live** | live | — (interactive, no gate) |
 
 - `teach?` — conditional: only if PRODUCT.md missing/placeholder
-- `design_explore?` — conditional: only if DESIGN.md missing AND `--skip-design-explore` not set. Generates multiple MASTER.md variants, renders HTML prototypes, launches visual comparison, user selects/mixes
-- `bridge?` — conditional: only if design_explore step ran (MASTER.md produced but no DESIGN.md yet)
+- `design_explore?` — conditional: only if DESIGN.md missing AND `--skip-design-explore` not set. Delegates to `Skill("maestro-impeccable", "explore")` which handles variant generation, prototype rendering, visual comparison, user selection/mix, AND bridge to DESIGN.md internally
 - `[refine loop]` — quality gate loop: extract suggested commands from critique → execute → re-critique
 
 ### Intent → Chain Routing
@@ -99,8 +98,7 @@ S_PARSE      — 解析参数、意图分类、chain 选择                PERSI
 S_RESUME     — 扫描已有 ui-craft session、恢复执行           PERSIST: —
 S_SETUP      — 加载 context、检查 PRODUCT.md                PERSIST: —
 S_CREATE     — 创建 session + status.json                    PERSIST: session (全量)
-S_DESIGN_EXPLORE — 多变体设计探索：生成 MASTER variants、渲染 HTML 原型、可视化对比、用户选型/混搭  PERSIST: variants, html_prototypes, selection, mix_config, redo_count
-S_BRIDGE     — MASTER.md → DESIGN.md 格式转换                 PERSIST: bridge status
+S_DESIGN_EXPLORE — 委托 impeccable explore：多变体生成、原型对比、选型/混搭、自动 bridge 到 DESIGN.md  PERSIST: explore_completed, design_md_path
 S_CHAIN      — 按序执行 chain 步骤                           PERSIST: step progress, executed commands
 S_GATE       — 质量门控：解析评分、决策                       PERSIST: scores, loop count
 S_REFINE     — 执行自动选取的 refine 命令                    PERSIST: refine commands, loop state
@@ -126,21 +124,15 @@ S_CREATE:
   → S_CHAIN      DO: A_CREATE_SESSION
 
 S_CHAIN:
-  → S_DESIGN_EXPLORE  WHEN: current step is 'design_explore' AND DESIGN.md missing AND --skip-design-explore not set
-  → S_BRIDGE     WHEN: current step is 'bridge' AND design_explore step produced MASTER.md
+  → S_DESIGN_EXPLORE  WHEN: current step is 'design_explore' AND DESIGN.md missing AND --skip-design-explore not set AND --skip-design not set
   → S_GATE       WHEN: current step is gate command (critique/audit)
-  → S_CHAIN      WHEN: step is design_explore/bridge but skip conditions met → advance
+  → S_CHAIN      WHEN: step is design_explore but skip conditions met → advance
   → S_CHAIN      WHEN: step is normal command → execute → advance
   → S_REPORT     WHEN: all steps complete
 
 S_DESIGN_EXPLORE:
-  → S_DESIGN_EXPLORE  WHEN: user chose 'Redo' AND redo_count < 3    DO: regenerate variants with adjusted keywords
-  → S_BRIDGE     WHEN: variant approved or mix completed (MASTER.md ready)  DO: A_DESIGN_EXPLORE (generate variants, render prototypes, visual compare, user review, optional mix, harvest rejected, persist selected)
-  → S_CHAIN      WHEN: exploration failed → W004 → skip bridge       DO: advance to shape (full interview fallback)
-
-S_BRIDGE:
-  → S_CHAIN      WHEN: DESIGN.md written → advance to shape          DO: A_BRIDGE_TO_DESIGN_MD
-  → S_CHAIN      WHEN: bridge failed → W005 → continue without       DO: advance to shape
+  → S_CHAIN      WHEN: explore completed (DESIGN.md produced) → advance to shape
+  → S_CHAIN      WHEN: explore failed → W004 → advance to shape (full interview fallback)
 
 S_GATE:
   → S_CHAIN      WHEN: PASS (score ≥ threshold AND P0 == 0) → advance to next step
@@ -191,21 +183,12 @@ S_REPORT:
 
 ### A_DESIGN_EXPLORE
 
-1. Read `.workflow/impeccable/PRODUCT.md`, extract: register, brand_personality, anti_references, industry
-2. Resolve scripts: `search.py` and `render-prototype.js` (project-local → installed fallback)
-3. Verify Python available (E006 if not), scripts exist (E007 if not), Node.js available (W008 if not → text fallback)
-4. Read deferred: `~/.maestro/workflows/impeccable/design.md`, execute Phase A (variant generation → prototype rendering → visual comparison → user review → optional mix → harvest rejected → persist selected)
-5. Persist selected/mixed variant to `.workflow/impeccable/design-system/{project}/MASTER.md`
-6. Archive rejected variants to `.workflow/impeccable/design-system/harvest/rejected-variants/`
-7. Update status.json with design selection metadata (variant, mix_config, redo_count, rejected_variants)
+Delegate to impeccable explore as a black-box command. The explore command internally handles:
+variant generation, prototype rendering, visual comparison, user review, mix protocol, rejected variant harvest, bridge to DESIGN.md, and spec registration.
 
-### A_BRIDGE_TO_DESIGN_MD
-
-1. Read deferred: `~/.maestro/workflows/impeccable/design.md`, execute Phase B (bridge transformation)
-2. Transform MASTER.md → `.workflow/impeccable/DESIGN.md` (Google Stitch format with YAML frontmatter + 6 canonical sections)
-3. Register: `maestro spec add ui "Design System: {project}" "{style_name}" --keywords design,colors,typography --ref .workflow/impeccable/DESIGN.md`
-4. Refresh: `maestro impeccable load-context`
-5. Announce bridge completion with key metrics
+1. Execute: `Skill({ skill: "maestro-impeccable", args: "explore --styles {styles_count}" })`
+2. On completion: verify `.workflow/impeccable/DESIGN.md` exists
+3. Update status.json: `explore_completed: true`, `design_md_path`
 
 ### A_FINAL_REPORT
 
@@ -258,29 +241,13 @@ After each step: update status.json `current_step` and step `status`.
 
 When current step is `design_explore`:
 
-1. Check if `.workflow/impeccable/DESIGN.md` already exists → skip design_explore + bridge, advance to shape
-2. Check if `--skip-design-explore` or `--skip-design` is set → skip design_explore + bridge, advance to shape
+1. Check if `.workflow/impeccable/DESIGN.md` already exists → skip, advance to shape
+2. Check if `--skip-design-explore` or `--skip-design` is set → skip, advance to shape
 3. Otherwise → execute A_DESIGN_EXPLORE:
-   - Read `.workflow/impeccable/PRODUCT.md` for register, brand personality, anti-references, industry
-   - Resolve `search.py` and `render-prototype.js` (project-local → installed fallback)
-   - Verify Python available (E006), scripts exist (E007)
-   - Read deferred: `~/.maestro/workflows/impeccable/design.md`, execute **Phase A** (variant generation → prototype rendering → visual comparison → user review → optional mix → harvest rejected → persist selected)
-   - Persist selected/mixed variant to `.workflow/impeccable/design-system/{project}/MASTER.md`
-   - Archive rejected variants to `harvest/rejected-variants/` with user feedback
-4. On failure → W004, skip bridge, advance to shape (full interview fallback)
-
-### 4b. Bridge step (build chain only, after design)
-
-When current step is `bridge`:
-
-1. Check if design step was skipped or failed → skip bridge, advance to shape
-2. Otherwise → execute A_BRIDGE_TO_DESIGN_MD:
-   - Read deferred: `~/.maestro/workflows/impeccable/design.md`, execute **Phase B** (bridge transformation)
-   - Transform MASTER.md → `.workflow/impeccable/DESIGN.md` (Google Stitch format: YAML frontmatter + 6 canonical sections)
-   - Register via `maestro spec add ui`
-   - Refresh via `maestro impeccable load-context`
-3. On failure → W005, continue without DESIGN.md
-4. After bridge completes → shape will auto-skip visual direction questions already answered by DESIGN.md
+   - `Skill({ skill: "maestro-impeccable", args: "explore --styles {styles_count}" })`
+   - explore handles everything internally: variant generation, prototype rendering, visual comparison, user selection/mix, bridge to DESIGN.md, spec registration
+4. On completion → verify DESIGN.md exists, advance to shape
+5. On failure → W004, advance to shape (full interview fallback, no DESIGN.md)
 
 ### 4c. Normal steps
 

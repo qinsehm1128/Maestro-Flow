@@ -287,6 +287,32 @@ Seven sub-phases producing guidance-specification.md:
 
 **Output**: `{output_dir}/guidance-specification.md`, session metadata (workflow-session.json)
 
+### Step 3.5: Visual Style Foundation (Auto Mode, conditional)
+
+When `ui-designer` is among the selected roles, establish the project's visual direction before role analysis begins. This ensures all downstream UX analysis works within a confirmed design system.
+
+**Condition**: Skip if `.workflow/impeccable/DESIGN.md` already exists (visual direction already locked).
+
+**Execution** (sequential):
+
+1. **Product context** — if `.workflow/impeccable/PRODUCT.md` missing:
+   ```
+   Skill({ skill: "maestro-impeccable", args: "teach" })
+   ```
+   This runs the teach interview to establish brand, users, personality, anti-references.
+
+2. **Visual exploration** — multi-style comparison and selection:
+   ```
+   Skill({ skill: "maestro-impeccable", args: "explore" })
+   ```
+   This generates multiple design system variants as HTML prototypes, launches visual comparison, and lets the user select/mix. Produces DESIGN.md on completion.
+
+3. Record in session metadata: `design_system_established: true`, `design_md_path: ".workflow/impeccable/DESIGN.md"`
+
+**`--yes` mode**: `explore` auto-selects variant 1 without visual comparison. `teach` still requires minimal input if PRODUCT.md is missing.
+
+**Skip mode**: If user explicitly passes `--skip-design` to brainstorm, skip this step entirely. ui-designer role will generate its own independent theme in Phase 2.
+
 ### Step 4: Parallel Role Analysis (Auto Mode)
 
 For EACH selected role, spawn a conceptual-planning-agent in parallel:

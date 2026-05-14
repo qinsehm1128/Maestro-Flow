@@ -49,6 +49,7 @@ S_ROLES      — 选择 roles（-y auto / interactive）        PERSIST: —
 S_CSV_GEN    — 生成 tasks.csv                              PERSIST: tasks.csv
 S_WAVE_1     — Guidance Spec (single agent)                PERSIST: guidance-specification.md
 S_CHECK_1    — Checkpoint: 用户审阅 guidance（-y 跳过）    PERSIST: —
+S_DESIGN     — 视觉风格确定 (impeccable teach + explore)   PERSIST: DESIGN.md
 S_WAVE_2     — Role Analysis (parallel spawn)              PERSIST: role analyses
 S_CHECK_2    — Checkpoint: 用户审阅 roles（-y 跳过）       PERSIST: —
 S_WAVE_3     — Synthesis + Feature Index (single agent)    PERSIST: synthesis artifacts
@@ -63,9 +64,14 @@ S_CSV_GEN → S_WAVE_1   DO: generate tasks.csv (1 guidance + N roles + 1 synthe
 S_WAVE_1 → S_CHECK_1   WHEN: completed    DO: spawn wave-1, merge results, read guidance-spec
 S_WAVE_1 → END         WHEN: failed       DO: abort pipeline
 
-S_CHECK_1 → S_WAVE_2   WHEN: -y OR user "Proceed"
+S_CHECK_1 → S_DESIGN   WHEN: (-y OR user "Proceed") AND ui-designer in selected_roles
+S_CHECK_1 → S_WAVE_2   WHEN: (-y OR user "Proceed") AND ui-designer NOT in selected_roles
 S_CHECK_1 → S_CHECK_1  WHEN: user "Revise"    DO: edit guidance-spec, re-display
 S_CHECK_1 → END        WHEN: user "Abort"
+
+S_DESIGN → S_WAVE_2    WHEN: DESIGN.md exists OR explore completed    DO: A_DESIGN_EXPLORE
+S_DESIGN → S_WAVE_2    WHEN: DESIGN.md already exists (skip explore)
+S_DESIGN → S_WAVE_2    WHEN: explore failed → W004 → continue without
 
 S_WAVE_2 → S_CHECK_2   DO: spawn wave-2 (parallel), merge results
 S_WAVE_2 → S_WAVE_3    WHEN: all failed       DO: skip synthesis
@@ -88,13 +94,24 @@ S_AGGREGATE → END      DO: A_AGGREGATE
 
 **Synthesis (W3)**: Cross-role consensus/conflicts/unique → conflict tags [RESOLVED]/[SUGGESTED]/[UNRESOLVED] → feature-specs or synthesis-specification.md → feature-index.json + synthesis-changelog.md. Four-layer: Direct Reference → Structured Extraction → Conflict Distillation → Cross-Feature Annotation.
 
+### A_DESIGN_EXPLORE
+
+When ui-designer is among selected roles, establish visual direction before Wave 2:
+
+1. If `.workflow/impeccable/PRODUCT.md` missing → run `$maestro-impeccable teach`
+2. If `.workflow/impeccable/DESIGN.md` missing → run `$maestro-impeccable explore`
+3. If both already exist → skip (visual direction already locked)
+
+explore generates multi-style HTML prototypes, visual comparison, user selection/mix, and produces DESIGN.md.
+ui-designer agents in Wave 2 then focus on UX analysis only (interaction flows, state design), not visual styling.
+
 ### A_AGGREGATE
 
 1. Export results.csv
 2. Generate context.md (summary, guidance, per-role findings, synthesis, feature index, next steps)
 3. Confidence scoring: 5 dimensions (role_coverage, cross_role_consistency, feature_completeness, spec_quality, design_feasibility). Quality gate: >3 UNRESOLVED → warn.
 4. Copy artifacts to target .brainstorming/
-5. Next-step routing: UI features detected → maestro-ui-craft --chain build; else → maestro-analyze / maestro-plan / maestro-roadmap
+5. Next-step routing: DESIGN.md established → `maestro-ui-craft <feature> --chain build`; else UI features detected → `maestro-ui-craft <feature> --chain build`; else → maestro-analyze / maestro-plan / maestro-roadmap
 
 </actions>
 </state_machine>

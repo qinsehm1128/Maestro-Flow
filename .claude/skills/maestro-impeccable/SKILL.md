@@ -3,7 +3,7 @@ name: maestro-impeccable
 description: Use when the user wants to design, redesign, shape, critique, audit, polish, clarify, distill, harden, optimize, adapt, animate, colorize, extract, or otherwise improve a frontend interface. Covers websites, landing pages, dashboards, product UI, app shells, components, forms, settings, onboarding, and empty states. Handles UX review, visual hierarchy, information architecture, cognitive load, accessibility, performance, responsive behavior, theming, anti-patterns, typography, fonts, spacing, layout, alignment, color, motion, micro-interactions, UX copy, error states, edge cases, i18n, and reusable design systems or tokens. Also use for bland designs that need to become bolder or more delightful, loud designs that should become quieter, live browser iteration on UI elements, or ambitious visual effects that should feel technically extraordinary. Not for backend-only or non-UI tasks.
 version: 1.0.0
 user-invocable: true
-argument-hint: "[craft|shape · audit|critique · animate|bolder|colorize|delight|layout|overdrive|quieter|typeset · adapt|clarify|distill · harden|onboard|optimize|polish · teach|document|extract|live] [target] [--skip-harvest] [-y]"
+argument-hint: "[craft|shape|explore · audit|critique · animate|bolder|colorize|delight|layout|overdrive|quieter|typeset · adapt|clarify|distill · harden|onboard|optimize|polish · teach|document|extract|live] [target] [--skip-harvest] [-y] [--styles N]"
 allowed-tools:
   - Bash(maestro impeccable *)
   - Write
@@ -108,6 +108,7 @@ See [~/.maestro/workflows/impeccable/brand.md](~/.maestro/workflows/impeccable/b
 | `teach` | Build | Set up PRODUCT.md and DESIGN.md | [~/.maestro/workflows/impeccable/teach.md](~/.maestro/workflows/impeccable/teach.md) |
 | `document` | Build | Generate DESIGN.md from code | [~/.maestro/workflows/impeccable/document.md](~/.maestro/workflows/impeccable/document.md) |
 | `extract [target]` | Build | Pull tokens/components into design system | [~/.maestro/workflows/impeccable/extract.md](~/.maestro/workflows/impeccable/extract.md) |
+| `explore [--styles N]` | Build | Multi-style comparison: generate variants, render prototypes, visual compare, select/mix | [~/.maestro/workflows/impeccable/explore.md](~/.maestro/workflows/impeccable/explore.md) |
 | `critique [target]` | Evaluate | UX review with heuristic scoring | [~/.maestro/workflows/impeccable/critique.md](~/.maestro/workflows/impeccable/critique.md) |
 | `audit [target]` | Evaluate | Technical quality checks | [~/.maestro/workflows/impeccable/audit.md](~/.maestro/workflows/impeccable/audit.md) |
 | `polish [target]` | Refine | Final quality pass | [~/.maestro/workflows/impeccable/polish.md](~/.maestro/workflows/impeccable/polish.md) |
@@ -146,6 +147,7 @@ After every command execution (except `live`), harvest design decisions into `.w
 | teach | reference | REF- | Brand/user/principles from PRODUCT.md |
 | document | asset | AST- | Token system from DESIGN.md YAML |
 | extract | asset | AST- | Design system patterns |
+| explore | decision + asset | DCS- + AST- | Style selection rationale + design tokens |
 | critique | tip | TIP- | Scores + P0/P1 findings |
 | audit | tip | TIP- | 5-dimension scores |
 | polish | tip | TIP- | Polish points |
