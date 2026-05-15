@@ -106,9 +106,15 @@ export function Sidebar() {
           isMobileOpen ? 'max-lg:translate-x-0' : '',
         ].join(' ')}
       >
-      <nav className="py-[var(--spacing-4)]" aria-label="Command categories">
+      <nav className="py-[var(--spacing-4)]" aria-label={t('sidebar.aria_nav')}>
         {/* Guides section */}
         <SidebarGuidesSection />
+
+        {/* Divider */}
+        <div className="mx-[var(--spacing-3)] my-[var(--spacing-2)] border-t border-border-divider" />
+
+        {/* Changelog link */}
+        <SidebarChangelogLink />
 
         {/* Divider */}
         <div className="mx-[var(--spacing-3)] my-[var(--spacing-2)] border-t border-border-divider" />
@@ -187,7 +193,7 @@ function SidebarSection({ section, isActive, onToggle }: SidebarSectionProps) {
             onClick={onToggle}
             aria-expanded={section.isOpen}
             aria-label={`Toggle ${t(section.titleKey)} section`}
-            className="p-1 rounded-[var(--radius-sm)] hover:bg-bg-hover text-text-tertiary transition-all duration-[var(--duration-fast)]"
+            className="p-2 min-w-8 min-h-8 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-bg-hover text-text-tertiary transition-all duration-[var(--duration-fast)]"
           >
             <svg
               className={[
@@ -253,6 +259,7 @@ interface SidebarItemProps {
 }
 
 function SidebarItem({ category, item, type, dotColor }: SidebarItemProps) {
+  const { t } = useI18n();
   const href = `/${category}/${item}`;
   const location = useLocation();
   const isActive = location.pathname === href;
@@ -260,11 +267,11 @@ function SidebarItem({ category, item, type, dotColor }: SidebarItemProps) {
   // Badge for skill types
   const badge = type === 'claude-skill' ? (
     <span className="ml-auto text-[length:9px] font-[var(--font-weight-semibold)] px-[var(--spacing-1-5)] py-[1px] rounded-full bg-status-bg-planning text-accent-purple">
-      Skill
+      {t('sidebar.badge_skill')}
     </span>
   ) : type === 'codex-skill' ? (
     <span className="ml-auto text-[length:9px] font-[var(--font-weight-semibold)] px-[var(--spacing-1-5)] py-[1px] rounded-full bg-status-bg-verifying text-accent-orange">
-      Codex
+      {t('sidebar.badge_codex')}
     </span>
   ) : null;
 
@@ -317,14 +324,14 @@ function SidebarGuidesSection() {
           ].join(' ')}
         >
           {getGuideIcon('book-open', 'w-3.5 h-3.5')}
-          {isZh ? '指南' : 'Guides'}
+          {t('sidebar.guides')}
         </NavLink>
 
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
           aria-expanded={isOpen}
-          className="p-1 rounded-[var(--radius-sm)] hover:bg-bg-hover text-text-tertiary transition-all duration-[var(--duration-fast)]"
+          className="p-2 min-w-8 min-h-8 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-bg-hover text-text-tertiary transition-all duration-[var(--duration-fast)]"
         >
           <svg
             className={[
@@ -368,6 +375,39 @@ function SidebarGuidesSection() {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SidebarChangelogLink — link to changelog page
+// ---------------------------------------------------------------------------
+
+function SidebarChangelogLink() {
+  const { t } = useI18n();
+  const location = useLocation();
+  const isActive = location.pathname === '/changelog';
+
+  return (
+    <div className="px-[var(--spacing-3)]">
+      <NavLink
+        to="/changelog"
+        className={[
+          'flex items-center gap-[var(--spacing-2)] px-[var(--spacing-3)] py-[var(--spacing-2)]',
+          'text-[length:var(--font-size-sm)] font-[var(--font-weight-semibold)]',
+          'transition-all duration-[var(--duration-fast)]',
+          'rounded-[var(--radius-default)]',
+          isActive
+            ? 'bg-bg-active text-text-primary'
+            : 'text-text-secondary hover:text-text-primary hover:bg-bg-hover',
+        ].join(' ')}
+      >
+        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="4 17 10 11 4 5" />
+          <line x1="12" y1="19" x2="20" y2="19" />
+        </svg>
+        {t('nav.changelog')}
+      </NavLink>
     </div>
   );
 }

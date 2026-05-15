@@ -1,0 +1,159 @@
+import { useI18n } from '@/client/i18n/index.js';
+import { Link } from 'react-router-dom';
+
+// ---------------------------------------------------------------------------
+// ChangelogPage — version history with recent releases
+// ---------------------------------------------------------------------------
+
+interface ChangelogEntry {
+  version: string;
+  date: string;
+  changes: Array<{
+    type: 'feat' | 'fix' | 'refactor' | 'chore' | 'docs';
+    text_en: string;
+    text_zh: string;
+  }>;
+}
+
+const changelog: ChangelogEntry[] = [
+  {
+    version: '0.4.3',
+    date: '2025-05',
+    changes: [
+      { type: 'feat', text_en: 'Enhanced skill docs with next-step routing and success criteria details', text_zh: '增强各技能文档，添加下一步路由和成功标准细节' },
+      { type: 'feat', text_en: 'Added DecisionLogPlugin for logging decision outcomes', text_zh: '添加 DecisionLogPlugin 用于记录决策结果' },
+      { type: 'fix', text_en: 'Fixed Codex hooks hookEventName enum validation failure', text_zh: '修复 Codex hooks hookEventName 枚举验证失败' },
+    ],
+  },
+  {
+    version: '0.4.2',
+    date: '2025-05',
+    changes: [
+      { type: 'feat', text_en: 'Added Codex Hooks and MCP server support, enhanced installation flow', text_zh: '添加 Codex Hooks 和 MCP 服务器支持，增强安装流程' },
+      { type: 'fix', text_en: 'Dark mode adaptation and Chat page UX optimization', text_zh: '暗色模式适配与 Chat 页面 UX 优化' },
+      { type: 'feat', text_en: 'Updated maestro-impeccable docs, enhanced command chain and intent matching', text_zh: '更新 maestro-impeccable 文档，增强命令链和意图匹配说明' },
+    ],
+  },
+  {
+    version: '0.4.1',
+    date: '2025-05',
+    changes: [
+      { type: 'feat', text_en: 'Enhanced intent matching and task routing in maestro coordinator', text_zh: '增强 maestro 和 maestro-impeccable 的意图匹配和任务路由' },
+      { type: 'fix', text_en: 'Fixed script path priority for project-local and installed paths', text_zh: '修正脚本路径优先级，确保正确解析项目本地和安装路径' },
+      { type: 'refactor', text_en: 'Refactored maestro-impeccable command usage and documentation', text_zh: '重构 maestro-impeccable 命令用法和文档' },
+    ],
+  },
+  {
+    version: '0.4.0',
+    date: '2025-05',
+    changes: [
+      { type: 'refactor', text_en: 'Merged maestro-ui-craft into maestro-impeccable as unified command', text_zh: '合并 maestro-ui-craft 到 maestro-impeccable 为统一命令' },
+      { type: 'feat', text_en: 'Updated UI production pipeline, replaced ui-craft with maestro-impeccable', text_zh: '更新 UI 生产管线文档，替换 ui-craft 为 maestro-impeccable' },
+      { type: 'feat', text_en: 'Enhanced design flow and knowledge accumulation in impeccable', text_zh: '增强 impeccable 设计流程和知识积累说明' },
+    ],
+  },
+  {
+    version: '0.3.49',
+    date: '2025-05',
+    changes: [
+      { type: 'feat', text_en: 'Added preloading spec descriptions for multi-role analysis', text_zh: '添加预加载规范说明，增强多角色分析和上下文支持' },
+      { type: 'feat', text_en: 'Added BM25 search engine for UI/UX style guides with CLI', text_zh: '添加 BM25 搜索引擎用于 UI/UX 风格指南搜索' },
+      { type: 'refactor', text_en: 'Refactored delegate usage documentation for clarity', text_zh: '重构委派用法文档，提升清晰度和一致性' },
+    ],
+  },
+  {
+    version: '0.3.48',
+    date: '2025-05',
+    changes: [
+      { type: 'feat', text_en: 'Enhanced maestro-ralph docs with artifact reasoning and lifecycle stages', text_zh: '更新 maestro-ralph 文档，增强工件推理和生命周期阶段描述' },
+    ],
+  },
+  {
+    version: '0.3.47',
+    date: '2025-05',
+    changes: [
+      { type: 'feat', text_en: 'Added UI spec loading for design consistency and context support', text_zh: '添加 UI 规范加载功能，增强设计一致性和上下文支持' },
+      { type: 'feat', text_en: 'Converted Impeccable tools to TypeScript, adapted to maestro CLI architecture', text_zh: '将 Impeccable 工具转换为 TypeScript，适配 maestro CLI 架构' },
+      { type: 'feat', text_en: 'Added Impeccable live session management tools', text_zh: '添加 Impeccable 实时会话管理工具' },
+      { type: 'feat', text_en: 'Added comprehensive workflows for impeccable design processes', text_zh: '添加 impeccable 设计流程的完整工作流' },
+    ],
+  },
+];
+
+const typeConfig: Record<string, { label: string; color: string; bg: string }> = {
+  feat: { label: 'Feature', color: 'text-accent-green', bg: 'bg-status-bg-completed' },
+  fix: { label: 'Fix', color: 'text-accent-red', bg: 'bg-status-bg-blocked' },
+  refactor: { label: 'Refactor', color: 'text-accent-blue', bg: 'bg-status-bg-in-progress' },
+  chore: { label: 'Chore', color: 'text-text-tertiary', bg: 'bg-bg-hover' },
+  docs: { label: 'Docs', color: 'text-accent-purple', bg: 'bg-status-bg-planning' },
+};
+
+export default function ChangelogPage() {
+  const { t, locale } = useI18n();
+  const isZh = locale === 'zh-CN';
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="mb-[var(--spacing-8)]">
+        <h1 className="text-[length:28px] font-[var(--font-weight-bold)] text-text-primary leading-[1.3] mb-[var(--spacing-2)]">
+          {t('changelog.title')}
+        </h1>
+        <p className="text-[length:var(--font-size-md)] text-text-secondary leading-[var(--line-height-relaxed)]">
+          {t('changelog.description')}
+        </p>
+        <Link
+          to="/"
+          className="inline-flex items-center gap-[var(--spacing-1)] text-[length:var(--font-size-sm)] text-accent-blue no-underline hover:underline mt-[var(--spacing-3)]"
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+          {t('changelog.back_to_home')}
+        </Link>
+      </div>
+
+      {/* Version entries */}
+      <div className="space-y-[var(--spacing-8)] max-w-[860px]">
+        {changelog.map((entry) => (
+          <section key={entry.version}>
+            {/* Version header */}
+            <div className="flex items-center gap-[var(--spacing-3)] mb-[var(--spacing-3)]">
+              <span className="text-[length:20px] font-[var(--font-weight-bold)] text-text-primary">
+                v{entry.version}
+              </span>
+              <span className="text-[length:var(--font-size-sm)] text-text-tertiary">
+                {entry.date}
+              </span>
+              {entry.version === '0.4.3' && (
+                <span className="text-[length:10px] font-[var(--font-weight-semibold)] px-[var(--spacing-2)] py-[2px] rounded-full bg-status-bg-completed text-accent-green">
+                  {t('changelog.latest')}
+                </span>
+              )}
+            </div>
+
+            {/* Changes list */}
+            <ul className="space-y-[var(--spacing-2)] pl-[var(--spacing-1)]">
+              {entry.changes.map((change, i) => {
+                const config = typeConfig[change.type];
+                return (
+                  <li
+                    key={i}
+                    className="flex items-start gap-[var(--spacing-3)] py-[var(--spacing-1-5)] px-[var(--spacing-3)] rounded-[var(--radius-default)] hover:bg-bg-hover transition-colors duration-[var(--duration-fast)]"
+                  >
+                    <span className={`shrink-0 mt-[3px] text-[length:10px] font-[var(--font-weight-semibold)] px-[var(--spacing-1-5)] py-[2px] rounded-[var(--radius-sm)] ${config.bg} ${config.color}`}>
+                      {config.label}
+                    </span>
+                    <span className="text-[length:var(--font-size-sm)] text-text-secondary leading-[var(--line-height-relaxed)]">
+                      {isZh ? change.text_zh : change.text_en}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}

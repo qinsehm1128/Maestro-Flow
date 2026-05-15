@@ -10,6 +10,7 @@ const CommandDetailPage = lazy(() => import('./pages/CommandDetailPage.js'));
 const SkillDetailPage = lazy(() => import('./pages/SkillDetailPage.js'));
 const SearchPage = lazy(() => import('./pages/SearchPage.js'));
 const GuidePage = lazy(() => import('./pages/GuidePage.js'));
+const ChangelogPage = lazy(() => import('./pages/ChangelogPage.js'));
 
 // Import Router components
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
@@ -111,6 +112,9 @@ export function App() {
 
               {/* Search page */}
               <Route path="/search" element={<SearchPage />} />
+
+              {/* Changelog page */}
+              <Route path="/changelog" element={<ChangelogPage />} />
 
               {/* Guides */}
               <Route path="/guides" element={<Navigate to="/guides/command-usage" replace />} />

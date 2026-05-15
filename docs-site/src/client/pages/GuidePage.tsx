@@ -81,7 +81,7 @@ export default function GuidePage({ slug }: GuidePageProps) {
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M15 18l-6-6 6-6" />
           </svg>
-          {isZh ? '所有指南' : 'All Guides'}
+          {t('guides.back_to_all')}
         </Link>
       </div>
 

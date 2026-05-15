@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { extractToc } from './MarkdownRenderer.js';
+import { useI18n } from '@/client/i18n/index.js';
 
 // ---------------------------------------------------------------------------
 // FloatingToc — sticky right-side TOC with scroll tracking
@@ -11,6 +12,7 @@ interface FloatingTocProps {
 }
 
 export function FloatingToc({ content }: FloatingTocProps) {
+  const { t } = useI18n();
   const headings = extractToc(content);
   const [activeId, setActiveId] = useState<string>('');
   const rafRef = useRef(0);
@@ -52,10 +54,10 @@ export function FloatingToc({ content }: FloatingTocProps) {
     <aside className="hidden xl:block shrink-0 w-[var(--size-toc-width)]">
       <nav
         className="sticky top-[var(--spacing-6)] max-h-[calc(100vh-var(--size-topbar-height)-var(--spacing-12))] overflow-y-auto"
-        aria-label="Table of contents"
+        aria-label={t('toc.aria_label')}
       >
         <div className="text-[length:10px] font-[var(--font-weight-semibold)] uppercase tracking-[var(--letter-spacing-wide)] text-text-tertiary mb-[var(--spacing-3)] px-[var(--spacing-1)]">
-          On this page
+          {t('toc.on_this_page')}
         </div>
         <ul className="flex flex-col gap-[2px]">
           {headings.map(({ id, level, text }) => {
