@@ -17,6 +17,11 @@ $ARGUMENTS — topic text and optional flags.
 
 **9 valid roles**: data-architect, product-manager, product-owner, scrum-master, subject-matter-expert, system-architect, test-strategist, ui-designer, ux-expert
 
+### Pre-load specs
+1. **Architecture specs**: `maestro spec load --category arch` — load architecture constraints as context for multi-role analysis (roles respect documented decisions).
+2. **Role Knowledge**: `maestro wiki list --category arch` → identify relevant entries → `maestro wiki load <id1> [id2...]`
+3. Both optional — proceed without if unavailable.
+
 **Session**: `.workflow/.csv-wave/{YYYYMMDD}-brainstorm-{slug}/`
 **Output**: tasks.csv, results.csv, discoveries.ndjson, context.md, `.brainstorming/` (guidance-specification.md, feature-index.json, synthesis-changelog.md, feature-specs/, {role}/analysis*.md)
 </context>
@@ -139,8 +144,16 @@ Protocol: read before analysis, append-only, dedup by type+key.
 
 <success_criteria>
 - [ ] 3 waves executed: guidance → parallel roles → synthesis
-- [ ] guidance-specification.md + role analyses + synthesis artifacts produced
-- [ ] feature-index.json + context.md generated
+- [ ] guidance-specification.md with RFC 2119 keywords, terminology, non-goals, feature decomposition
+- [ ] Role analysis files for each selected NON-UI role
+- [ ] If ui-designer selected: DESIGN.md established via impeccable explore; analysis.md with UX analysis
+- [ ] Feature specs in `.brainstorming/feature-specs/` or synthesis-specification.md
+- [ ] UI-bearing feature specs reference DESIGN.md for visual constraints
+- [ ] feature-index.json + synthesis-changelog.md + context.md generated
+- [ ] All user decisions captured with Decision Recording Protocol
+- [ ] Confidence scored per role and after cross-role analysis
+- [ ] Readiness gate checked before spec generation (wave 3)
+- [ ] Pressure pass completed on at least 1 feature spec
 - [ ] discoveries.ndjson append-only throughout
-- [ ] Confidence scored, conflict quality gate evaluated
+- [ ] Conflict quality gate: >3 UNRESOLVED → warn
 </success_criteria>

@@ -248,12 +248,18 @@ Protocol: read before writing tests, append-only, dedup by type+key.
 
 <success_criteria>
 - [ ] Route auto-selected from project state (spec/gap/code)
+- [ ] Review findings and debug root causes integrated as additional test scenarios
 - [ ] Layers executed in order with fail-fast on critical
 - [ ] Test writing + diagnosis parallelized via spawn_agents_on_csv
 - [ ] Cross-layer context propagation via prev_context
 - [ ] Iteration engine: inner test_defect fix, outer strategy adjust
 - [ ] Test confidence scored per iteration (5-dimension model)
+- [ ] Convergence check includes confidence >= 60% alongside pass_rate threshold
+- [ ] Pressure pass completed on highest-pass-rate layer before completion
 - [ ] state.json, report.json, reflection-log.md written
-- [ ] If spec: traceability.md; if failures: issues auto-created
+- [ ] TST artifact registered in state.json
+- [ ] If spec: traceability.md written; if failures: issues auto-created in issues.jsonl
+- [ ] If gap source: validation.json gaps updated (MISSING→COVERED)
+- [ ] Next step routed (converged → verify, bugs → debug, >80% → quality-test, <80% → debug)
 </success_criteria>
 </output>

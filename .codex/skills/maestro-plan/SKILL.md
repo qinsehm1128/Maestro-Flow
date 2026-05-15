@@ -181,7 +181,15 @@ Collision detection against same-milestone plans.
 
 <success_criteria>
 - [ ] Parallel explorations + sequential planning via spawn_agents_on_csv
-- [ ] plan.json + TASK files with read_first and grep-verifiable convergence criteria
-- [ ] Plan confidence scored, readiness gate checked, collision detected
-- [ ] PLN artifact registered, issues linked if --gaps
+- [ ] plan.json with summary, approach, task_ids, waves (with phase labels), confidence section
+- [ ] .task/TASK-*.json with read_first[] (file being modified + source of truth files)
+- [ ] Every task has convergence.criteria[] with grep-verifiable conditions (no subjective language)
+- [ ] Every task action and implementation contain concrete values (no "align X with Y")
+- [ ] Plan confidence scored with 5-dimension factor model
+- [ ] Readiness gate checked before collision detection
+- [ ] Pressure pass completed on highest-complexity task
+- [ ] Collision detection against same-milestone plans (non-blocking)
+- [ ] Plan-checker passed (or minor issues acknowledged, max 3 iterations)
+- [ ] PLN artifact registered in state.json
+- [ ] If --gaps: issues linked bidirectionally (task_refs[], task_plan_dir in issues.jsonl)
 </success_criteria>

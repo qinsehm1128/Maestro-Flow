@@ -66,6 +66,9 @@ $quality-review --continue "20260318-review-P3-auth"
 - `-y, --yes`: Skip all confirmations (auto mode)
 - `-c, --concurrency N`: Max concurrent agents within each wave (default: 6)
 - `--continue`: Resume existing session
+- `--level quick|standard|deep`: Explicit review level (default: auto-detect from file count)
+- `--dimensions <list>`: Comma-separated subset of dimensions to review (overrides level defaults)
+- `--skip-specs`: Skip loading project specs as review context
 
 When `--yes` or `-y`: Auto-confirm dimension selection, skip interactive validation, use defaults for level detection.
 

@@ -355,6 +355,9 @@ echo '{"ts":"<ISO>","worker":"TASK-001","type":"code_pattern","data":{"name":"Re
 - [ ] Completed tasks have .summaries/TASK-{NNN}-summary.md
 - [ ] .task/TASK-*.json statuses updated to match execution results
 - [ ] state.json updated with EXC artifact
+- [ ] Issue status synced for tasks with issue_id (all completed → resolved, any failed → in_progress)
+- [ ] Incremental specs extracted from summaries (learnings, design rationale, root causes)
+- [ ] Post-task knowledge inquiry triggered when applicable (deviation, retry>=2, design rationale)
 - [ ] context.md produced with execution report
 - [ ] Blocked tasks have checkpoint info for resume
 - [ ] Cascading skip applied for dependent tasks

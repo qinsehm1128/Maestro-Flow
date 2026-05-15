@@ -194,12 +194,17 @@ Protocol: read before analysis, append-only, dedup by type+key.
 </error_codes>
 
 <success_criteria>
+- [ ] Must-haves established from convergence.criteria + success_criteria + derived behaviors
 - [ ] All 3 waves executed (with skip flags respected)
 - [ ] verification.json + context.md produced
 - [ ] validation.json produced (if Nyquist ran)
 - [ ] Fix plans generated for gap clusters
 - [ ] Issues auto-created for gaps + blocker anti-patterns
+- [ ] Post-verify knowledge inquiry triggered when applicable
 - [ ] Phase index.json updated with verification status
+- [ ] VRF artifact registered in state.json
+- [ ] Gap-fix closure loop documented: gaps → plan --gaps → execute → verify (re-run)
+- [ ] Next step routed (quality-review if passed, plan --gaps if gaps, quality-auto-test if low coverage)
 - [ ] discoveries.ndjson append-only throughout
 </success_criteria>
 </output>

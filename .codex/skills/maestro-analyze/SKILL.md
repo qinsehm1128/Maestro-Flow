@@ -158,6 +158,17 @@ Gray area detection: domain-aware (things users SEE/CALL/RUN/READ), phase-specif
 4. Spec enrichment: Locked decisions -> `maestro spec add arch`; code patterns -> `maestro spec add coding`
 5. Register artifact in state.json (type: analyze)
 6. Copy outputs to scratchDir, display summary
+7. **Next-step routing**:
+
+   | Scope | Condition | Next |
+   |-------|-----------|------|
+   | Phase/Milestone | Go + UI work needed | `$maestro-impeccable build {target}` |
+   | Phase/Milestone | Go + ready to plan | `$maestro-plan` or `$maestro-plan {phase}` |
+   | Phase/Milestone | No-Go | `$maestro-brainstorm {topic}` |
+   | Adhoc/Standalone | Ready to plan | `$maestro-plan --dir {scratch_dir}` |
+   | Adhoc/Standalone | Need more exploration | `$maestro-analyze {topic} --continue` |
+   | Gaps | Issues analyzed | `$maestro-plan --gaps` |
+   | Gaps | Need more context | `$maestro-analyze --gaps {ISS-ID}` |
 
 </actions>
 
@@ -192,9 +203,15 @@ Protocol: read before analysis, append-only, dedup by type+key.
 <success_criteria>
 - [ ] All waves executed in order (or skipped per mode)
 - [ ] context.md produced (all modes); analysis.md + conclusions.json (full mode)
+- [ ] context.md contains all decisions classified as Locked/Free/Deferred
+- [ ] Decision Recording Protocol applied to all decisions
 - [ ] Confidence scored per dimension with factor-based model (full mode)
+- [ ] Readiness gate checked before synthesis (wave 3)
+- [ ] Pressure pass completed ≥ 1 time on highest-risk dimension before synthesis
 - [ ] Deferred items auto-created as issues
+- [ ] Scope creep redirected to Deferred section
 - [ ] Artifact registered in state.json
 - [ ] discoveries.ndjson append-only throughout
+- [ ] Next step routed (plan for Go, brainstorm for No-Go, plan --gaps for Gaps)
 </success_criteria>
 </output>

@@ -216,3 +216,9 @@ Protocol: read before analysis, append-only, dedup by type+key.
 - [ ] CLB artifact registered, outputs copied to scratchDir
 - [ ] Partial degradation: continued if 1+ tools succeeded
 </success_criteria>
+
+<next_step_routing>
+- Deep feasibility analysis → `$maestro-analyze "{topic}"`
+- Plan from conclusions → `$maestro-plan --dir {dir}`
+- Expand exploration → `$maestro-brainstorm "{topic}"`
+</next_step_routing>
