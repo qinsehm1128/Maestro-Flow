@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { SettingsCard, SettingsSaveBar } from '../SettingsComponents.js';
 import { cn } from '@/client/lib/utils.js';
 import { useI18n } from '@/client/i18n/index.js';
@@ -257,24 +257,91 @@ function CollapsibleSection({
 }
 
 // ---------------------------------------------------------------------------
-// PathList — editable list of file paths with add/remove
+// Category color mapping for visual distinction
 // ---------------------------------------------------------------------------
 
-function PathList({
+const CATEGORY_COLORS: Record<string, string> = {
+  coding: 'bg-accent-blue/15 text-accent-blue border-accent-blue/30',
+  arch: 'bg-accent-purple/15 text-accent-purple border-accent-purple/30',
+  debug: 'bg-accent-orange/15 text-accent-orange border-accent-orange/30',
+  test: 'bg-accent-green/15 text-accent-green border-accent-green/30',
+  review: 'bg-accent-yellow/15 text-accent-yellow border-accent-yellow/30',
+  learning: 'bg-status-active/15 text-status-active border-status-active/30',
+  ui: 'bg-accent-purple/15 text-accent-purple border-accent-purple/30',
+};
+
+function getCategoryColor(cat: string): string {
+  return CATEGORY_COLORS[cat] ?? 'bg-bg-hover text-text-secondary border-border';
+}
+
+// ---------------------------------------------------------------------------
+// CategoryPill — colored pill for a category name
+// ---------------------------------------------------------------------------
+
+function CategoryPill({ name }: { name: string }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center px-[var(--spacing-1-5)] py-[var(--spacing-0-5)]',
+        'rounded-full border text-[length:var(--font-size-xs)]',
+        getCategoryColor(name),
+      )}
+    >
+      {name}
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// PathListWithSuggestions — editable path list with suggestions & validation
+// ---------------------------------------------------------------------------
+
+function PathListWithSuggestions({
   paths,
   onChange,
   placeholder,
+  suggestions,
 }: {
   paths: string[];
   onChange: (paths: string[]) => void;
   placeholder: string;
+  suggestions?: string[];
 }) {
+  const [inputValue, setInputValue] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  const isValidPath = (p: string): boolean => {
+    if (!p.trim()) return false;
+    // Basic path validation: should have at least one segment and look like a path
+    return /^[.\/~]|^\w/.test(p) && !p.includes(' ') || p.includes('/') || p.includes('.');
+  };
+
+  const handleAdd = (value: string) => {
+    const v = value.trim();
+    if (v && !paths.includes(v)) {
+      onChange([...paths, v]);
+    }
+    setInputValue('');
+    setShowSuggestions(false);
+  };
+
+  const filteredSuggestions = (suggestions ?? []).filter(
+    (s) => !paths.includes(s) && (!inputValue || s.toLowerCase().includes(inputValue.toLowerCase())),
+  );
+
   return (
     <div className="flex flex-col gap-[var(--spacing-1-5)]">
       {paths.map((p, i) => (
         <div key={`${p}-${i}`} className="flex items-center gap-[var(--spacing-2)]">
           <span className="text-[length:var(--font-size-xs)] text-text-secondary font-mono truncate flex-1 min-w-0">
             {p}
+          </span>
+          <span className={cn(
+            'text-[length:var(--font-size-xs)] shrink-0',
+            isValidPath(p) ? 'text-accent-green' : 'text-accent-orange',
+          )}>
+            {isValidPath(p) ? '[ok]' : '[?]'}
           </span>
           <button
             type="button"
@@ -286,15 +353,453 @@ function PathList({
           </button>
         </div>
       ))}
-      <TagInput
-        placeholder={placeholder}
-        onAdd={(v) => {
-          if (!paths.includes(v)) onChange([...paths, v]);
-        }}
-      />
+      <div className="relative">
+        <div className="flex items-center gap-[var(--spacing-1)]">
+          <input
+            type="text"
+            value={inputValue}
+            onChange={(e) => {
+              setInputValue(e.target.value);
+              setShowSuggestions(true);
+            }}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => {
+              // Delay to allow click on suggestions
+              setTimeout(() => setShowSuggestions(false), 200);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && inputValue.trim()) {
+                e.preventDefault();
+                handleAdd(inputValue);
+              }
+            }}
+            placeholder={placeholder}
+            className={cn(
+              'px-[var(--spacing-2)] py-[var(--spacing-1)] rounded-[var(--radius-sm)]',
+              'border border-border bg-bg-primary text-text-primary text-[length:var(--font-size-xs)]',
+              'focus:outline-none focus:border-accent-blue focus:shadow-[var(--shadow-focus-ring)]',
+              'transition-colors duration-[var(--duration-fast)]',
+              'placeholder:text-text-tertiary w-56',
+            )}
+          />
+          {inputValue && (
+            <span className={cn(
+              'text-[length:var(--font-size-xs)] shrink-0',
+              isValidPath(inputValue) ? 'text-accent-green' : 'text-accent-orange',
+            )}>
+              {isValidPath(inputValue) ? '[ok]' : '[?]'}
+            </span>
+          )}
+        </div>
+        {showSuggestions && filteredSuggestions.length > 0 && (
+          <div className={cn(
+            'absolute top-full left-0 mt-[var(--spacing-0-5)] z-10',
+            'border border-border rounded-[var(--radius-sm)] bg-bg-secondary shadow-lg',
+            'max-h-32 overflow-y-auto w-56',
+          )}>
+            {filteredSuggestions.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => handleAdd(s)}
+                className={cn(
+                  'w-full text-left px-[var(--spacing-2)] py-[var(--spacing-1)]',
+                  'text-[length:var(--font-size-xs)] text-text-secondary font-mono',
+                  'hover:bg-bg-hover hover:text-text-primary',
+                  'transition-colors duration-[var(--duration-fast)]',
+                )}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// KeywordBrowser — keyword discovery panel
+// ---------------------------------------------------------------------------
+
+function KeywordBrowser({
+  config,
+  defaults,
+  onQuickBind,
+}: {
+  config: SpecInjectionConfigData;
+  defaults: SpecInjectionDefaults;
+  onQuickBind: (keyword: string, agent: string) => void;
+}) {
+  const [filterInput, setFilterInput] = useState('');
+  const [expandedKeyword, setExpandedKeyword] = useState<string | null>(null);
+  const [quickBindAgent, setQuickBindAgent] = useState<Record<string, string>>({});
+
+  // Collect all keywords referenced across the config
+  const keywordMap = useMemo(() => {
+    const map = new Map<string, { agents: string[]; type: 'include' | 'exclude'; source: string }[]>();
+
+    const addRef = (kw: string, agent: string, type: 'include' | 'exclude', source: string) => {
+      if (!map.has(kw)) map.set(kw, []);
+      map.get(kw)!.push({ agents: [agent], type, source });
+    };
+
+    // From agent mappings
+    for (const [agent, mapping] of Object.entries(config.mapping ?? {})) {
+      for (const kw of mapping.includeKeywords ?? []) {
+        addRef(kw, agent, 'include', 'agent');
+      }
+      for (const kw of mapping.excludeKeywords ?? []) {
+        addRef(kw, agent, 'exclude', 'agent');
+      }
+    }
+
+    // From global keyword filters
+    for (const kw of config.keywordFilters?.include ?? []) {
+      addRef(kw, '(global)', 'include', 'global');
+    }
+    for (const kw of config.keywordFilters?.exclude ?? []) {
+      addRef(kw, '(global)', 'exclude', 'global');
+    }
+
+    return map;
+  }, [config]);
+
+  const allKeywords = useMemo(() => {
+    const kws = Array.from(keywordMap.keys()).sort();
+    if (!filterInput.trim()) return kws;
+    const q = filterInput.toLowerCase();
+    return kws.filter((k) => k.toLowerCase().includes(q));
+  }, [keywordMap, filterInput]);
+
+  const allAgents = Object.keys(defaults.agentCategoryMap);
+
+  return (
+    <div className="flex flex-col gap-[var(--spacing-3)]">
+      {/* Search input */}
+      <div>
+        <input
+          type="text"
+          value={filterInput}
+          onChange={(e) => setFilterInput(e.target.value)}
+          placeholder="Filter or type a new keyword..."
+          className={cn(
+            'w-full px-[var(--spacing-2)] py-[var(--spacing-1)] rounded-[var(--radius-sm)]',
+            'border border-border bg-bg-primary text-text-primary text-[length:var(--font-size-xs)]',
+            'focus:outline-none focus:border-accent-blue focus:shadow-[var(--shadow-focus-ring)]',
+            'transition-colors duration-[var(--duration-fast)]',
+            'placeholder:text-text-tertiary',
+          )}
+        />
+      </div>
+
+      {allKeywords.length === 0 ? (
+        <p className="text-[length:var(--font-size-xs)] text-text-tertiary italic">
+          {keywordMap.size === 0
+            ? 'No keywords configured yet. Add keywords to agent mappings or global filters below.'
+            : 'No keywords match the filter.'}
+        </p>
+      ) : (
+        <div className="flex flex-wrap gap-[var(--spacing-1-5)]">
+          {allKeywords.map((kw) => {
+            const refs = keywordMap.get(kw) ?? [];
+            const hasInclude = refs.some((r) => r.type === 'include');
+            const hasExclude = refs.some((r) => r.type === 'exclude');
+            const isExpanded = expandedKeyword === kw;
+            const variant = hasExclude && !hasInclude ? 'exclude' : hasInclude ? 'include' : 'default';
+
+            const colorClass =
+              variant === 'include'
+                ? 'bg-status-active/15 text-status-active border-status-active/30'
+                : variant === 'exclude'
+                  ? 'bg-status-blocked/15 text-status-blocked border-status-blocked/30'
+                  : 'bg-bg-hover text-text-secondary border-border';
+
+            return (
+              <div key={kw} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setExpandedKeyword(isExpanded ? null : kw)}
+                  className={cn(
+                    'inline-flex items-center gap-[var(--spacing-1)] px-[var(--spacing-2)] py-[var(--spacing-0-5)]',
+                    'rounded-[var(--radius-sm)] border text-[length:var(--font-size-xs)]',
+                    'cursor-pointer transition-opacity duration-[var(--duration-fast)]',
+                    'focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]',
+                    colorClass,
+                    isExpanded && 'ring-1 ring-accent-blue',
+                  )}
+                >
+                  {kw}
+                  <span className="text-[length:10px] opacity-60">
+                    ({refs.length})
+                  </span>
+                </button>
+
+                {/* Expanded detail popover */}
+                {isExpanded && (
+                  <div className={cn(
+                    'absolute top-full left-0 mt-[var(--spacing-1)] z-20',
+                    'border border-border rounded-[var(--radius-sm)] bg-bg-secondary shadow-lg',
+                    'p-[var(--spacing-2)] min-w-48',
+                  )}>
+                    <div className="flex flex-col gap-[var(--spacing-1-5)]">
+                      <span className="text-[length:var(--font-size-xs)] font-[var(--font-weight-medium)] text-text-primary">
+                        Referenced by:
+                      </span>
+                      {refs.map((ref, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center gap-[var(--spacing-1)] text-[length:var(--font-size-xs)]"
+                        >
+                          <span className={cn(
+                            'px-[var(--spacing-1)] rounded-[2px]',
+                            ref.type === 'include'
+                              ? 'bg-status-active/15 text-status-active'
+                              : 'bg-status-blocked/15 text-status-blocked',
+                          )}>
+                            {ref.type}
+                          </span>
+                          <span className="text-text-secondary">
+                            {ref.agents[0]}
+                          </span>
+                        </div>
+                      ))}
+
+                      {/* Quick Bind controls */}
+                      <div className="border-t border-border-divider pt-[var(--spacing-1-5)] mt-[var(--spacing-0-5)]">
+                        <span className="text-[length:var(--font-size-xs)] font-[var(--font-weight-medium)] text-text-secondary block mb-[var(--spacing-1)]">
+                          Quick Bind:
+                        </span>
+                        <div className="flex items-center gap-[var(--spacing-1)]">
+                          <select
+                            value={quickBindAgent[kw] ?? ''}
+                            onChange={(e) => setQuickBindAgent((prev) => ({ ...prev, [kw]: e.target.value }))}
+                            className={cn(
+                              'flex-1 px-[var(--spacing-1)] py-[var(--spacing-0-5)] rounded-[var(--radius-sm)]',
+                              'border border-border bg-bg-primary text-text-primary text-[length:var(--font-size-xs)]',
+                              'focus:outline-none focus:border-accent-blue',
+                            )}
+                          >
+                            <option value="" disabled>Agent...</option>
+                            {allAgents.map((a) => (
+                              <option key={a} value={a}>{a}</option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            disabled={!quickBindAgent[kw]}
+                            onClick={() => {
+                              if (quickBindAgent[kw]) {
+                                onQuickBind(kw, quickBindAgent[kw]);
+                                setExpandedKeyword(null);
+                                setQuickBindAgent((prev) => {
+                                  const next = { ...prev };
+                                  delete next[kw];
+                                  return next;
+                                });
+                              }
+                            }}
+                            className={cn(
+                              'px-[var(--spacing-1-5)] py-[var(--spacing-0-5)] rounded-[var(--radius-sm)]',
+                              'text-[length:var(--font-size-xs)] font-[var(--font-weight-medium)]',
+                              'bg-accent-blue text-white',
+                              'hover:opacity-90 transition-opacity duration-[var(--duration-fast)]',
+                              'disabled:opacity-40 disabled:pointer-events-none',
+                              'focus-visible:outline-none',
+                            )}
+                          >
+                            +Add
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// AgentPreviewModal — shows effective injection summary for an agent
+// ---------------------------------------------------------------------------
+
+function AgentPreviewModal({
+  agent,
+  mapping,
+  defaults,
+  config,
+  onClose,
+}: {
+  agent: string;
+  mapping: AgentMapping;
+  defaults: SpecInjectionDefaults;
+  config: SpecInjectionConfigData;
+  onClose: () => void;
+}) {
+  const defaultCats = defaults.agentCategoryMap[agent] ?? [];
+  const effectiveCats = mapping.categories ?? defaultCats;
+  const includeKw = [
+    ...(config.keywordFilters?.include ?? []),
+    ...(mapping.includeKeywords ?? []),
+  ];
+  const excludeKw = [
+    ...(config.keywordFilters?.exclude ?? []),
+    ...(mapping.excludeKeywords ?? []),
+  ];
+  const specFiles: string[] = [];
+  for (const cat of effectiveCats) {
+    const defaultFile = defaults.categoryFileMap[cat];
+    if (defaultFile) specFiles.push(defaultFile);
+    const catDoc = config.categoryDocs?.[cat];
+    if (catDoc?.specFiles) specFiles.push(...catDoc.specFiles);
+    if (catDoc?.docs) specFiles.push(...catDoc.docs);
+  }
+  const alwaysFiles = config.always ?? [];
+  const extraDocs = mapping.extras ?? [];
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onClose]);
+
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        'absolute top-full right-0 mt-[var(--spacing-1)] z-20',
+        'border border-border rounded-[var(--radius-sm)] bg-bg-secondary shadow-lg',
+        'p-[var(--spacing-3)] min-w-64 max-w-80',
+      )}
+    >
+      <div className="flex items-center justify-between mb-[var(--spacing-2)]">
+        <span className="text-[length:var(--font-size-xs)] font-[var(--font-weight-semibold)] text-text-primary">
+          Effective Injection: {agent}
+        </span>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-[length:var(--font-size-xs)] text-text-tertiary hover:text-text-primary focus-visible:outline-none"
+        >
+          [x]
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-[var(--spacing-2)] text-[length:var(--font-size-xs)]">
+        {/* Categories */}
+        <div>
+          <span className="font-[var(--font-weight-medium)] text-text-secondary block mb-[var(--spacing-0-5)]">
+            Categories:
+          </span>
+          <div className="flex flex-wrap gap-[var(--spacing-1)]">
+            {effectiveCats.length > 0 ? (
+              effectiveCats.map((c) => <CategoryPill key={c} name={c} />)
+            ) : (
+              <span className="text-text-tertiary italic">none</span>
+            )}
+          </div>
+        </div>
+
+        {/* Spec files */}
+        <div>
+          <span className="font-[var(--font-weight-medium)] text-text-secondary block mb-[var(--spacing-0-5)]">
+            Spec Files ({specFiles.length}):
+          </span>
+          {specFiles.length > 0 ? (
+            <div className="flex flex-col gap-[var(--spacing-0-5)]">
+              {specFiles.map((f, i) => (
+                <span key={`${f}-${i}`} className="text-text-secondary font-mono truncate">{f}</span>
+              ))}
+            </div>
+          ) : (
+            <span className="text-text-tertiary italic">none</span>
+          )}
+        </div>
+
+        {/* Keyword filters */}
+        {(includeKw.length > 0 || excludeKw.length > 0) && (
+          <div>
+            <span className="font-[var(--font-weight-medium)] text-text-secondary block mb-[var(--spacing-0-5)]">
+              Keyword Filters:
+            </span>
+            {includeKw.length > 0 && (
+              <div className="flex flex-wrap gap-[var(--spacing-0-5)] mb-[var(--spacing-0-5)]">
+                {includeKw.map((kw, i) => (
+                  <span key={`inc-${kw}-${i}`} className="px-[var(--spacing-1)] rounded-[2px] bg-status-active/15 text-status-active">
+                    +{kw}
+                  </span>
+                ))}
+              </div>
+            )}
+            {excludeKw.length > 0 && (
+              <div className="flex flex-wrap gap-[var(--spacing-0-5)]">
+                {excludeKw.map((kw, i) => (
+                  <span key={`exc-${kw}-${i}`} className="px-[var(--spacing-1)] rounded-[2px] bg-status-blocked/15 text-status-blocked">
+                    -{kw}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Always inject */}
+        {alwaysFiles.length > 0 && (
+          <div>
+            <span className="font-[var(--font-weight-medium)] text-text-secondary block mb-[var(--spacing-0-5)]">
+              Always Injected ({alwaysFiles.length}):
+            </span>
+            <div className="flex flex-col gap-[var(--spacing-0-5)]">
+              {alwaysFiles.map((f, i) => (
+                <span key={`${f}-${i}`} className="text-text-secondary font-mono truncate">{f}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Extra docs */}
+        {extraDocs.length > 0 && (
+          <div>
+            <span className="font-[var(--font-weight-medium)] text-text-secondary block mb-[var(--spacing-0-5)]">
+              Extra Docs ({extraDocs.length}):
+            </span>
+            <div className="flex flex-col gap-[var(--spacing-0-5)]">
+              {extraDocs.map((f, i) => (
+                <span key={`${f}-${i}`} className="text-text-secondary font-mono truncate">{f}</span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Common path suggestions for document paths
+// ---------------------------------------------------------------------------
+
+const DOC_PATH_SUGGESTIONS = [
+  '.workflow/docs/',
+  '.workflow/knowhow/',
+  'docs/',
+  '.workflow/specs/',
+  '.maestro/specs/',
+  '.maestro/knowhow/',
+];
 
 // ---------------------------------------------------------------------------
 // SpecInjectionConfig — main config panel
@@ -312,6 +817,7 @@ function SpecInjectionConfig() {
   const [expandedAgents, setExpandedAgents] = useState<Record<string, boolean>>({});
   const [addingAgent, setAddingAgent] = useState(false);
   const [addingCategory, setAddingCategory] = useState(false);
+  const [previewAgent, setPreviewAgent] = useState<string | null>(null);
 
   const isDirty = JSON.stringify(config) !== original;
 
@@ -412,6 +918,26 @@ function SpecInjectionConfig() {
     });
   };
 
+  const quickBindKeyword = useCallback((keyword: string, agent: string) => {
+    setConfig((prev) => {
+      const existingMapping = prev.mapping?.[agent] ?? {};
+      const currentIncludes = existingMapping.includeKeywords ?? [];
+      if (currentIncludes.includes(keyword)) return prev;
+      const defaultCats = defaults?.agentCategoryMap[agent] ?? [];
+      return {
+        ...prev,
+        mapping: {
+          ...prev.mapping,
+          [agent]: {
+            ...existingMapping,
+            categories: existingMapping.categories ?? [...defaultCats],
+            includeKeywords: [...currentIncludes, keyword],
+          },
+        },
+      };
+    });
+  }, [defaults]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-[var(--spacing-4)]">
@@ -450,6 +976,20 @@ function SpecInjectionConfig() {
         </p>
       )}
 
+      {/* --- Keyword Browser --- */}
+      <CollapsibleSection
+        title="Keyword Browser"
+        description="Discover and manage keywords referenced across agent mappings and global filters"
+        expanded={!!expandedSections['keywords-browser']}
+        onToggle={() => toggleSection('keywords-browser')}
+      >
+        <KeywordBrowser
+          config={config}
+          defaults={defaults}
+          onQuickBind={quickBindKeyword}
+        />
+      </CollapsibleSection>
+
       {/* --- Agent Mappings --- */}
       <CollapsibleSection
         title="Agent Mappings"
@@ -469,17 +1009,54 @@ function SpecInjectionConfig() {
             const defaultCats = defaults.agentCategoryMap[agent] ?? [];
             const isExpanded = !!expandedAgents[agent];
 
+            const effectiveCats = mapping.categories ?? defaultCats;
+            const kwIncCount = (mapping.includeKeywords ?? []).length;
+            const kwExcCount = (mapping.excludeKeywords ?? []).length;
+
             return (
               <div key={agent} className="border border-border-divider rounded-[var(--radius-sm)]">
                 <div className="flex items-center justify-between px-[var(--spacing-3)] py-[var(--spacing-2)]">
-                  <button
-                    type="button"
-                    onClick={() => toggleAgent(agent)}
-                    className="flex-1 text-left text-[length:var(--font-size-sm)] font-[var(--font-weight-medium)] text-text-primary hover:text-accent-blue focus-visible:outline-none"
-                  >
-                    {agent}
-                  </button>
-                  <div className="flex items-center gap-[var(--spacing-2)]">
+                  <div className="flex-1 min-w-0">
+                    <button
+                      type="button"
+                      onClick={() => toggleAgent(agent)}
+                      className="text-left text-[length:var(--font-size-sm)] font-[var(--font-weight-medium)] text-text-primary hover:text-accent-blue focus-visible:outline-none"
+                    >
+                      {agent}
+                    </button>
+                    {/* Effective injection summary */}
+                    <div className="flex flex-wrap items-center gap-[var(--spacing-1)] mt-[var(--spacing-0-5)]">
+                      {effectiveCats.map((c) => (
+                        <CategoryPill key={c} name={c} />
+                      ))}
+                      {kwIncCount > 0 && (
+                        <span className="text-[length:10px] px-[var(--spacing-1)] rounded-[2px] bg-status-active/15 text-status-active">
+                          +{kwIncCount} kw
+                        </span>
+                      )}
+                      {kwExcCount > 0 && (
+                        <span className="text-[length:10px] px-[var(--spacing-1)] rounded-[2px] bg-status-blocked/15 text-status-blocked">
+                          -{kwExcCount} kw
+                        </span>
+                      )}
+                      {(mapping.extras ?? []).length > 0 && (
+                        <span className="text-[length:10px] px-[var(--spacing-1)] rounded-[2px] bg-bg-hover text-text-tertiary">
+                          {(mapping.extras ?? []).length} docs
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-[var(--spacing-2)] shrink-0 relative">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewAgent(previewAgent === agent ? null : agent)}
+                      className={cn(
+                        'text-[length:var(--font-size-xs)] font-[var(--font-weight-medium)]',
+                        'text-accent-purple hover:text-accent-purple/80 focus-visible:outline-none',
+                      )}
+                    >
+                      test
+                    </button>
                     <span className="text-[length:var(--font-size-xs)] text-text-tertiary">
                       {isExpanded ? '[-]' : '[+]'}
                     </span>
@@ -491,12 +1068,21 @@ function SpecInjectionConfig() {
                     >
                       remove
                     </button>
+                    {previewAgent === agent && (
+                      <AgentPreviewModal
+                        agent={agent}
+                        mapping={mapping}
+                        defaults={defaults}
+                        config={config}
+                        onClose={() => setPreviewAgent(null)}
+                      />
+                    )}
                   </div>
                 </div>
 
                 {isExpanded && (
                   <div className="px-[var(--spacing-3)] pb-[var(--spacing-3)] border-t border-border-divider pt-[var(--spacing-2)] flex flex-col gap-[var(--spacing-3)]">
-                    {/* Categories */}
+                    {/* Categories with color-coded checkboxes */}
                     <div>
                       <span className="text-[length:var(--font-size-xs)] font-[var(--font-weight-medium)] text-text-secondary block mb-[var(--spacing-1)]">
                         Categories
@@ -510,7 +1096,14 @@ function SpecInjectionConfig() {
                           return (
                             <label
                               key={cat}
-                              className="flex items-center gap-[var(--spacing-1)] text-[length:var(--font-size-xs)] text-text-primary cursor-pointer"
+                              className={cn(
+                                'flex items-center gap-[var(--spacing-1)] text-[length:var(--font-size-xs)] cursor-pointer',
+                                'px-[var(--spacing-1-5)] py-[var(--spacing-0-5)] rounded-[var(--radius-sm)]',
+                                'border transition-colors duration-[var(--duration-fast)]',
+                                checked
+                                  ? getCategoryColor(cat)
+                                  : 'border-transparent text-text-tertiary hover:text-text-secondary',
+                              )}
                             >
                               <input
                                 type="checkbox"
@@ -589,15 +1182,16 @@ function SpecInjectionConfig() {
                       </div>
                     </div>
 
-                    {/* Extra Docs */}
+                    {/* Extra Docs with suggestions */}
                     <div>
                       <span className="text-[length:var(--font-size-xs)] font-[var(--font-weight-medium)] text-text-secondary block mb-[var(--spacing-1)]">
                         Extra Docs
                       </span>
-                      <PathList
+                      <PathListWithSuggestions
                         paths={mapping.extras ?? []}
                         onChange={(extras) => updateMapping(agent, { extras })}
-                        placeholder="Add path..."
+                        placeholder="Add path (e.g. .workflow/docs/...)"
+                        suggestions={DOC_PATH_SUGGESTIONS}
                       />
                     </div>
                   </div>
@@ -684,9 +1278,12 @@ function SpecInjectionConfig() {
             return (
               <div key={cat} className="border border-border-divider rounded-[var(--radius-sm)] p-[var(--spacing-3)]">
                 <div className="flex items-center justify-between mb-[var(--spacing-2)]">
-                  <span className="text-[length:var(--font-size-sm)] font-[var(--font-weight-medium)] text-text-primary">
-                    {cat}
-                  </span>
+                  <div className="flex items-center gap-[var(--spacing-2)]">
+                    <CategoryPill name={cat} />
+                    <span className="text-[length:var(--font-size-sm)] font-[var(--font-weight-medium)] text-text-primary">
+                      {cat}
+                    </span>
+                  </div>
                   <button
                     type="button"
                     onClick={() => removeCategory(cat)}
@@ -708,20 +1305,22 @@ function SpecInjectionConfig() {
                     <span className="text-[length:var(--font-size-xs)] font-[var(--font-weight-medium)] text-text-secondary block mb-[var(--spacing-1)]">
                       Extra Spec Files
                     </span>
-                    <PathList
+                    <PathListWithSuggestions
                       paths={doc.specFiles ?? []}
                       onChange={(specFiles) => updateCategoryDocs(cat, { specFiles })}
                       placeholder="Add spec file..."
+                      suggestions={['.workflow/specs/', '.maestro/specs/']}
                     />
                   </div>
                   <div>
                     <span className="text-[length:var(--font-size-xs)] font-[var(--font-weight-medium)] text-text-secondary block mb-[var(--spacing-1)]">
                       Extra Docs
                     </span>
-                    <PathList
+                    <PathListWithSuggestions
                       paths={doc.docs ?? []}
                       onChange={(docs) => updateCategoryDocs(cat, { docs })}
                       placeholder="Add doc path..."
+                      suggestions={DOC_PATH_SUGGESTIONS}
                     />
                   </div>
                 </div>
@@ -790,10 +1389,11 @@ function SpecInjectionConfig() {
         expanded={!!expandedSections['always']}
         onToggle={() => toggleSection('always')}
       >
-        <PathList
+        <PathListWithSuggestions
           paths={config.always ?? []}
           onChange={(always) => setConfig((prev) => ({ ...prev, always: always.length > 0 ? always : undefined }))}
           placeholder="Add file path..."
+          suggestions={DOC_PATH_SUGGESTIONS}
         />
       </CollapsibleSection>
 

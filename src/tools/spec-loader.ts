@@ -287,6 +287,11 @@ function formatFileContent(body: string, keyword?: string, crossCategory?: SpecC
   if (entries.length === 0 && legacy.length === 0) {
     // Cross-category mode: non-primary docs with no structured entries are skipped
     if (crossCategory) return null;
+
+    // Skip files that are just headings with no real content (e.g. empty seed files)
+    const stripped = body.replace(/^#+\s+.*$/gm, '').replace(/^---+$/gm, '').trim();
+    if (!stripped) return null;
+
     if (keyword) {
       return body.toLowerCase().includes(keyword.toLowerCase()) ? body : null;
     }
