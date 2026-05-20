@@ -57,6 +57,16 @@ interface CodexItem {
   path?: string;
   action?: string;
   diff?: string;
+  // command_execution fields (codex shell tool)
+  command?: string;
+  aggregated_output?: string;
+  exit_code?: number;
+  status?: string;
+  // mcp_tool_call fields
+  server?: string;
+  tool?: string;
+  result?: unknown;
+  error?: string;
 }
 
 interface CodexError {
@@ -453,6 +463,55 @@ export class CodexCliAdapter extends BaseAgentAdapter {
     const itemType = item.type ?? '';
     const itemName = (item.name ?? '').toLowerCase();
 
+    // Reasoning / thinking content — route to thinking, not assistant_message.
+    // Codex newer builds may surface model reasoning as items; without this
+    // branch, reasoning text would pollute the final assistant reply extraction.
+    if (itemType === 'reasoning' || itemType === 'agent_reasoning') {
+      const text = this.extractItemText(item);
+      if (text.length > 0) {
+        this.emitEntry(processId, EntryNormalizer.thinking(processId, text));
+      }
+      return;
+    }
+
+    // Codex shell tool: explicit `command_execution` item shape
+    // (id, command, aggregated_output, exit_code, status). Emit as command_exec
+    // boundary so extractLastReply can split segments correctly.
+    if (itemType === 'command_execution') {
+      const command = item.command ?? item.name ?? 'shell';
+      this.emitEntry(
+        processId,
+        EntryNormalizer.commandExec(
+          processId,
+          command,
+          typeof item.exit_code === 'number' ? item.exit_code : undefined,
+          item.aggregated_output ?? item.output ?? '',
+        ),
+      );
+      return;
+    }
+
+    // Codex MCP tool call: explicit `mcp_tool_call` item shape
+    // (server, tool, arguments, result, error, status). Emit as tool_use
+    // boundary so extractLastReply can split segments correctly.
+    if (itemType === 'mcp_tool_call') {
+      const name = `${item.server ?? 'mcp'}/${item.tool ?? itemName ?? '?'}`;
+      const input = this.parseArguments(item.arguments);
+      const status = this.codexStatusToToolStatus(item);
+      const resultText = item.error
+        ? String(item.error)
+        : item.result === undefined
+          ? ''
+          : typeof item.result === 'string'
+            ? item.result
+            : JSON.stringify(item.result);
+      this.emitEntry(
+        processId,
+        EntryNormalizer.toolUse(processId, name, input, status, resultText),
+      );
+      return;
+    }
+
     // Function call that looks like a command execution
     if (
       itemType === 'function_call_output' ||
@@ -479,6 +538,36 @@ export class CodexCliAdapter extends BaseAgentAdapter {
       return;
     }
 
+    // Safety net: any item whose type smells like a tool/shell call but isn't
+    // handled above (e.g. future codex types like `web_search_call`,
+    // `local_shell_call`, `custom_tool_call`, `*_output`). Emit as boundary
+    // tool_use to prevent JSON.stringify pollution of assistant_message.
+    if (this.isToolLikeType(itemType)) {
+      const name = item.name ?? item.tool ?? itemType;
+      const output =
+        typeof item.output === 'string'
+          ? item.output
+          : typeof item.aggregated_output === 'string'
+            ? item.aggregated_output
+            : item.result !== undefined
+              ? typeof item.result === 'string'
+                ? item.result
+                : JSON.stringify(item.result)
+              : '';
+      const status = this.codexStatusToToolStatus(item);
+      this.emitEntry(
+        processId,
+        EntryNormalizer.toolUse(
+          processId,
+          name,
+          this.parseArguments(item.arguments),
+          status,
+          output,
+        ),
+      );
+      return;
+    }
+
     // Default: treat as assistant message — accumulate within turn,
     // emit as partial now (for streaming display) and flush final on turn.completed
     const text = this.extractItemText(item);
@@ -494,6 +583,60 @@ export class CodexCliAdapter extends BaseAgentAdapter {
         EntryNormalizer.assistantMessage(processId, text, true),
       );
     }
+  }
+
+  /** Map codex item status/error fields to ToolUseEntry status. */
+  private codexStatusToToolStatus(item: CodexItem): 'pending' | 'running' | 'completed' | 'failed' {
+    if (item.error) return 'failed';
+    switch (item.status) {
+      case 'error':
+      case 'failed':
+        return 'failed';
+      case 'pending':
+      case 'queued':
+        return 'pending';
+      case 'running':
+      case 'in_progress':
+        return 'running';
+      case 'success':
+      case 'completed':
+      case 'done':
+      default:
+        return 'completed';
+    }
+  }
+
+  /** Parse codex function/tool `arguments` (JSON string) into an object; tolerate non-JSON. */
+  private parseArguments(raw: unknown): Record<string, unknown> {
+    if (raw === undefined || raw === null) return {};
+    if (typeof raw === 'object') return raw as Record<string, unknown>;
+    if (typeof raw === 'string') {
+      const trimmed = raw.trim();
+      if (!trimmed) return {};
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          return parsed as Record<string, unknown>;
+        }
+        return { value: parsed };
+      } catch {
+        return { raw };
+      }
+    }
+    return { value: raw };
+  }
+
+  /** Heuristic: does this item.type look like a tool/shell call we should treat as a boundary? */
+  private isToolLikeType(type: string): boolean {
+    if (!type) return false;
+    return (
+      type.endsWith('_call') ||
+      type.endsWith('_call_output') ||
+      type.endsWith('_call_end') ||
+      type.endsWith('_execution') ||
+      type.endsWith('_output') ||
+      /tool|shell|exec|search|patch|file_change/.test(type)
+    );
   }
 
   private isCommandCall(name: string): boolean {
