@@ -12,14 +12,18 @@ Parse flags from `$ARGUMENTS`:
 - `--yes` / `-y` → auto mode
 - `--continue` / `-c` → resume from last state
 - `--mode` / `-m` → `progressive|direct|auto` (default: auto)
-- `--from-brainstorm <SESSION-ID>` → import brainstorm session
+- `--from <source>` → load upstream context package (brainstorm:ID, @file, or path). Alias: `--from-brainstorm` (backward compat)
 - Remaining text → requirement (slugified for directory name)
 
 **Session directory**: `.workflow/.roadmap/RMAP-{slug}-{date}/`
 
 **Continue mode**: If `-c` and session exists, resume from last state.
 
-**Brainstorm import**: If `--from-brainstorm`, read `guidance-specification.md` for enriched context (problem statement, features, non-goals, terminology).
+**Context import**: If `--from`, resolve source to `context-package.json`:
+  - `brainstorm:ID` → `state.json.artifacts[type=brainstorm, id=ID].context_package` → load
+  - `@file` → create import session → delegate extraction → load context-package.json
+  - `path/` → load `path/context-package.json` (generate if missing)
+  - `--from-brainstorm SESSION-ID` → alias for `--from brainstorm:{resolve(SESSION-ID)}`
 
 ---
 
@@ -29,7 +33,13 @@ Parse flags from `$ARGUMENTS`:
 
 1. **Parse Requirement**
    - Extract: goal, constraints, stakeholders, keywords
-   - If `--from-brainstorm`: enrich from guidance-specification.md
+   - If `--from`: enrich from context-package.json
+     - `requirements[]` → feature list for decomposition input
+     - `constraints[locked]` → immutable constraints for phase planning
+     - `domain` → problem statement, terminology, audience context
+     - `non_goals[]` → explicit exclusions from scope
+     - `insights[]` → role analysis insights (data models, architecture decisions)
+     - `open_questions[]` → items needing further investigation
    - If `project_context` loaded: merge into requirement analysis
      - Cross-reference requirement against `already_shipped` — flag overlaps as "already done"
      - Promote `deferred_from_previous` items into active requirement scope

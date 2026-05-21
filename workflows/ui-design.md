@@ -80,7 +80,7 @@ Show: phase/topic, mode (explore|refine), styleCount, layoutCount, stack, target
 
 Gather from available sources:
 - **2a.** `${PHASE_DIR}/context.md` -- product type, industry, audience, design preferences, locked UI decisions
-- **2b.** `${PHASE_DIR}/brainstorm/design/` -- `ui-designer.md`, `product-manager.md` (visual keywords, personas)
+- **2b.** `${PHASE_DIR}/brainstorm/ui-designer/analysis.md`, `${PHASE_DIR}/brainstorm/product-manager/analysis.md` (visual keywords, personas)
 - **2c.** `spec-summary.md` + `requirements/_index.md` (if index.json.spec_ref) -- UI-relevant requirements & acceptance criteria
 - **2d.** `.workflow/codebase/doc-index.json` -- existing design tokens, CSS frameworks, component libraries, brand colors
 

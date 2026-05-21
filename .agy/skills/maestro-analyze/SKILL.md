@@ -1,7 +1,7 @@
 ---
 name: maestro-analyze
 description: Use when a topic needs structured multi-dimensional investigation before planning or decision-making
-argument-hint: [phase|topic] [-y] [-c] [-q] [--gaps [ISS-ID]]
+argument-hint: [phase|topic] [-y] [-c] [-q] [--gaps [ISS-ID]] [--from <source>]
 allowed-tools:
   - ask_question
   - define_subagent
@@ -17,7 +17,7 @@ allowed-tools:
 <purpose>
 Perform multi-dimensional analysis of a technical proposal, decision, or architecture choice through iterative CLI-assisted exploration and interactive discussion. Produces a discussion timeline (discussion.md) with evolving understanding, multi-perspective findings, Decision Recording Protocol, Intent Coverage tracking, and a final conclusions package with Go/No-Go recommendation.
 
-Combines structured 6-dimension scoring with iterative deepening and decision extraction. Replaces both analysis and decision-capture workflows — produces analysis.md (scoring) AND context.md (Locked/Free/Deferred decisions for plan).
+Combines structured 6-dimension scoring with iterative deepening and decision extraction. Replaces both analysis and decision-capture workflows — produces analysis.md (scoring), context.md (Locked/Free/Deferred decisions for plan), and context-package.json (standardized context for cross-command consumption).
 
 Use `-q` for quick decision extraction only (skip exploration + scoring).
 
@@ -41,6 +41,7 @@ $ARGUMENTS -- phase number for milestone-scoped, topic text for adhoc/standalone
 - `-c` / `--continue`: Resume from existing session (auto-detect session folder + discussion.md)
 - `-q` / `--quick`: Quick mode — skip exploration + scoring, go straight to decision extraction (context.md only)
 - `--gaps [ISS-ID]`: Issue root cause analysis mode. If ISS-ID provided, analyze single issue. If omitted, analyze all open/registered issues from issues.jsonl.
+- `--from <source>`: Load upstream context package (brainstorm:ID, analyze:ID, @file, or path). Resolves to context-package.json for upstream context inheritance.
 
 Scope routing, output directory format, artifact registration schema, and output artifact listing are defined in workflow analyze.md (Scope Routing and Output Structure sections).
 
@@ -76,7 +77,7 @@ Phase 4: Output context.md for downstream plan --gaps
   - Register ANL artifact in state.json
 ```
 
-**Handoff:** context.md is consumed by maestro-plan (loads Locked/Free/Deferred decisions). In --gaps mode, context.md contains issue root causes for `plan --gaps` consumption.
+**Handoff:** context.md is consumed by maestro-plan (loads Locked/Free/Deferred decisions). context-package.json is the standardized contract for any downstream command (`--from analyze:ID`). In --gaps mode, context.md contains issue root causes for `plan --gaps` consumption.
 
 **Next-step routing on completion:**
 
@@ -126,10 +127,12 @@ Gaps mode:
 
 Both modes (full + quick):
 - [ ] context.md written with all decisions classified as Locked/Free/Deferred
+- [ ] context-package.json written with constraints, requirements, insights, and open_questions
 - [ ] Gray areas identified through phase-specific analysis
 - [ ] Decision Recording Protocol applied to all decisions
 - [ ] Scope creep redirected to Deferred section
 - [ ] Deferred items auto-created as issues (if any)
-- [ ] Artifact registered in state.json with correct scope/milestone/phase
+- [ ] Artifact registered in state.json with correct scope/milestone/phase (includes context_package field)
+- [ ] Upstream context loaded via `--from` when specified
 - [ ] Next step routed (impeccable/plan for Go, brainstorm for No-Go)
 </success_criteria>

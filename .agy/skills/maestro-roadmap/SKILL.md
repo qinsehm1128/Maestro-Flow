@@ -1,7 +1,7 @@
 ---
 name: maestro-roadmap
 description: Generate roadmap from requirements (light or full mode)
-argument-hint: <requirement> [--mode light|full] [-y] [-c] [-m progressive|direct|auto] [--from-brainstorm SESSION-ID] [--revise [instructions]] [--review]
+argument-hint: <requirement> [--mode light|full] [-y] [-c] [-m progressive|direct|auto] [--from <source>] [--from-brainstorm SESSION-ID] [--revise [instructions]] [--review]
 allowed-tools:
   - ask_question
   - define_subagent
@@ -45,7 +45,8 @@ $ARGUMENTS -- requirement text, @file reference, or brainstorm session reference
 - `--mode light|full`: Execution path (default: light)
 - `-y` / `--yes`: Auto mode — skip interactive questions, use recommended defaults
 - `-c` / `--continue`: Resume from last checkpoint
-- `--from-brainstorm SESSION-ID`: Import guidance-specification.md from a brainstorm session as seed
+- `--from <source>`: Load upstream context package (brainstorm:ID, @file, or path). Resolves to context-package.json
+- `--from-brainstorm SESSION-ID`: (backward compat alias for `--from brainstorm:ID`)
 
 **Flags (light mode only):**
 - `-m progressive|direct|auto`: Decomposition strategy (default: auto)
@@ -55,13 +56,14 @@ $ARGUMENTS -- requirement text, @file reference, or brainstorm session reference
 **Input types:**
 - Direct text: `"Implement user authentication system with OAuth and 2FA"`
 - File reference: `@requirements.md`
-- Brainstorm import: `--from-brainstorm WFS-xxx`
+- Context import: `--from brainstorm:WFS-xxx` or `--from @spec.md` or `--from path/`
+- Brainstorm import (alias): `--from-brainstorm WFS-xxx`
 - No args + `--revise` / `--review`: Operate on existing `.workflow/roadmap.md`
 
 **Pipeline position:**
 ```
 maestro-brainstorm (optional upstream)
-        ↓ guidance-specification.md
+        ↓ context-package.json (via --from)
 maestro-init (project setup)
         ↓ project.md, state.json, config.json
 maestro-roadmap [--mode light]     → roadmap.md directly
@@ -117,7 +119,7 @@ Follow `~/.maestro/workflows/spec-generate.md` completely.
 | Code | Severity | Condition | Recovery |
 |------|----------|-----------|----------|
 | E001 | error | Requirement/idea text or @file required | Prompt user for input |
-| E002 | error | Brainstorm session not found (--from-brainstorm) | Show available sessions |
+| E002 | error | Context source not found (--from / --from-brainstorm) | Show available sessions/sources |
 | W001 | warning | CLI analysis failed, using fallback | Continue with available data |
 | W005 | warning | External research agent failed | Continue without apiResearchContext |
 

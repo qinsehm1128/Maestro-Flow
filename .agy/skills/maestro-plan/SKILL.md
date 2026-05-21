@@ -1,7 +1,7 @@
 ---
 name: maestro-plan
 description: Use when creating, revising, or verifying an execution plan for a phase or task
-argument-hint: [phase] [--collab] [--spec SPEC-xxx] [-y] [--gaps] [--tdd] [--dir <path>] [--revise [instructions]] [--check <plan-dir>]
+argument-hint: [phase] [--collab] [--spec SPEC-xxx] [-y] [--gaps] [--tdd] [--dir <path>] [--from <source>] [--revise [instructions]] [--check <plan-dir>]
 allowed-tools:
   - ask_question
   - define_subagent
@@ -38,13 +38,15 @@ All plan output goes to `.workflow/scratch/{YYYYMMDD}-plan-[P{N}-|M{N}-]{slug}/`
 <context>
 $ARGUMENTS — phase number, or no args for milestone-wide planning, with optional flags.
 
-Scope routing, base flags (`--collab`, `--spec`, `-y`, `--gaps`, `--dir`), output directory format, and artifact registration are defined in workflow plan.md.
+Scope routing, base flags (`--collab`, `--spec`, `-y`, `--gaps`, `--dir`, `--from`), output directory format, and artifact registration are defined in workflow plan.md.
 
 **Command-level flags** (extensions beyond workflow base):
+- `--from <source>` -- Load upstream context package directly (brainstorm:ID, analyze:ID, @file, or path). Bypasses normal context resolution. See workflow plan.md § P1 Step 1
 - `--revise [instructions]` -- See workflow plan.md § Revise Mode
 - `--check <plan-dir>` -- See workflow plan.md § Check Mode
 
 **Upstream context:**
+- If `--from` specified: resolves to `context-package.json` (constraints, requirements, insights, open_questions). Takes precedence over context.md when both exist
 - Reads `context.md` from prior analyze artifact (auto-discovered from state.json or via --dir)
 - Reads `conclusions.json` if available (implementation_scope seeds task generation)
 

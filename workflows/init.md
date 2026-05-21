@@ -42,13 +42,14 @@ state.json exists → Path C (existing) | source files exist → Path B (brownfi
    - "Keep exploring" → continue questioning
 
    If `--auto` flag: skip interactive questioning, extract from @ referenced document.
-   If `--from-brainstorm SESSION-ID`:
-   - Locate brainstorm session directory (`.workflow/scratch/brainstorm-*/`)
-   - Read `guidance-specification.md`:
-     - Problem statement → project vision + core value
-     - Features → project goals (Active requirements)
-     - Non-goals → constraints + Out of Scope requirements
-     - Terminology → project glossary context
+   If `--from <source>` (alias: `--from-brainstorm`):
+   - Locate source directory (`.workflow/scratch/brainstorm-*/`, `.workflow/scratch/*-import-*/`, etc.)
+   - Load `context-package.json` (preferred) or fall back to `guidance-specification.md`:
+     - `domain` (name, description, problem_statement) → project vision + core value
+     - `requirements[]` → project goals (Active requirements)
+     - `constraints[locked]` → key decisions
+     - `non_goals[]` → constraints + Out of Scope requirements
+     - `domain.terminology[]` → project glossary context
    - Skip interactive questioning (context already gathered)
 
 2. **Workflow Preferences** -- Configure project workflow settings:
@@ -86,7 +87,7 @@ state.json exists → Path C (existing) | source files exist → Path B (brownfi
    - "Skip mapping" → proceed
 4. Run Workflow Preferences (same as Path A step 2) → `.workflow/config.json`
 5. Ask user for project vision, goals, constraints (same deep questioning as Path A step 1)
-   - If `--from-brainstorm SESSION-ID`: extract from guidance-specification.md (skip questioning)
+   - If `--from <source>` (alias: `--from-brainstorm`): load context-package.json (skip questioning)
    - For brownfield: infer Validated requirements from existing code (what does codebase already do?)
 6. Create `.workflow/project.md` (include inferred Validated requirements + new Active requirements)
 

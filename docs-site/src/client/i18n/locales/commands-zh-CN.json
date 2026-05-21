@@ -19,7 +19,7 @@
       "workflow_zh": "头脑风暴之后，路线图/规格生成之前执行",
       "prev_commands": ["maestro-brainstorm"],
       "next_commands": ["maestro-roadmap"],
-      "flags": ["--auto (自动模式)", "--from-brainstorm SESSION-ID (从头脑风暴导入)"]
+      "flags": ["--auto (自动模式)", "--from <source> (导入上游 context package，如 brainstorm:ID、@file)"]
     },
     "maestro-plan": {
       "name": "maestro-plan",
@@ -107,7 +107,7 @@
       "workflow_zh": "项目初始化之后，阶段规划之前。适合不需要完整规格文档的项目",
       "prev_commands": ["maestro-init", "maestro-brainstorm"],
       "next_commands": ["maestro-plan"],
-      "flags": ["<requirement> (需求描述，必填)", "-y (自动模式)", "-c (恢复会话)", "-m progressive|direct|auto (模式)", "--from-brainstorm SESSION-ID (从头脑风暴导入)", "--revise [instructions] (修订路线图)", "--review (审查模式)"]
+      "flags": ["<requirement> (需求描述，必填)", "-y (自动模式)", "-c (恢复会话)", "-m progressive|direct|auto (模式)", "--from <source> (导入上游 context package，如 brainstorm:ID、@file)", "--revise [instructions] (修订路线图)", "--review (审查模式)"]
     },
     "maestro-impeccable": {
       "name": "maestro-impeccable",

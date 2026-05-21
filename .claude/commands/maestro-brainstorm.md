@@ -12,7 +12,7 @@ allowed-tools:
   - AskUserQuestion
 ---
 <purpose>
-Unified brainstorming combining interactive framework generation, multi-role parallel design, cross-role review, and resolution writeback. Two modes: Auto (full pipeline: guidance-specification → parallel design/{role}.md → cross-role-reviewer finds conflicts/gaps/synergies → user-confirmed resolutions patched into role files + logged in guidance §11) and Single Role (individual role design for an existing session). Outputs structured artifacts in `.workflow/scratch/brainstorm-{slug}-{date}/` ready for downstream planning (roadmap / analyze / spec-generate consume `guidance-specification.md`).
+Unified brainstorming combining interactive framework generation, multi-role parallel analysis, cross-role review, and resolution writeback. Two modes: Auto (full pipeline: guidance-specification → parallel {role}/ multi-file analysis → cross-role-reviewer compares Decision Digests for conflicts/gaps/synergies → user-confirmed resolutions patched into role files + logged in guidance §12) and Single Role (individual role analysis for an existing session). Outputs structured artifacts in `.workflow/scratch/brainstorm-{slug}-{date}/` ready for downstream planning (roadmap / analyze / spec-generate consume `guidance-specification.md`).
 </purpose>
 
 <required_reading>
@@ -29,11 +29,11 @@ Unified brainstorming combining interactive framework generation, multi-role par
 $ARGUMENTS -- topic text for auto mode, or role name for single role mode.
 
 **Auto mode**: topic text (e.g., "Build real-time collaboration platform") triggers full pipeline.
-**Single role mode**: valid role name (e.g., "system-architect") runs one role design.
+**Single role mode**: valid role name (e.g., "system-architect") runs one role analysis.
 **All output** goes to `.workflow/scratch/{YYYYMMDD}-brainstorm-{slug}/`.
 **Artifact registration**: On completion, registers artifact (type=brainstorm) in state.json.
 **Output boundary**: ALL file writes MUST target `{output_dir}/` or `.workflow/state.json` only. NEVER modify source code or files outside these paths.
-**Produced files**: `guidance-specification.md`, `design-research.md` (optional), `design/{role}.md` (per selected role).
+**Produced files**: `guidance-specification.md`, `design-research.md` (optional), `{role}/analysis.md` + `{role}/analysis-F-*.md` + `{role}/findings-*.md` (per selected role).
 
 **Valid roles**: data-architect, product-manager, product-owner, scrum-master, subject-matter-expert, system-architect, test-strategist, ui-designer, ux-expert
 
@@ -66,8 +66,8 @@ Follow '~/.maestro/workflows/brainstorm.md' completely.
 
 Auto mode:
 - Project not initialized → Skill({ skill: "maestro-init" })
-- Project initialized, need spec package → Skill({ skill: "maestro-roadmap", args: "--mode full --from-brainstorm {session_id}" })
-- Project initialized, quick roadmap → Skill({ skill: "maestro-roadmap", args: "--from-brainstorm {session_id}" })
+- Project initialized, need spec package → Skill({ skill: "maestro-roadmap", args: "--mode full --from brainstorm:{artifact_id}" })
+- Project initialized, quick roadmap → Skill({ skill: "maestro-roadmap", args: "--from brainstorm:{artifact_id}" })
 - Need deeper analysis first → Skill({ skill: "maestro-analyze", args: "{topic}" })
 - `html-prototypes/` produced with 2+ files and user wants to browse → load `~/.maestro/workflows/brainstorm-visualize.md` and launch visualizer server (optional, user-triggered)
 - DESIGN.md established during Step 3.5 → suggest: "Run `/maestro-impeccable build <feature-description>` to build with the established design system"
@@ -83,7 +83,7 @@ Single role mode:
 | E001 | error | Topic or role argument required | Prompt user for topic text or role name |
 | E002 | error | No active session for single role mode | Guide user to run auto mode first |
 | E003 | error | Invalid role name | Show valid roles list |
-| E006 | error | `--review-only` but no `design/*.md` found | Run auto or single-role mode first |
+| E006 | error | `--review-only` but no `{role}/analysis.md` found | Run auto or single-role mode first |
 | E007 | error | `--review-only` but `guidance-specification.md` missing | Run auto mode to generate guidance first |
 | W001 | warning | Fewer than 10 ideas in divergent phase | Proceed with available ideas |
 | W002 | warning | Project context (.workflow/) not found | Continue without project context |
@@ -95,23 +95,23 @@ Single role mode:
 
 <success_criteria>
 **Auto mode**:
-- [ ] `guidance-specification.md` with RFC 2119 keywords, terminology, non-goals, feature decomposition (§10), decision tracking (§11)
+- [ ] `guidance-specification.md` with RFC 2119 keywords, terminology, non-goals, feature decomposition (§10), decision tracking (§11), cross-role resolutions placeholder (§12)
 - [ ] `design-research.md` persisted when Step 1.7 external research ran (fail-soft: absence not a failure)
 - [ ] If `ui-designer` in selected_roles AND Step 3.5 ran: `.workflow/impeccable/DESIGN.md` exists (visual style established via impeccable explore)
-- [ ] `design/{role}.md` written for each selected role (one file per role, ≤ 1500 lines)
-- [ ] Each `design/{role}.md` contains §1 Role Mandate, §2 Cross-Cutting Foundations, §3 Per-Feature Design, §4 Outstanding TODOs
-- [ ] `design/system-architect.md` §2 includes Data Model + State Machine when system-architect is selected
-- [ ] `design/ui-designer.md` references DESIGN.md visual constraints when ui-designer is selected
-- [ ] Each `design/{role}.md` §3 references ≥ 1 guidance decision ID per feature subsection
-- [ ] Cross-role review (Step 4.5) executed; reviewer output includes `patch_targets[]` for every finding
-- [ ] If findings exist: each accepted resolution applied via Edit (annotate / strikeout / append) AND logged in `guidance-specification.md` §11 "Cross-Role Resolutions"
-- [ ] If zero findings: final report explicitly states "No cross-role issues detected"; guidance §11 unchanged
+- [ ] `{role}/analysis.md` written for each selected role, containing §2 Decision Digest (4 tables) + §3 Cross-Cutting Foundations + §4 File Index
+- [ ] `{role}/analysis-F-{id}-{slug}.md` written per feature (one file per feature, < 2000 words)
+- [ ] `system-architect/analysis.md` §3 includes Data Model + State Machine when system-architect is selected
+- [ ] `ui-designer/analysis.md` references DESIGN.md visual constraints when ui-designer is selected
+- [ ] Each `{role}/analysis.md` §2 Decisions table has ≥ 1 row per feature
+- [ ] Cross-role review (Step 4.5) executed; reviewer compares §2 Decision Digests; output includes `patch_targets[]` for every finding
+- [ ] If findings exist: each accepted resolution applied via Edit (annotate / strikeout / append) AND logged in `guidance-specification.md` §12 "Cross-Role Resolutions"
+- [ ] If zero findings: final report explicitly states "No cross-role issues detected"; guidance §12 unchanged
 - [ ] Heading-drift patch failures surfaced in final report (if any)
 - [ ] Session metadata updated with completion status (review_findings_count, resolutions_applied, patches_skipped)
 
 **Single role mode**:
-- [ ] `design/{role}.md` written
-- [ ] §3 Per-Feature Design populated when guidance §10 feature list available
-- [ ] §1 references guidance-specification.md when it exists
+- [ ] `{role}/analysis.md` written with §2 Decision Digest + §4 File Index
+- [ ] `{role}/analysis-F-*.md` written when guidance §10 feature list available
+- [ ] §2 Decisions table references guidance decision IDs
 - [ ] Session metadata updated
 </success_criteria>

@@ -1,7 +1,7 @@
 ---
 name: maestro-plan
 description: Use when creating, revising, or verifying an execution plan for a phase or task
-argument-hint: "[-y|--yes] [-c|--concurrency N] [--continue] \"<phase> [--dir <path>] [--gaps] [--spec SPEC-xxx] [--collab]\""
+argument-hint: "[-y|--yes] [-c|--concurrency N] [--continue] \"<phase> [--dir <path>] [--from <source>] [--gaps] [--spec SPEC-xxx] [--collab]\""
 allowed-tools: spawn_agents_on_csv, Read, Write, Edit, Bash, Glob, Grep, request_user_input
 ---
 
@@ -65,14 +65,14 @@ All mean: **follow the cycle anyway**.
 <context>
 $ARGUMENTS — phase number/text and optional flags.
 
-**Flags**: `-y` (auto), `-c N` (concurrency, default 4), `--continue` (resume), `--dir <path>`, `--gaps` (issue-linked), `--spec SPEC-xxx`, `--collab`, `--revise`, `--check`, `--tdd` (RED-GREEN-REFACTOR task chains)
+**Flags**: `-y` (auto), `-c N` (concurrency, default 4), `--continue` (resume), `--dir <path>`, `--from <source>` (load upstream context-package directly), `--gaps` (issue-linked), `--spec SPEC-xxx`, `--collab`, `--revise`, `--check`, `--tdd` (RED-GREEN-REFACTOR task chains)
 
 **Scope routing** (priority): --dir → from parent artifact; no args → milestone; digit → phase; text → adhoc/standalone.
 
 **Session**: `.workflow/.csv-wave/{YYYYMMDD}-plan-P{N}-{slug}/`
 **Scratch**: `.workflow/scratch/{YYYYMMDD}-plan-P{N}-{slug}/` (.task/ subdir)
 
-**Pre-load** (optional): context.md (prior analyze), conclusions.json, codebase ARCHITECTURE.md, `maestro wiki search`, `maestro spec load --category arch`, team preflight `maestro collab preflight`.
+**Pre-load** (optional): context-package.json (via `--from`, takes precedence), context.md (prior analyze), conclusions.json, codebase ARCHITECTURE.md, `maestro wiki search`, `maestro spec load --category arch`, team preflight `maestro collab preflight`.
 </context>
 
 <csv_schema>
@@ -117,7 +117,7 @@ S_RESUME → S_WAVE_1    WHEN: W1 incomplete    DO: load session, resume
 S_RESUME → S_WAVE_2    WHEN: W1 done, W2 pending
 S_RESUME → S_CHECK     WHEN: W2 done, check pending
 
-S_CONTEXT → S_CSV_GEN  DO: load context.md, conclusions.json, specs, wiki, codebase docs
+S_CONTEXT → S_CSV_GEN  DO: if --from: resolve context-package.json (precedence over context.md); load context.md, conclusions.json, specs, wiki, codebase docs
 
 S_CSV_GEN → S_WAVE_1   DO: pre-flight (`maestro collab preflight --phase N`; exit 1 → warn + ask), determine exploration angles, generate tasks.csv, user validates (skip -y)
 

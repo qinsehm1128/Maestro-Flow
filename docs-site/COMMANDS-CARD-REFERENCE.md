@@ -19,11 +19,11 @@
 
 ### `maestro-init` — 初始化项目
 
-**Usage:** `/maestro-init [--auto] [--from-brainstorm SESSION-ID]`
+**Usage:** `/maestro-init [--auto] [--from <source>]`
 
 自动检测项目状态（空项目/代码库/已有项目），创建 .workflow/ 目录结构，包含 project.md、state.json、config.json 和 specs/
 
-**Flags:** --auto (自动模式) · --from-brainstorm SESSION-ID (从头脑风暴导入)
+**Flags:** --auto (自动模式) · --from <source> (导入上游 context package)
 
 ---
 
@@ -99,11 +99,11 @@
 
 ### `maestro-roadmap` — 路线图
 
-**Usage:** `/maestro-roadmap <requirement> [-y] [-c] [-m progressive|direct|auto] [--from-brainstorm SESSION-ID] [--revise [instructions]] [--review]`
+**Usage:** `/maestro-roadmap <requirement> [-y] [-c] [-m progressive|direct|auto] [--from <source>] [--revise [instructions]] [--review]`
 
 交互式路线图创建：需求分解 → 里程碑规划 → 迭代精化 → 阶段确认。spec-generate 的轻量级替代方案
 
-**Flags:** <requirement> (需求描述，必填) · -y (自动模式) · -c (恢复会话) · -m progressive|direct|auto (模式) · --from-brainstorm SESSION-ID (从头脑风暴导入) · --revise [instructions] (修订路线图) · --review (审查模式)
+**Flags:** <requirement> (需求描述，必填) · -y (自动模式) · -c (恢复会话) · -m progressive|direct|auto (模式) · --from <source> (导入上游 context package) · --revise [instructions] (修订路线图) · --review (审查模式)
 
 ---
 

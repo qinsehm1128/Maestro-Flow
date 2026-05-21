@@ -42,13 +42,13 @@ const COMMANDS: CommandData[] = [
       desc: '初始化 .workflow/ 目录，创建 state.json 和目录结构',
       when: '新项目第一次使用 Maestro，或已有项目需要引入工作流管理',
       how: '/maestro-init',
-      tips: ['会自动扫描代码库填充初始 spec', '可配合 --from-brainstorm 基于头脑风暴结果初始化'],
+      tips: ['会自动扫描代码库填充初始 spec', '可配合 --from brainstorm:ID 基于头脑风暴结果初始化'],
     },
     en: {
       desc: 'Initialize .workflow/ directory, create state.json and directory structure',
       when: 'First time using Maestro on a new or existing project',
       how: '/maestro-init',
-      tips: ['Auto-scans codebase to populate initial specs', 'Use --from-brainstorm to init from brainstorm results'],
+      tips: ['Auto-scans codebase to populate initial specs', 'Use --from brainstorm:ID to init from brainstorm results'],
     },
   },
   {

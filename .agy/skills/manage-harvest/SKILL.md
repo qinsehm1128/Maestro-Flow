@@ -1,7 +1,7 @@
 ---
 name: manage-harvest
 description: Extract knowledge from artifacts into wiki/spec/issues
-argument-hint: [<session-id|path>] [--to wiki|spec|issue|auto] [--source <type>] [--recent N] [--dry-run] [-y]
+argument-hint: [<session-id|path>] [--to wiki|spec|issue|auto] [--source <type>] [--recent N] [--dry-run] [-y] [--prune] [--age N]
 allowed-tools:
   - ask_question
   - define_subagent
@@ -39,11 +39,15 @@ Arguments: $ARGUMENTS
 - `<session-id>` (e.g., `ANL-auth-20260410`, `WFS-xxx`) → `session` mode: harvest specific session
 - `<path>` (e.g., `.workflow/.analysis/ANL-auth-20260410/`) → `path` mode: harvest from explicit directory
 
+**Additional flags:**
+- `--prune` — State hygiene mode: classify artifacts, graduate harvested → knowhow, archive from state.json, prune accumulated_context
+- `--age N` — Graduation age threshold in days (default: 14). Used with `--prune`
+
 Flags, source registry (scan paths), and storage locations defined in workflow harvest.md.
 </context>
 
 <execution>
-Follow '~/.maestro/workflows/harvest.md' Stages 1-8 in order.
+Follow '~/.maestro/workflows/harvest.md' Stages 1-8 (standard mode) or Stage 9 (`--prune` mode).
 
 **Key invariants:**
 1. **Read-only until Stage 6** — extraction and classification happen in-memory.
@@ -51,6 +55,8 @@ Follow '~/.maestro/workflows/harvest.md' Stages 1-8 in order.
 3. **Never modify source artifacts** — harvest is purely extractive.
 
 Extraction patterns, classification rules, routing infrastructure, and fragment ID scheme defined in workflow harvest.md.
+
+**Prune mode** (`--prune`): Classifies artifacts (active/graduated/stale/protected), graduates harvested artifacts to wiki knowhow, archives from `artifacts[]` → `artifact_archive[]`, prunes resolved entries from accumulated_context. Files on disk are never deleted. Always backs up state.json before writing.
 
 **Next-step routing on completion:**
 - Review wiki entries → `maestro wiki list --type note`
@@ -93,4 +99,8 @@ Extraction patterns, classification rules, routing infrastructure, and fragment 
 - [ ] `harvest-report-{date}.md` written with full summary
 - [ ] No source artifacts modified
 - [ ] Summary displayed with counts and next-step routing
+- [ ] If --prune: artifacts classified (active/graduated/stale/protected)
+- [ ] If --prune: graduated artifacts → knowhow + artifact_archive[]
+- [ ] If --prune: accumulated_context pruned (resolved deferred/blockers, deduplicated decisions)
+- [ ] If --prune: state.json backed up before modification
 </success_criteria>

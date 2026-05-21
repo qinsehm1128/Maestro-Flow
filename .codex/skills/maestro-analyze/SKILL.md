@@ -1,7 +1,7 @@
 ---
 name: maestro-analyze
 description: Use when a topic needs structured multi-dimensional investigation before planning or decision-making
-argument-hint: "[-y|--yes] [-c|--concurrency N] [--continue] \"<phase|topic> [-q|--quick] [--gaps [ISS-ID]]\""
+argument-hint: "[-y|--yes] [-c|--concurrency N] [--continue] [--from <source>] \"<phase|topic> [-q|--quick] [--gaps [ISS-ID]]\""
 allowed-tools: spawn_agents_on_csv, Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion
 ---
 
@@ -10,6 +10,8 @@ Wave-based multi-dimensional analysis using `spawn_agents_on_csv`. Diamond topol
 Wave 1 (CLI exploration, parallel) -> Wave 2 (6-dimension scoring, parallel) -> Wave 3 (decision synthesis).
 
 **Tri-depth**: Full mode (all 3 waves), Quick mode (`-q`, Wave 3 only), Gaps mode (`--gaps`, issue root cause pipeline).
+
+Produces context-package.json (standardized cross-command context contract) in all modes.
 </purpose>
 
 <context>
@@ -21,9 +23,10 @@ $ARGUMENTS -- phase number, topic text, and optional flags.
 - `--continue`: Resume existing session
 - `-q, --quick`: Skip exploration + scoring, Wave 3 only
 - `--gaps [ISS-ID]`: Issue root cause analysis. If ISS-ID: single issue. If omitted: all open/registered from issues.jsonl.
+- `--from <source>`: Load upstream context package (brainstorm:ID, analyze:ID, @file, or path). Resolves to context-package.json for upstream context inheritance.
 
 **Session**: `.workflow/.csv-wave/{YYYYMMDD}-analyze-{slug}/`
-**Output**: tasks.csv, results.csv, discoveries.ndjson, context.md (all modes), analysis.md + conclusions.json (full mode only)
+**Output**: tasks.csv, results.csv, discoveries.ndjson, context.md, context-package.json (all modes), analysis.md + conclusions.json (full mode only)
 </context>
 
 <csv_schema>
@@ -62,7 +65,7 @@ Available exploration dimensions: architecture, implementation, performance, sec
 5. **Quick mode shortcut**: -q generates only wave 3 task
 6. **Gaps mode pipeline**: --gaps follows: Load issues from issues.jsonl -> Classify & group by location/component -> CSV gen (W1: 1 explore row per issue, W2: 1 synthesis per group) -> Execute waves -> Write issue.analysis record per issue -> Append history `{ action: "analyzed", at: <ISO>, by: "maestro-analyze --gaps" }` -> Output context.md for plan --gaps
 7. **Graceful degradation**: Missing exploration reduces scoring quality; missing scoring reduces synthesis quality
-8. **Tri-output**: context.md always. analysis.md + conclusions.json full-mode only. Gaps mode writes to issues.jsonl + context.md
+8. **Tri-output**: context.md + context-package.json always. analysis.md + conclusions.json full-mode only. Gaps mode writes to issues.jsonl + context.md + context-package.json
 </invariants>
 
 <state_machine>
@@ -94,7 +97,7 @@ S_PARSE:
   | Text subject, no milestone | standalone | subject slugified (max 40) |
 
 S_CONTEXT:
-  -> S_CSV_GEN    DO: load project.md, roadmap.md, state.json, prior artifacts, specs
+  -> S_CSV_GEN    DO: load project.md, roadmap.md, state.json, prior artifacts, specs, upstream context-package (if --from)
 
 S_CSV_GEN:
   -> S_WAVE_1     WHEN: full mode         DO: generate N explore + 6 score + 1 synthesis rows
@@ -144,9 +147,9 @@ Merge results -> master tasks.csv.
 Filter wave==3 -> build prev_context from wave 2 scores (or project context for quick mode) -> spawn.
 
 **Synthesis agent**:
-- Full mode: analysis.md (executive summary, per-dimension scores, risk matrix, Go/No-Go), context.md (Locked/Free/Deferred decisions), conclusions.json
-- Quick mode: context.md only from available project context
-- Gaps mode: per-issue analysis records -> issues.jsonl + context.md for plan --gaps
+- Full mode: analysis.md (executive summary, per-dimension scores, risk matrix, Go/No-Go), context.md (Locked/Free/Deferred decisions), context-package.json, conclusions.json
+- Quick mode: context.md + context-package.json only from available project context
+- Gaps mode: per-issue analysis records -> issues.jsonl + context.md + context-package.json for plan --gaps
 
 Gray area detection: domain-aware (things users SEE/CALL/RUN/READ), phase-specific (skip prior decided areas).
 
@@ -156,7 +159,7 @@ Gray area detection: domain-aware (things users SEE/CALL/RUN/READ), phase-specif
 2. **Confidence scoring** (full mode): factors -- findings_depth(.30), evidence_strength(.25), coverage_breadth(.20), user_validation(.15), consistency(.10). Thresholds: <60% deeper, 60-80% optional, 80-95% converging, >95% converge.
 3. Auto-create issues from Deferred items -> issues.jsonl
 4. Spec enrichment: Locked decisions -> `maestro spec add arch`; code patterns -> `maestro spec add coding`
-5. Register artifact in state.json (type: analyze)
+5. Register artifact in state.json (type: analyze, includes context_package field pointing to context-package.json)
 6. Copy outputs to scratchDir, display summary
 7. **Next-step routing**:
 
@@ -203,6 +206,7 @@ Protocol: read before analysis, append-only, dedup by type+key.
 <success_criteria>
 - [ ] All waves executed in order (or skipped per mode)
 - [ ] context.md produced (all modes); analysis.md + conclusions.json (full mode)
+- [ ] context-package.json produced (all modes) with constraints, requirements, insights, open_questions
 - [ ] context.md contains all decisions classified as Locked/Free/Deferred
 - [ ] Decision Recording Protocol applied to all decisions
 - [ ] Confidence scored per dimension with factor-based model (full mode)
@@ -210,7 +214,8 @@ Protocol: read before analysis, append-only, dedup by type+key.
 - [ ] Pressure pass completed ≥ 1 time on highest-risk dimension before synthesis
 - [ ] Deferred items auto-created as issues
 - [ ] Scope creep redirected to Deferred section
-- [ ] Artifact registered in state.json
+- [ ] Artifact registered in state.json (includes context_package field)
+- [ ] Upstream context loaded via `--from` when specified
 - [ ] discoveries.ndjson append-only throughout
 - [ ] Next step routed (plan for Go, brainstorm for No-Go, plan --gaps for Gaps)
 </success_criteria>

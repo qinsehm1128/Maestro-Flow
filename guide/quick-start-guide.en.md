@@ -37,7 +37,7 @@ After installation, `/maestro-*` slash commands and `maestro` terminal commands 
 
 ```bash
 /maestro-brainstorm "Online education platform"  # Multi-role brainstorming
-/maestro-init --from-brainstorm ANL-xxx          # Initialize from brainstorm
+/maestro-init --from brainstorm:ANL-xxx          # Initialize from brainstorm
 /maestro-roadmap "Create roadmap" -y
 ```
 

@@ -48,6 +48,7 @@ OUTPUT_DIR = .workflow/scratch/plan-{PHASE_SLUG or milestone_slug}-{date}/
 | `--revise [instructions]` | Revise existing plan (skip P1-P3, load → modify → P4). Auto-discovers latest plan or use `--dir` |
 | `--check <plan-dir>` | Standalone plan verification (P4 only, read-only) |
 | `--tdd` | Generate TDD task chains (RED-GREEN-REFACTOR triplets). Load `@~/.maestro/workflows/tdd.md` for discipline and task structure |
+| `--from <source>` | Load upstream context package directly (brainstorm:ID, analyze:ID, @file, or path). Bypasses normal context resolution |
 
 ---
 
@@ -78,7 +79,15 @@ When `--tdd` is active:
 ### Steps
 
 1. **Load user decisions**
-   - Read `${CONTEXT_DIR}/context.md` if exists, else warn (no upstream analyze)
+   - If `--from` specified: resolve to `context-package.json` → load
+     - `constraints[locked]` → immutable constraints (planner must respect)
+     - `constraints[open]` → implementer discretion
+     - `constraints[deferred]` → explicitly scoped out
+     - `requirements[]` → task scope input
+     - `insights[]` → role analysis context (data models, state machines, architecture decisions)
+     - `open_questions[]` → flag areas needing clarification in P2
+   - Else: read `${CONTEXT_DIR}/context.md` if exists, else warn (no upstream analyze)
+   - Merge: if both `--from` and `context.md` exist, context-package takes precedence; context.md supplements
 
 2. **Load spec reference** (if `--spec` flag or index.json has spec_ref)
    - Read from `.workflow/.spec/${spec_ref}/`: spec-summary.md, requirements/_index.md, epics/_index.md
@@ -105,6 +114,11 @@ When `--tdd` is active:
        - `scope.target_files` → files[] + read_first[]
        - `scope.priority` → task/wave ordering
      - Skip parallel exploration
+
+5b. **Merge context-package insights** (if `--from` was loaded)
+   - If context-package `insights[]` contain `area: "data-model"` or `area: "state-machine"`: inject as planner constraints
+   - Map `insights[].summary` to implementation guidance for relevant tasks
+   - These replace the need for a separate analyze step when brainstorm already provided sufficient role analysis
 
 5. **Parallel exploration** (skip if `--gaps` or upstream analysis loaded)
    - Exploration angles (1-4 based on complexity): architecture, implementation, integration, risk

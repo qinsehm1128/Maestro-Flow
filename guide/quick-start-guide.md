@@ -37,7 +37,7 @@ maestro hooks install --level standard
 
 ```bash
 /maestro-brainstorm "在线教育平台"       # 多角色头脑风暴
-/maestro-init --from-brainstorm ANL-xxx # 基于头脑风暴初始化
+/maestro-init --from brainstorm:ANL-xxx # 基于头脑风暴初始化
 /maestro-roadmap "创建路线图" -y
 ```
 

@@ -20,8 +20,9 @@ Unified brainstorming workflow with dual-mode operation: auto pipeline (full mul
     ↓        ↓          ↓       ↓    ↓
  Phase 2  Phase 3    Phase 4 Phase 5 Phase 3
 Artifacts N×Role     Cross-  Apply  1×Role
-          Design     Role    Resol. Design
-                     Review
+          Analysis   Role    Resol. Analysis
+          (multi-    Review
+           file)     (digest)
 ```
 
 ## Dual-Mode Routing
@@ -33,9 +34,9 @@ Triggered by `--yes`/`-y` flag or user selection.
 Phase 1: Mode Detection → Parse args, detect mode
 Phase 1.5: Terminology & Boundary → Extract terms, collect Non-Goals
 Phase 2: Interactive Framework → 7 sub-phases (context → topic → roles → questions → conflicts → check → spec)
-Phase 3: Parallel Role Design → N concurrent design/{role}.md via role-design-author
-Phase 4: Cross-Role Review → cross-role-reviewer agent finds conflicts / gaps / synergies (read-only)
-Phase 5: Apply Resolutions → AskUserQuestion per finding → patch guidance §11 + design/{role}.md
+Phase 3: Parallel Role Analysis → N concurrent {role}/ multi-file via role-design-author
+Phase 4: Cross-Role Review → cross-role-reviewer compares Decision Digests (read-only)
+Phase 5: Apply Resolutions → AskUserQuestion per finding → patch role files + guidance §12
 ```
 
 ### Single Role Mode
@@ -43,7 +44,7 @@ Triggered when first arg is a valid role name.
 
 ```
 Phase 1: Mode Detection → Parse args, detect mode
-Phase 3: Single Role Design → Detection → Context → Agent → Validation
+Phase 3: Single Role Analysis → Detection → Context → Agent → Validation
 ```
 
 ## Input
@@ -63,7 +64,7 @@ Phase 3: Single Role Design → Detection → Context → Agent → Validation
 | `--include-questions` | Interactive context gathering | - |
 | `--skip-questions` | Use default answers | - |
 | `--style-skill PKG` | Style package for ui-designer | - |
-| `--review-only` | Skip Phase 3 (role design); run only Step 4.5 + Step 5 on existing `design/*.md` | - |
+| `--review-only` | Skip Phase 3 (role analysis); run only Step 4.5 + Step 5 on existing role analyses | - |
 
 ### Available Roles
 
@@ -86,16 +87,22 @@ Phase 3: Single Role Design → Detection → Context → Agent → Validation
 All brainstorm output goes to scratch:
 ```
 .workflow/scratch/brainstorm-{slug}-{date}/
-├── guidance-specification.md     # Phase 2 output — machine contract (downstream consumes this)
-├── design-research.md            # Optional Step 1.7 output
-└── design/                       # Phase 3 per-role design
-    ├── system-architect.md
-    ├── ux-expert.md
-    ├── data-architect.md
-    └── {role}.md                 # one file per selected role
+├── guidance-specification.md          # Phase 2 output — machine contract (downstream consumes this)
+├── design-research.md                 # Optional Step 1.7 output
+├── system-architect/                  # Phase 3 per-role analysis (one folder per selected role)
+│   ├── analysis.md                    # INDEX — digest + cross-cutting foundations + file index
+│   ├── analysis-F-001-agent-loop.md   # per-feature analysis
+│   ├── analysis-F-002-skill-engine.md
+│   └── findings-perf-risk.md          # additional discoveries
+├── ux-expert/
+│   ├── analysis.md
+│   ├── analysis-F-001-agent-loop.md
+│   └── analysis-F-003-tui-frontend.md
+└── {role}/
+    └── ...
 ```
 
-Clarifications and audit trail live in `guidance-specification.md` §11 Appendix.
+Clarifications and audit trail live in `guidance-specification.md` §11 Appendix. Cross-Role Resolutions in §12.
 
 ---
 
@@ -111,9 +118,9 @@ Parse $ARGUMENTS to determine execution mode:
 3. First non-flag arg matches valid role name → **Single Role Mode**
 4. First non-flag arg is a number → **Phase Mode** (resolve phase dir, then auto)
 5. Text provided without flags → Ask user via AskUserQuestion:
-   - "自动模式 (推荐)" — 完整流程：框架生成 → 多角色并行设计 → 跨角色复审 → 决议回流
-   - "单角色设计" — 为单个角色生成 design/{role}.md
-   - "跨角色复审" — 已有多个 design/{role}.md，仅运行复审与决议回流
+   - "自动模式 (推荐)" — 完整流程：框架生成 → 多角色并行分析 → 跨角色复审 → 决议回流
+   - "单角色分析" — 为单个角色生成 {role}/ 分析文件
+   - "跨角色复审" — 已有多个角色分析，仅运行复审与决议回流
 
 **Parameter Parsing**:
 - `--count N`: cap at 9, default 3
@@ -140,7 +147,7 @@ Parse $ARGUMENTS to determine execution mode:
 specs_content = maestro spec load --category arch
 ```
 
-Pass to role-design-author in Step 4 for architecture-aware role design.
+Pass to role-design-author in Step 4 for architecture-aware role analysis.
 
 ---
 
@@ -193,7 +200,7 @@ designResearchContext = agent_output
 `designResearchContext` is passed into:
 - Step 2 (Terminology): enriches domain term extraction
 - Step 3 Phase 1 (Topic Analysis): provides external design alternatives
-- Step 4 (Parallel Role Design): each role-design-author receives design research as additional context
+- Step 4 (Parallel Role Analysis): each role-design-author receives design research as additional context
 
 Also persisted to `{output_dir}/design-research.md` for future reference.
 
@@ -285,8 +292,9 @@ Seven sub-phases producing guidance-specification.md:
   4-N. [Role] Decisions (with RFC 2119)
   Cross-Role Integration
   Risks & Constraints
-  Feature Decomposition (table)
-  Appendix: Decision Tracking
+  §10. Feature Decomposition (table)
+  §11. Appendix: Decision Tracking
+  §12. Cross-Role Resolutions (initially empty — populated by Step 5)
 - Validate: no interrogative sentences, all decisions traceable, RFC keywords applied
 
 **Output**: `{output_dir}/guidance-specification.md`, session metadata (workflow-session.json)
@@ -317,9 +325,9 @@ When `ui-designer` is among the selected roles, establish the project's visual d
 
 **Skip mode**: If user explicitly passes `--skip-design` to brainstorm, skip this step entirely. ui-designer role will generate its own independent theme in Phase 2.
 
-### Step 4: Parallel Role Design (Auto Mode)
+### Step 4: Parallel Role Analysis (Auto Mode)
 
-For EACH selected role, spawn a `role-design-author` agent in parallel. Each agent produces exactly one file: `{output_dir}/design/{role}.md`.
+For EACH selected role, spawn a `role-design-author` agent in parallel. Each agent produces a multi-file analysis under `{output_dir}/{role}/`.
 
 ```
 Agent({
@@ -328,14 +336,14 @@ Agent({
     role_name: {role}
     role_template_path: ~/.maestro/templates/planning-roles/{role}.md
     guidance_path: {output_dir}/guidance-specification.md
-    output_path: {output_dir}/design/{role}.md
+    output_dir: {output_dir}/{role}/
     feature_list: <F-id + slug + title rows from guidance §10>
     design_research: {output_dir}/design-research.md if exists, else null
     project_specs: {specs_content or null}
     user_context: {session.role_decisions[role] if any}
     style_skill: {style_skill_path if role == ui-designer and provided}
 
-    Write the design document per the role template's "Brainstorming Analysis Structure".
+    Write the analysis files per the role template's "Brainstorming Analysis Structure".
     Reference guidance decisions by ID (e.g., SA-03) — do NOT copy decision text.
     All behavioural statements MUST use RFC 2119 keywords.
   """,
@@ -343,39 +351,43 @@ Agent({
 })
 ```
 
-**Output Contract**: each agent writes exactly one file at `design/{role}.md` with three sections:
-1. **Role Mandate** (≤ 200 words) — what this role decides, what it defers
-2. **Cross-Cutting Foundations** — per the role template's required subsections (data model, FSM, etc. for system-architect; pitfall taxonomy etc. for SME; information architecture etc. for ux-expert)
-3. **Per-Feature Design** — one subsection per feature in feature_list, each referencing ≥ 1 guidance decision ID
+**Output Contract**: each agent writes files under `{output_dir}/{role}/`:
+- `analysis.md` — INDEX document containing §1 Role Mandate, §2 Decision Digest (4 tables), §3 Cross-Cutting Foundations, §4 File Index, §5 Outstanding TODOs
+- `analysis-F-{id}-{slug}.md` — one per feature (< 2000 words each)
+- `findings-{slug}.md` — additional discoveries (0 or more, < 1000 words each)
 
 See `.claude/agents/role-design-author.md` for the full output contract.
 
-**Quality Validation** (orchestrator self-check after each agent returns):
-- Verify `design/{role}.md` exists and is non-empty
-- Grep for RFC 2119 keywords (MUST / SHOULD / MAY / MUST NOT / SHOULD NOT) — warn if < 5 occurrences
-- If feature_list available: verify §3 has one subsection per feature ID
-- Check line count — warn if > 1500 lines (hard cap per agent contract)
-- system-architect specifically: verify §2 contains "Data Model" and "State Machine" headings
+**Digest-Based Validation** (orchestrator reads ONLY `analysis.md` per role, not sub-files):
+- Read `{role}/analysis.md` §2 Decision Digest:
+  - Decisions table: verify ≥ 1 row per feature in feature_list → feature coverage check
+  - RFC 2119 keywords in Constraints column → keyword count check
+- Read `{role}/analysis.md` §4 File Index:
+  - Verify listed files actually exist on disk (glob check)
+  - Verify feature coverage matches feature_list
+- system-architect specifically: verify §3 contains "Data Model" and "State Machine" headings
+- Warn if any analysis-F-*.md > 2000 words (from agent's return protocol `total_lines`)
 
-**Parallel Safety**: Each agent writes only to its own `design/{role}.md`. No shared output, no cross-agent dependencies.
+**Parallel Safety**: Each agent writes only to its own `{role}/` directory. No shared output, no cross-agent dependencies.
 
 ### Step 4.5: Cross-Role Review (Auto Mode)
 
-After all role design files are produced, spawn ONE `cross-role-reviewer` agent to identify conflicts / gaps / synergies across the role files. The agent is read-only and returns structured text.
+After all role analyses are produced, spawn ONE `cross-role-reviewer` agent. The agent compares Decision Digests from each role's `analysis.md` — it does NOT read per-feature sub-files unless it needs deeper context.
 
 ```
 Agent({
   subagent_type: "cross-role-reviewer",
   prompt: """
-    design_files:
-      - {output_dir}/design/{role_1}.md
-      - {output_dir}/design/{role_2}.md
+    analysis_indexes:
+      - {output_dir}/{role_1}/analysis.md
+      - {output_dir}/{role_2}/analysis.md
       - ...
     guidance_path: {output_dir}/guidance-specification.md
     feature_list: <F-id + slug + title rows from guidance §10>
 
-    Identify conflicts, gaps, and synergy opportunities across these role design files.
-    Cite role files by section. Reference guidance decisions by ID.
+    Compare Decision Digests (§2) across these role analysis index files.
+    Identify conflicts, gaps, and synergy opportunities.
+    Use §4 File Index for accurate patch target file paths and headings.
     Return the structured report — do NOT write files.
   """,
   run_in_background: false
@@ -383,9 +395,12 @@ Agent({
 ```
 
 **Agent output** (parsed by orchestrator):
-- `conflicts[]` — C-IDs with role-A vs role-B contradictions, suggested resolution, confidence
-- `gaps[]` — G-IDs naming an owner role to fill the missing definition
-- `synergies[]` — S-IDs with concrete patch suggestions (which file, which section, what text)
+- `conflicts[]` — C-IDs with role-A vs role-B contradictions from §2 Decisions/Positions comparison
+- `gaps[]` — G-IDs from §2 Interfaces consumer references without matching definitions
+- `synergies[]` — S-IDs from §2 Findings Summary with concrete patch suggestions
+- `need_deeper_context[]` — (optional) specific sub-files the reviewer needs to read for ambiguous cases
+
+**Deeper context handling**: If the reviewer returns `need_deeper_context` entries, the orchestrator reads those specific files and re-invokes the reviewer via SendMessage with the injected content. Expected to happen in < 10% of reviews.
 
 Store as `review_findings` in session memory. Skip Step 5 entirely if all three arrays are empty.
 
@@ -393,14 +408,14 @@ If `--yes` flag set: auto-apply each finding's suggested resolution without AskU
 
 ### Step 5: Apply Cross-Role Resolutions (Auto Mode)
 
-Consume `review_findings` from Step 4.5 and apply user-confirmed resolutions to both `guidance-specification.md` and the relevant `design/{role}.md` files.
+Consume `review_findings` from Step 4.5 and apply user-confirmed resolutions to the relevant role analysis files and `guidance-specification.md`.
 
 **Sub-phase 5.1: Interactive Confirmation (skip if `--yes`)**
 - For each finding (conflicts → gaps → synergies, in that order), call AskUserQuestion (max 4 per round):
   - **Conflict question** options: "Accept suggested resolution" (recommended) / "Pick role A's stance" / "Pick role B's stance" / "Defer to TODO"
   - **Gap question** options: "Accept suggested addition" (recommended) / "Skip this gap" / "Defer to TODO"
   - **Synergy question** options: "Apply patch" (recommended) / "Skip"
-- Question text MUST cite the exact role file + `target_heading` from the agent output (heading text, not section number).
+- Question text MUST cite the exact role folder + `target_heading` from the agent output (heading text, not section number).
 - Store user choices as `resolutions[]`.
 
 **Sub-phase 5.2: Apply Patches to Role Files**
@@ -410,7 +425,7 @@ The reviewer's output includes a `patch_targets[]` block per finding with closed
 For each accepted finding, iterate over its `patch_targets[]`:
 
 **Conflict patches** (edit_type usually `annotate_and_strikeout`):
-- Locate `target_heading` in `target_file` via Edit string match (heading text MUST match verbatim).
+- Locate `target_heading` in `target_file` (e.g., `system-architect/analysis-F-002-skill-engine.md`) via Edit string match (heading text MUST match verbatim).
 - Insert `edit_content` (a `> blockquote` Cross-Role Resolution line) immediately after the matched heading.
 - Wrap the original paragraph below the heading in `<!-- superseded by C-XXX -->` … `<!-- /superseded -->` HTML comments so the original text stays readable but downstream tooling treats it as non-authoritative.
 - If the user chose "Pick role A's stance" → strikeout role B's site only; vice versa. If "Accept suggested resolution" → strikeout BOTH role-A and role-B sites (both supersede to the new resolution).
@@ -428,15 +443,15 @@ For each accepted finding, iterate over its `patch_targets[]`:
 - If `target_heading` does not match verbatim, log the finding ID and target, skip the patch, and surface to the user in Step 7 final report ("3 patches skipped — heading drift").
 - Never invent the heading; refusal to patch is safer than wrong patch.
 
-**Sub-phase 5.3: Append to guidance §11**
-Append a new subsection to `guidance-specification.md` §11 Appendix capturing the audit trail:
+**Sub-phase 5.3: Append to guidance §12**
+Append a new subsection to `guidance-specification.md` §12 Cross-Role Resolutions capturing the audit trail:
 ```markdown
 ### Cross-Role Resolutions (added {date})
 | ID | Type | Source(s) | Resolution | Applied to |
 |---|---|---|---|---|
-| C-001 | conflict | system-architect.md "### 3.4 F-002 — Skill Engine" / sme.md "### 3.4 F-002 — Skill Engine" | {answer} | system-architect.md "### 3.4 F-002 — Skill Engine" |
-| G-001 | gap | ux-expert.md "### 3.2 F-005 — Ink TUI Frontend" | {answer} | data-architect.md "### 2.3 YAML Schemas" |
-| S-001 | synergy | ux-expert.md "### 8. Pruned-Frame Expand" / sme.md "### 6. NDJSON Transcript" | applied | both annotated |
+| C-001 | conflict | system-architect/analysis-F-002-skill-engine.md "## Architecture" / sme/analysis-F-002-skill-engine.md "## Constraints" | {answer} | both files patched |
+| G-001 | gap | ux-expert/analysis.md "### Interfaces" | {answer} | data-architect/analysis.md "### Decisions" |
+| S-001 | synergy | ux-expert/analysis-F-005-tui.md "## Interface Contract" / sme/findings-ndjson.md "## Recommendation" | applied | both annotated |
 ```
 
 **Sub-phase 5.4: Finalization**
@@ -447,16 +462,16 @@ Append a new subsection to `guidance-specification.md` §11 Appendix capturing t
 
 ### Single Role Mode Steps
 
-### Step 6: Single Role Design
+### Step 6: Single Role Analysis
 
-Execute design for ONE specified role with optional interactive context gathering.
+Execute analysis for ONE specified role with optional interactive context gathering.
 
 **Step 6.1: Detection & Validation**
 - Validate role_name against VALID_ROLES list
 - Detect session (--session or find existing)
 - Check for guidance-specification.md → framework_mode
 - Extract feature list from guidance §10 → feature_mode
-- Check existing `design/{role}.md` → update_mode (ask: update/regenerate/cancel)
+- Check existing `{role}/analysis.md` → update_mode (ask: update/regenerate/cancel)
 
 **Step 6.2: Interactive Context Gathering**
 - Skip if `--skip-questions`
@@ -467,10 +482,12 @@ Execute design for ONE specified role with optional interactive context gatherin
 
 **Step 6.3: Agent Execution**
 - Spawn role-design-author with full Inputs block (see Step 4 schema)
-- Agent writes `{output_dir}/design/{role}.md`
+- Agent writes files under `{output_dir}/{role}/`
 
 **Step 6.4: Validation**
-- Verify `design/{role}.md` exists and is non-empty
+- Read `{role}/analysis.md` — verify exists and non-empty
+- Check §2 Decision Digest tables present
+- Check §4 File Index matches files on disk
 - Check framework reference if framework_mode
 - Update session metadata with completion status
 - Report results with next step suggestions
@@ -481,15 +498,15 @@ Execute design for ONE specified role with optional interactive context gatherin
 
 ### Step 6.5: Review-Only Mode
 
-Triggered by `--review-only --session ID`. Skips Phase 3 entirely; runs only Step 4.5 + Step 5 against the existing `design/*.md` files.
+Triggered by `--review-only --session ID`. Skips Phase 3 entirely; runs only Step 4.5 + Step 5 against the existing role analysis files.
 
 **Step 6.5.1: Validation**
 - Require `--session ID`. Error E002 if missing.
-- Glob `{output_dir}/design/*.md`. Error E006 if zero files found (nothing to review).
+- Glob `{output_dir}/*/analysis.md`. Error E006 if zero files found (no role analyses to review).
 - Require `guidance-specification.md` to exist (for decision-ID context). Error E007 if missing.
 
 **Step 6.5.2: Execute Step 4.5 + Step 5**
-- Reuse the exact same logic as auto mode Step 4.5 (spawn cross-role-reviewer) and Step 5 (interactive confirmation + patch application + guidance §11 audit).
+- Reuse the exact same logic as auto mode Step 4.5 (spawn cross-role-reviewer with analysis indexes) and Step 5 (interactive confirmation + patch application + guidance §12 audit).
 - Skip Step 5.1 interactive confirmation if `--yes` also passed.
 
 **Step 6.5.3: Report**
@@ -501,21 +518,22 @@ Triggered by `--review-only --session ID`. Skips Phase 3 entirely; runs only Ste
 
 **Auto mode report:**
 - Session ID and output directory
-- Roles designed (N) — list each `design/{role}.md` path
+- Roles analyzed (N) — list each `{role}/analysis.md` path
+- Files written per role (from agent return protocol)
 - Features in scope (N, from guidance §10)
 - Cross-role review: conflicts / gaps / synergies counts
 - Resolutions applied: count + a breakdown by type (C/G/S)
 - Next:
-  Skill({ skill: "maestro-roadmap", args: "--mode full --from-brainstorm {sessionId}" })  — Generate full spec package
+  Skill({ skill: "maestro-roadmap", args: "--mode full --from brainstorm:{artifactId}" })  — Generate full spec package
   Skill({ skill: "maestro-analyze", args: "{topic}" })   — Evaluate feasibility + lock decisions
   Skill({ skill: "maestro-analyze", args: "{phase} -q" })   — Quick decision extraction only
   Skill({ skill: "maestro-plan", args: "{phase}" })       — Plan directly (if scope is clear)
 
 **Single role mode report:**
-- Role designed
-- Framework alignment status (does design reference guidance decisions?)
+- Role analyzed
+- Framework alignment status (does analysis reference guidance decisions?)
 - Context questions answered (count)
-- Output file: `design/{role}.md`
+- Files written: list from §4 File Index
 - Next:
   - Run more roles: `Skill({ skill: "maestro-brainstorm", args: "{another-role} --session {sessionId}" })`
   - When 2+ roles are done, trigger review: `Skill({ skill: "maestro-brainstorm", args: "--review-only --session {sessionId}" })`
@@ -529,6 +547,45 @@ Triggered by `--review-only --session ID`. Skips Phase 3 entirely; runs only Ste
 
 ---
 
+### Step 7.5: Generate Context Package
+
+Write `{output_dir}/context-package.json` by extracting from session artifacts:
+
+```jsonc
+{
+  "$schema": "context-package/1.0",
+  "source": {
+    "type": "brainstorm",
+    "artifact_id": "{artifact_id}",
+    "session_path": "{output_dir relative to .workflow/}",
+    "generated_at": "{ISO-8601}"
+  },
+  "requirements": [],      // From guidance-specification.md §10 Feature Decomposition
+  "constraints": [],        // From guidance-specification.md §4-N MUST/MUST NOT + {role}/analysis.md §2 Decisions[locked]
+  "domain": {},             // From guidance-specification.md §1-3 (problem, terminology, audience)
+  "non_goals": [],          // From guidance-specification.md Non-Goals section
+  "insights": [],           // From {role}/analysis.md §3 Cross-Cutting subsections
+  "open_questions": [],     // From guidance-specification.md §4-N SHOULD/MAY items
+  "references": []          // List all key files: guidance-specification.md + {role}/analysis.md per role
+}
+```
+
+**Extraction mapping**:
+- `requirements[]`: each row from §10 Feature Decomposition → `{ id: "F-{id}", title, description, priority: "must|should|may" (from RFC 2119 keywords), acceptance, ref: "guidance-specification.md#§10" }`
+- `constraints[]`: each MUST/MUST NOT from §4-N role decisions → `{ id: "C-{NNN}", area, constraint, rationale, status: "locked", ref: "{source}#§{N}" }`; append locked decisions from each `{role}/analysis.md` §2 Decisions table where status=locked
+- `domain.problem_statement`: from §1-3
+- `domain.terminology[]`: from Concepts & Terminology section → `{ term, definition, ref: "guidance-specification.md#§5" }`
+- `domain.audience`, `domain.industry`: from §1-3
+- `non_goals[]`: each Non-Goal → `{ title, rationale, ref: "guidance-specification.md#§6" }`
+- `insights[]`: from each `{role}/analysis.md` §3 Cross-Cutting subsections → `{ role, area, summary, ref: "{role}/analysis.md#§3-{heading}" }`
+- `open_questions[]`: from §4-N SHOULD/MAY items → `{ area, question, options[], ref }`
+- `references[]`: `{ type: "guidance", path: "guidance-specification.md" }` + `{ type: "role-analysis", path: "{role}/analysis.md" }` per role
+
+Register artifact in state.json with additional field:
+  `context_package: "{output_dir}/context-package.json"`   (relative to .workflow/)
+
+---
+
 ## Quality Criteria
 
 - If `designResearchContext` is set: guidance-specification.md references external design findings
@@ -536,10 +593,11 @@ Triggered by `--review-only --session ID`. Skips Phase 3 entirely; runs only Ste
 - Concepts & Terminology section with 5-10 core terms
 - Non-Goals section with rationale
 - Feature Decomposition table (max 8 features, independently implementable)
-- Each `design/{role}.md` follows the role template's structure and references guidance decisions by ID
-- system-architect's `design/system-architect.md` §2 includes: Data Model, State Machine, Error Handling, Observability
-- Each `design/{role}.md` ≤ 1500 lines (hard cap per agent contract)
-- Cross-role review runs (Step 4.5) and produces structured findings (conflicts / gaps / synergies) with `patch_targets[]` blocks
-- **If review yielded findings**: each accepted resolution is annotated in the affected `design/{role}.md` AND logged in guidance §11 "Cross-Role Resolutions" subsection
-- **If review yielded zero findings**: guidance §11 unchanged; final report explicitly notes "No cross-role issues detected"
+- Each `{role}/analysis.md` contains §2 Decision Digest with all four tables (Decisions, Interfaces, Cross-Cutting Positions, Findings Summary)
+- Each `{role}/analysis.md` §4 File Index accurately lists all written files with headings
+- Each `{role}/analysis-F-*.md` < 2000 words, each `findings-*.md` < 1000 words
+- system-architect's `analysis.md` §3 includes: Data Model, State Machine, Error Handling, Observability
+- Cross-role review runs (Step 4.5) and produces structured findings from §2 Digest comparison with `patch_targets[]` blocks
+- **If review yielded findings**: each accepted resolution is annotated in the affected role analysis file AND logged in guidance §12 "Cross-Role Resolutions"
+- **If review yielded zero findings**: guidance §12 unchanged; final report explicitly notes "No cross-role issues detected"
 - Heading-drift patch failures (if any) are surfaced in the final report, not silently dropped

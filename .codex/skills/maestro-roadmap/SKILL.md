@@ -1,7 +1,7 @@
 ---
 name: maestro-roadmap
 description: Generate roadmap from requirements (light or full mode)
-argument-hint: "\"<requirements>\" [--mode light|full] [-y|--yes] [-c] [--phases N] [--skip-research] [--from-brainstorm SESSION-ID] [--revise [instructions]] [--review]"
+argument-hint: "\"<requirements>\" [--mode light|full] [-y|--yes] [-c] [--phases N] [--skip-research] [--from <source>] [--from-brainstorm SESSION-ID] [--revise [instructions]] [--review]"
 allowed-tools: spawn_agents_on_csv, Read, Write, Edit, Bash, Glob, Grep, request_user_input
 ---
 
@@ -25,7 +25,8 @@ $ARGUMENTS -- requirement/idea text or @file reference, plus optional flags.
 - `--revise [instructions]`: Revise existing roadmap preserving completed phases (light only)
 - `--review`: Read-only roadmap health assessment (light only)
 - `--skip-research`: Skip Wave 1, jump to doc generation (full only)
-- `--from-brainstorm SESSION-ID`: Import guidance-specification.md as seed
+- `--from <source>`: Load upstream context package (brainstorm:ID, @file, or path). Resolves to context-package.json
+- `--from-brainstorm SESSION-ID`: (backward compat alias for `--from brainstorm:ID`)
 
 **Session**: `.workflow/.csv-wave/{YYYYMMDD}-roadmap[-full]-{slug}/`
 **Output**: tasks.csv, results.csv, discoveries.ndjson, context.md, `.workflow/roadmap.md`
@@ -91,7 +92,7 @@ S_PARSE:
   -> REVIEW_FLOW    WHEN: --review (read-only health assessment)
 
 S_INPUT:
-  -> S_CSV_GEN      DO: parse requirement (text/@file), import brainstorm if --from-brainstorm, codebase detection, load specs
+  -> S_CSV_GEN      DO: parse requirement (text/@file), load context-package.json if --from (or --from-brainstorm), codebase detection, load specs
 
 S_CSV_GEN:
   -> S_WAVE_1       WHEN: normal pipeline     DO: generate mode-specific CSV
@@ -182,7 +183,7 @@ Protocol: read before analysis, append-only, dedup by type+key.
 | Condition | Recovery |
 |-----------|----------|
 | No requirement text provided | Abort: "Requirement text or @file required" |
-| Brainstorm session not found | Abort with available sessions list |
+| Context source not found (--from / --from-brainstorm) | Abort with available sessions/sources list |
 | roadmap.md not found (--revise/--review) | Run maestro-roadmap first |
 | All Wave 1 agents failed | Wave 2 in degraded mode (seed only) |
 | Wave 2 agent failed (light) | Abort: "Roadmap generation failed" |

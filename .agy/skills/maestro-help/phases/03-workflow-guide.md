@@ -45,7 +45,7 @@ const taskPatterns = [
 
 ### 路径 2: 从头脑风暴开始（适合需要创意探索）
 1. `/maestro-brainstorm "项目描述"` — 多角色头脑风暴
-2. `/maestro-init --from-brainstorm ANL-xxx` — 基于分析初始化
+2. `/maestro-init --from brainstorm:ANL-xxx` — 基于分析初始化
 3. `/maestro-roadmap "创建路线图" -y`
 
 ### 路径 3: 完整规范链（适合大型项目）
