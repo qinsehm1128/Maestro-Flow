@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { SidebarProvider } from './SidebarContext.js';
 import { TopBar } from './TopBar.js';
 import { Sidebar } from './Sidebar.js';
@@ -27,12 +28,12 @@ function AnnouncementBanner() {
   return (
     <div className="fixed top-0 left-0 right-0 z-[101] bg-[#2E7D32] text-white text-[length:14px] text-center py-[8px] px-[var(--spacing-4)] leading-[1.4]">
       Maestro v0.4.12 已发布 — 工作流拓扑重构、maestro-amend、context-package 统一。详见{' '}
-      <a
-        href="/changelog"
+      <Link
+        to="/changelog"
         className="text-white font-[var(--font-weight-semibold)] underline hover:no-underline"
       >
         更新日志
-      </a>
+      </Link>
     </div>
   );
 }
