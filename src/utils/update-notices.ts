@@ -251,3 +251,16 @@ registerNotice({
     },
   ],
 });
+
+registerNotice({
+  version: '0.4.12',
+  title: '工作流拓扑重构 + maestro-amend + context-package 统一',
+  highlights: [
+    'blueprint 独立命令、Milestone 层级重排、双层 analyze 架构',
+    '新增 maestro-amend skill：生成工作流命令 overlay',
+    'context-package 体系统一，harvest --prune 支持 state.json 管理',
+    'analyze/brainstorm/roadmap 三命令新增 interview_protocol',
+    'spec 工具 seed 模板单一来源 + YAML frontmatter 保证',
+  ],
+  actions: [],
+});
