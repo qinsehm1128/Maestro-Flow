@@ -9,6 +9,8 @@ Archive completed milestone, move artifacts to history, and prepare for next.
 1. Read `.workflow/state.json`:
    - Determine target milestone (from $ARGUMENTS or current_milestone)
    - If no milestone: ERROR E001
+   - Resolve milestone object from `milestones[]` by id
+   - Determine milestone type: `milestone_obj.type` (default `"standard"` if field missing)
 
 2. Check milestone audit status:
    - Read `.workflow/milestones/{milestone}/audit-report.md` if exists
@@ -30,9 +32,8 @@ Archive completed milestone, move artifacts to history, and prepare for next.
    ```
 
 2. Snapshot roadmap:
-   ```
-   cp .workflow/roadmap.md .workflow/milestones/{milestone}/roadmap-snapshot.md
-   ```
+   - **Standard milestone**: `cp .workflow/roadmap.md .workflow/milestones/{milestone}/roadmap-snapshot.md`
+   - **Adhoc milestone**: Skip roadmap snapshot (roadmap may not exist)
 
 3. Archive scratch directories: copy each milestone artifact's `.workflow/{artifact.path}` to `.workflow/milestones/{milestone}/artifacts/{basename}/`
 
@@ -91,7 +92,9 @@ Check existing entries to avoid duplicates when appending in Step 3.
 
 2. Clear artifacts array: remove all entries where `milestone == target_milestone`
 
-3. Advance to next milestone: activate first pending milestone → set as `current_milestone`. If none pending → set `current_milestone = null`, `status = "completed"`
+3. Advance to next milestone:
+   - **Standard milestone**: activate first pending milestone → set as `current_milestone`. If none pending → set `current_milestone = null`, `status = "completed"`
+   - **Adhoc milestone**: Do NOT search for next milestone. Set `current_milestone = null`, `status = "idle"` (adhoc milestones are self-contained, no successor)
 
 4. Write state.json (atomic)
 
@@ -135,10 +138,12 @@ Artifacts: {count} archived
 Learnings: {learnings_count} extracted
 
 Archive: .workflow/milestones/{milestone}/
-Next:    {next_milestone or "Project complete"}
+Next:    {next_milestone or "Project complete" or "Ad-hoc task complete"}
 
 Next steps:
   /maestro-milestone-release    -- Cut a release
-  /maestro-analyze              -- Start next milestone
+  /maestro-analyze              -- Start next milestone (standard only)
   /manage-status                -- View project state
 ```
+
+**Adhoc milestone note:** When completing an adhoc milestone, the "Next steps" section omits "Start next milestone" since adhoc milestones have no successor in a roadmap chain.

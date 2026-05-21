@@ -54,6 +54,32 @@ Phase-to-Milestone resolution (when scope="phase"):
 OUTPUT_DIR = .workflow/scratch/{YYYYMMDD}-plan-[P{N}-|M{N}-]{slug}/
 ```
 
+### Ad-hoc Milestone Auto-Creation (D-008)
+
+When plan resolves to `scope == "standalone"` AND `state.json.current_milestone == null`:
+
+```
+1. Generate adhoc milestone ID: "M-adhoc-{YYYYMMDD}-{HHmmss}"
+2. Create milestone entry:
+   {
+     "id": "M-adhoc-{YYYYMMDD}-{HHmmss}",
+     "type": "adhoc",
+     "name": "Ad-hoc: {plan_slug or analyze_title}",
+     "status": "active",
+     "phases": [1],
+     "phase_slugs": { "1": "standalone" },
+     "roadmap_ref": null,
+     "created_at": "{ISO-8601}"
+   }
+3. Push to state.json.milestones[]
+4. Set state.json.current_milestone = milestone.id
+5. Use this milestone ID for artifact registration (P5 Step 4)
+```
+
+This ensures downstream commands (verify, milestone-audit, milestone-complete) have a valid milestone context without requiring roadmap.
+
+**Backward compatibility:** If `state.json.milestones[]` already has entries with `current_milestone != null`, skip creation (existing milestone takes precedence). Missing `type` field on legacy milestones defaults to `"standard"`.
+
 ---
 
 ## Flag Processing
@@ -369,6 +395,7 @@ Bidirectional linking (main flow, post-planner): update matching issues in `.wor
 
 4. **Register artifact in state.json**
    - Find upstream analyze artifact by CONTEXT_DIR path
+   - Determine milestone: use target_milestone from scope resolution; if adhoc milestone was created in this session, use its ID
    - Create artifact: `{ id: "PLN-{NNN}", type: "plan", milestone, phase, scope, path, status: "completed", depends_on, harvested: false, created_at, completed_at }`
    - Append to `state.json.artifacts`, atomic write
 
