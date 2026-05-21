@@ -98,15 +98,15 @@ title: ".workflow/ 产物目录体系"
 │   ├── features.md
 │   └── concerns.md
 │
-├── .spec/                        # 规范包（maestro-roadmap --mode full）
-│   ├── spec-config.json
+├── blueprint/                    # 规范蓝图包（maestro-blueprint）
+│   ├── blueprint-config.json
 │   ├── product-brief.md
 │   ├── glossary.json
 │   ├── requirements/REQ-*.md, NFR-*.md
 │   ├── architecture/ADR-*.md
 │   ├── epics/EPIC-*.md
 │   ├── readiness-report.md
-│   └── spec-summary.md
+│   └── blueprint-summary.md
 │
 ├── collab/                       # 人类团队协作
 │   ├── specs/                    # 团队级规范
@@ -379,7 +379,7 @@ Learn 特殊前缀：`KNW-follow-`, `KNW-decompose-`, `KNW-retro-`, `KNW-opinion
 
 ### 设计动机
 
-下游命令（roadmap / analyze / plan / spec-generate）消费上游产出时存在三个问题：
+下游命令（roadmap / analyze / plan / blueprint）消费上游产出时存在三个问题：
 1. **格式耦合**——每个消费者硬编码上游文件结构（如 roadmap 知道 guidance-specification.md §10 是 features）
 2. **输入封闭**——只支持 `--from-brainstorm`，无法传入任意用户文档（PRD、RFC、会议纪要）
 3. **价值泄漏**——brainstorm 角色分析（Decision Digest）未被 roadmap/plan 利用

@@ -127,7 +127,7 @@
       "name": "maestro-roadmap",
       "file": ".claude/commands/maestro-roadmap.md",
       "category": "maestro",
-      "description": "Interactive roadmap creation with iterative refinement — lightweight alternative to spec-generate",
+      "description": "Interactive roadmap creation with iterative refinement",
       "argumentHint": "<requirement> [-y] [-c] [-m progressive|direct|auto] [--from <source>] [--revise [instructions]] [--review]",
       "allowedTools": ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "Agent", "AskUserQuestion"]
     },

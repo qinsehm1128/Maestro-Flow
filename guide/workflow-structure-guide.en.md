@@ -98,15 +98,15 @@ title: ".workflow/ Artifact Directory System"
 │   ├── features.md
 │   └── concerns.md
 │
-├── .spec/                        # Spec package (maestro-roadmap --mode full)
-│   ├── spec-config.json
+├── blueprint/                    # Specification blueprint (maestro-blueprint)
+│   ├── blueprint-config.json
 │   ├── product-brief.md
 │   ├── glossary.json
 │   ├── requirements/REQ-*.md, NFR-*.md
 │   ├── architecture/ADR-*.md
 │   ├── epics/EPIC-*.md
 │   ├── readiness-report.md
-│   └── spec-summary.md
+│   └── blueprint-summary.md
 │
 ├── collab/                       # Human team collaboration
 │   ├── specs/                    # Team-level specs
@@ -379,7 +379,7 @@ Created by `maestro-milestone-complete` when a milestone is completed:
 
 ### Motivation
 
-Downstream commands (roadmap / analyze / plan / spec-generate) consuming upstream outputs suffer from three issues:
+Downstream commands (roadmap / analyze / plan / blueprint) consuming upstream outputs suffer from three issues:
 1. **Format coupling** — each consumer hardcodes upstream file structure (e.g., roadmap knows guidance-specification.md §10 is features)
 2. **Closed input** — only `--from-brainstorm` is supported; no way to feed arbitrary user documents (PRDs, RFCs, meeting notes)
 3. **Value leakage** — brainstorm role analyses (Decision Digests) are underutilized by roadmap/plan
