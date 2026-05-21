@@ -54,32 +54,47 @@ const COMMANDS: CommandData[] = [
   {
     id: 'roadmap', cmd: '/maestro-roadmap', category: 'init', status: 'core', level: 1,
     zh: {
-      desc: '生成项目路线图，将目标分解为里程碑和 Phase',
-      when: 'init 之后，需要规划项目阶段和里程碑',
+      desc: '生成项目路线图，将目标分解为 Milestone > Phase 层级',
+      when: 'init 之后，需要规划项目里程碑和阶段',
       how: '/maestro-roadmap "项目目标描述" -y',
-      tips: ['-y 自动确认，省去交互问答', '路线图可随时通过重新运行来调整'],
+      tips: ['-y 自动确认，省去交互问答', '支持 --from brainstorm:ID 或 --from analyze:ANL-xxx 导入上游上下文', '路线图可通过 --revise 随时修订'],
     },
     en: {
-      desc: 'Generate project roadmap, decompose goals into milestones and phases',
-      when: 'After init, when you need to plan project stages and milestones',
+      desc: 'Generate project roadmap, decompose goals into Milestone > Phase hierarchy',
+      when: 'After init, when you need to plan milestones and phases',
       how: '/maestro-roadmap "project goal description" -y',
-      tips: ['-y auto-confirms, skips interactive Q&A', 'Rerun anytime to adjust the roadmap'],
+      tips: ['-y auto-confirms, skips interactive Q&A', 'Use --from brainstorm:ID or --from analyze:ANL-xxx for upstream context', 'Revise anytime with --revise'],
+    },
+  },
+  {
+    id: 'blueprint', cmd: '/maestro-blueprint', category: 'init', status: 'recommended', level: 2,
+    zh: {
+      desc: '6 阶段规范蓝图：产品简报 → PRD → 架构文档 → 史诗故事',
+      when: '大型项目需要完整规范文档体系，与 brainstorm 并行的正式规范路径',
+      how: '/maestro-blueprint "项目想法或目标"',
+      tips: ['产出保存在 .workflow/blueprint/ 目录', '下游通过 --from blueprint:BLP-xxx 消费', '-y 自动模式跳过交互确认'],
+    },
+    en: {
+      desc: '6-stage spec blueprint: Product Brief → PRD → Architecture → Epics',
+      when: 'Large projects needing comprehensive spec documentation, parallel to brainstorm',
+      how: '/maestro-blueprint "project idea or goal"',
+      tips: ['Outputs saved to .workflow/blueprint/ directory', 'Downstream consumes via --from blueprint:BLP-xxx', '-y auto-mode skips interactive confirmation'],
     },
   },
   // Pipeline
   {
     id: 'analyze', cmd: '/maestro-analyze', category: 'pipeline', status: 'core', level: 1,
     zh: {
-      desc: '分析 Phase 现状，生成分析报告和依赖图',
-      when: '开始新 Phase 或需要了解当前代码状态',
+      desc: '双层分析：Micro（数字参数）Phase 级 6 维度深度分析，Macro（文本参数）宏观需求探索',
+      when: 'Micro：开始新 Phase 前深度分析；Macro：roadmap 之前探索需求影响面',
       how: '/maestro-analyze 1',
-      tips: ['可指定 Phase 编号，不指定则分析当前里程碑所有 Phase', 'standalone 模式可免初始化：/maestro-analyze "描述"'],
+      tips: ['Micro 模式：数字参数（如 1）→ Phase 级 6 维度评分 → 直接进入 plan', 'Macro 模式：文本参数（如 "多租户架构"）→ scope_verdict → 路由到 roadmap 或 plan', '支持 --from brainstorm:ID 导入上游上下文'],
     },
     en: {
-      desc: 'Analyze phase status, generate analysis report and dependency graph',
-      when: 'Starting a new phase or need to understand current code state',
+      desc: 'Dual-layer: Micro (number) for phase-level 6-dimension analysis, Macro (text) for requirement exploration',
+      when: 'Micro: deep analysis before a phase; Macro: explore requirement impact before roadmap',
       how: '/maestro-analyze 1',
-      tips: ['Specify phase number, or omit to analyze all phases in current milestone', 'Standalone mode skips init: /maestro-analyze "description"'],
+      tips: ['Micro mode: number arg (e.g. 1) → 6-dimension scoring → directly to plan', 'Macro mode: text arg (e.g. "multi-tenancy") → scope_verdict → routes to roadmap or plan', 'Use --from brainstorm:ID for upstream context'],
     },
   },
   {
@@ -317,13 +332,13 @@ const SCENARIOS: ScenarioData[] = [
     id: 'new-project', icon: '🚀',
     zh: {
       title: '新项目起步',
-      desc: '从零开始的项目完整工作流',
-      steps: ['/maestro-init', '/maestro-roadmap "项目目标" -y', '/maestro-analyze 1', '/maestro-plan 1', '/maestro-execute 1', '/maestro-verify 1', '/quality-auto-test 1', '/maestro-milestone-audit'],
+      desc: '从零开始的项目完整工作流（大型项目可用 /maestro-blueprint 替代 roadmap）',
+      steps: ['/maestro-init', '/maestro-roadmap "项目目标" -y', '# 或大型项目：/maestro-blueprint "项目目标"', '/maestro-analyze 1', '/maestro-plan 1', '/maestro-execute 1', '/maestro-verify 1', '/maestro-milestone-audit'],
     },
     en: {
       title: 'New Project',
-      desc: 'Complete workflow from scratch',
-      steps: ['/maestro-init', '/maestro-roadmap "goal" -y', '/maestro-analyze 1', '/maestro-plan 1', '/maestro-execute 1', '/maestro-verify 1', '/quality-auto-test 1', '/maestro-milestone-audit'],
+      desc: 'Complete workflow from scratch (use /maestro-blueprint instead of roadmap for large projects)',
+      steps: ['/maestro-init', '/maestro-roadmap "goal" -y', '# or for large projects: /maestro-blueprint "goal"', '/maestro-analyze 1', '/maestro-plan 1', '/maestro-execute 1', '/maestro-verify 1', '/maestro-milestone-audit'],
     },
   },
   {

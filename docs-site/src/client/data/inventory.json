@@ -111,8 +111,8 @@
       "name": "maestro-analyze",
       "file": ".claude/commands/maestro-analyze.md",
       "category": "maestro",
-      "description": "Multi-dimensional analysis with CLI exploration, decision extraction, and intent tracking",
-      "argumentHint": "[phase|topic] [-y] [-c] [-q] [--gaps [ISS-ID]]",
+      "description": "Dual-layer analysis: macro (text) for requirement exploration with scope_verdict, micro (number) for phase-level 6-dimension deep analysis",
+      "argumentHint": "[phase|topic] [-y] [-c] [-q] [--gaps [ISS-ID]] [--from <source>]",
       "allowedTools": ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "Agent", "AskUserQuestion"]
     },
     {
