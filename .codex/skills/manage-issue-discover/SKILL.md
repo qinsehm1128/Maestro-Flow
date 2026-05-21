@@ -155,7 +155,7 @@ Also writes to:
 5. **Discovery Board is Append-Only**: Never clear, modify, or recreate discoveries.ndjson
 6. **Skip on Failure**: If all perspective agents failed, skip dedup
 7. **Evidence Required**: Every finding must have file:line reference -- no speculative issues
-8. **Dedup Before Create**: Never append to issues.jsonl without deduplication
+8. **Dedup Before Create**: Never append to issues.jsonl without deduplication. Every appended record MUST include `source: "discover"` so concurrent writers (e.g. `manage-harvest` uses `source: "harvest"`) can be safely distinguished and deduplicated cross-skill.
 9. **Cleanup Temp Files**: Remove wave-{N}.csv after results are merged
 10. **DO NOT STOP**: Continuous execution until all waves complete
 </invariants>

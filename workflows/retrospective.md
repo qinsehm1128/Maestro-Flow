@@ -2,7 +2,7 @@
 
 Multi-lens 复盘 of completed phase artifacts. Consumes existing execution outputs (verification.json, review.json, issues.jsonl, .summaries/, state.json, uat.md, plan.json) and routes distilled insights into the spec / note / issue / knowhow stores.
 
-This is a **post-execution analysis** workflow. It reads only — until the routing stage, where it writes new spec stubs, issue rows, memory entries, and knowhow entries. It never modifies existing phase artifacts.
+This is a **post-execution analysis** workflow. It reads only — until the routing stage, where it writes new spec stubs, issue rows, memory entries, and knowhow entries. It **does not modify existing phase artifacts**; it writes to the spec / issue / knowhow stores as configured outputs (new entries appended; pre-existing phase outputs such as verification.json, review.json, uat.md, .summaries/ are never altered).
 
 ---
 

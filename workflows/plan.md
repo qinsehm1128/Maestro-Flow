@@ -166,12 +166,12 @@ When `--tdd` is active:
    - Map `insights[].summary` to implementation guidance for relevant tasks
    - These replace the need for a separate analyze step when brainstorm already provided sufficient role analysis
 
-5. **Parallel exploration** (skip if `--gaps` or upstream analysis loaded)
+6. **Parallel exploration** (skip if `--gaps` or upstream analysis loaded)
    - Exploration angles (1-4 based on complexity): architecture, implementation, integration, risk
    - Spawn 1-4 `cli-explore-agent` in parallel, each with phase goal + success_criteria + one angle
    - Output: `.process/exploration-{angle}.json`, `.process/explorations-manifest.json`, `.process/context-package.json`
 
-5b. **CLI supplementary context** (runs in parallel with step 5, skip if `--gaps` or no CLI tools enabled)
+6b. **CLI supplementary context** (runs in parallel with step 6, skip if `--gaps` or no CLI tools enabled)
    ```
    IF no CLI tools enabled: skip
 
@@ -188,7 +188,7 @@ When `--tdd` is active:
    ```
    **On callback:** Parse result, merge into explorationContext as `cli_context` field. Planner uses patterns for task `read_first[]`, dependencies for wave ordering, conflict_risks for collision detection.
 
-6. **Gap-mode context** (if `--gaps`)
+7. **Gap-mode context** (if `--gaps`)
 
    Gap sources (in priority order, first non-empty wins, then additionals merged):
    - **Primary**: `.workflow/issues/issues.jsonl` — filter by phase_ref + status in ["registered","diagnosed"], mark as "planning"
@@ -298,7 +298,7 @@ Every TASK-*.json MUST include these fields — they are NOT optional:
 
 ### Gap Mode (`--gaps`)
 
-Spawn `workflow-planner` agent with: explorationContext (gap list from P1 Step 6), spec-ref, doc-index.json, phase goal + success_criteria, templates, mode = `gap-fix`.
+Spawn `workflow-planner` agent with: explorationContext (gap list from P1 Step 7), spec-ref, doc-index.json, phase goal + success_criteria, templates, mode = `gap-fix`.
 
 Planner: for each gap emit one task — `type: "fix"`, `description`, `action` (concrete fix_direction), `read_first` (affected files), `convergence.criteria` (grep-verifiable), `issue_id` (if source == "issue"); assign IDs and waves; build plan.json.
 

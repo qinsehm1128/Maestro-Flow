@@ -6,9 +6,9 @@ User reviews via compare.html, selects winner(s), design solidified as code refe
 
 Pipeline position: analyze -> **ui-design** -> plan -> execute -> verify
 
-> **Note:** This is the full self-contained pipeline. When ui-ux-pro-max skill is available,
-> the command routes to `ui-style.md` instead (lightweight delegation).
-> This workflow runs when the skill is absent or `--full` is explicitly requested.
+> **Note:** This is the primary implementation. When the `ui-ux-pro-max` skill is available,
+> the command may delegate to `ui-style.md` for a lightweight path. This workflow is the
+> fallback when the skill is unavailable, and is also used when `--full` is explicitly requested.
 
 ---
 

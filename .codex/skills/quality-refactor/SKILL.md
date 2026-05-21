@@ -223,9 +223,9 @@ Display report: scope, tasks completed/blocked, reflection rounds, strategy adju
 | Result | Next Step |
 |--------|-----------|
 | All tests pass, refactoring complete | `$quality-sync` (update codebase docs) |
-| Test failures remain after refactor | `$quality-debug "{scope}"` |
+| Test failures remain after refactor | `$quality-debug "test failures in {scope} after refactor"` (debug expects bug description, not raw scope) |
 | No test suite available for scope | `$quality-auto-test "{phase}"` |
-| Partial completion (some blocked) | `$quality-debug "{scope}"` for blocked tasks |
+| Partial completion (some blocked) | `$quality-debug "blocked refactor tasks in {scope}: <task titles>"` |
 </execution>
 
 <error_codes>

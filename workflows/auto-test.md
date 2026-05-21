@@ -36,7 +36,7 @@ specs_arch = maestro spec load --category arch
 
 ### Step 1: Read State & Route
 
-Read project state signals and auto-select scenario source. This is the **sole branch point** in the pipeline.
+Read project state signals and auto-select scenario source. This is the **primary branch point, with Route-specific extraction in Step 2** (after Step 2 normalization, the downstream pipeline is identical).
 
 ```
 Priority: Resume > Re-run > Spec > Gap > Code
@@ -53,6 +53,11 @@ Priority: Resume > Re-run > Spec > Gap > Code
    Compat: also check .tests/business/business-test-report.json (old format)
    Action: load failed/blocked scenarios with status reset to pending
    Skip to Step 4 (scenarios pre-loaded, plan confirmation)
+
+# Note: `integration/state.json` and `business/business-test-report.json` are
+# legacy compat paths read for backward compatibility only. The new pipeline
+# writes exclusively to `.tests/auto-test/state.json` and `.tests/auto-test/report.json`
+# (these legacy paths are superseded; see migration table at end of file).
 
 3. SPEC:
    Check: .workflow/blueprint/BLP-*/requirements/REQ-*.md exists

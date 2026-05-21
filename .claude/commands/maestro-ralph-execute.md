@@ -38,7 +38,8 @@ Also read `session.auto_mode` from status.json — if true, treat as `-y`.
 | external (opt-in) | `maestro delegate --to claude --mode write` (STOP → callback) | Self-invoke next |
 
 HARD RULES:
-- internal step MUST 通过 `Read({command_path})` 把命令 .md 加载进当前会话，再按内容执行；禁止 `Skill({skill})` 调用
+- internal step：优先通过 `Read({command_path})` 把命令 .md 加载进当前会话，再按内容执行；不要对 internal step 使用 `Skill({skill})` 调用
+- decision 节点例外：A_EXEC_DECISION 必须使用 `Skill({ skill: "maestro-ralph" })` 进行 handoff（这是 decision 节点的唯一允许用法）
 - `command_path` 由 ralph 在 A_BUILD_STEPS 写入 status.json；ralph-execute 不再自行解析（缺失 → 报错 E002）
 - external 仅在 `step.type == "external"` 显式声明时使用，并 always append `-y` 到 prompt args
 - 每个 step 必须产出 `--- COMPLETION STATUS ---` 块，否则视为 NEEDS_RETRY
@@ -157,10 +158,10 @@ Write enriched args back to status.json.
 1. Validate `step.command_path != null`；否则 raise E002，pause session
 2. Mark step running, write status.json
 3. Display: `[{index}/{total}] {step.skill} [internal · {step.command_scope}]`
-4. `Read({ file_path: step.command_path })` — 把命令 .md 全文加载进当前会话
+4. `Read({ file_path: step.command_path })` — 把命令 .md 全文加载进当前会话（prefer Read over Skill for internal steps；decision 节点另行使用 Skill 见 A_EXEC_DECISION）
 5. 解析 frontmatter `argument-hint` 与 `<purpose>/<state_machine>/<actions>` 等指令块
 6. 计算 `effective_args`：`step.args` + auto flag（`auto ? (flag_map[step.skill] || "") : ""`）
-7. 按读到的指令在本会话中**内联执行**：调用允许的工具完成命令所规定的工作，不再发起 Skill() 或 delegate
+7. 按读到的指令在本会话中**内联执行**：调用允许的工具完成命令所规定的工作，不再发起 delegate
 8. 执行结束：要求最后一段必须包含 `--- COMPLETION STATUS ---` 块（见 A_MARK_COMPLETE）
 9. Return success / failure
 

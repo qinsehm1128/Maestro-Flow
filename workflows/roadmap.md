@@ -102,7 +102,7 @@ Follow roadmap-common.md **Roadmap Write Logic** (overwrite vs edit rules, state
 ## Step 6: Handoff
 
 Display summary (strategy, phase count, milestones, roadmap path) and offer next steps:
-- `maestro-init` — set up project (if not yet initialized)
+- `maestro-blueprint` — generate formal spec package for the roadmap (if heavier spec is needed)
 - `maestro-plan 1` — plan first phase
 - `maestro-brainstorm 1` — explore first phase ideas
 - `manage-status` — view project dashboard

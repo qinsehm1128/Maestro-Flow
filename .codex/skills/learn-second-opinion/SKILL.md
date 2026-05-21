@@ -11,7 +11,7 @@ Structured second-opinion for code, decisions, or plans. Three modes:
 - **challenge**: single adversarial agent via spawn_agents_on_csv (1 worker)
 - **consult**: interactive Q&A (no CSV wave — direct orchestration)
 
-Findings persist to `specs/learnings.md`. Decoupled from phase lifecycle.
+Findings persist to `.workflow/specs/learnings.md`. Decoupled from phase lifecycle.
 </purpose>
 
 <context>
@@ -62,7 +62,7 @@ Interactive loop via AskUserQuestion. Agent studies target, answers questions wi
 
 ### Phase 3: Persist
 1. Write `KNW-opinion-{slug}-{date}.md` with per-persona findings + synthesis
-2. Append non-trivial findings to `specs/learnings.md` (source: "second-opinion")
+2. Append non-trivial findings to `.workflow/specs/learnings.md` (source: "second-opinion")
 3. Display summary with verdict and next steps
 
 **Next steps:** `/manage-issue create`, `/learn-decompose <path>`, `/learn-follow <path>`
@@ -82,5 +82,5 @@ Interactive loop via AskUserQuestion. Agent studies target, answers questions wi
 - [ ] Mode executed: review (3 parallel agents), challenge (adversarial), or consult (interactive)
 - [ ] Synthesis produced with agreements, disagreements, verdict
 - [ ] Report written to `KNW-opinion-{slug}-{date}.md`
-- [ ] Non-trivial findings appended to `specs/learnings.md`
+- [ ] Non-trivial findings appended to `.workflow/specs/learnings.md`
 </success_criteria>

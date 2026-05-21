@@ -3,7 +3,7 @@
 Debug issues using scientific method with subagent isolation. Supports three modes:
 
 1. **Standalone**: User describes issue, gather symptoms via 5 questions
-2. **From UAT**: --from-uat reads uat.md gaps as pre-filled symptoms (skip gathering)
+2. **From UAT**: --from-uat reads uat.md gaps as pre-filled symptoms (skip gathering). Input-only: does not write back to uat.md/test artifacts (test workflow is the sole caller and owns uat.md writes).
 3. **Parallel**: --parallel spawns one debug agent per gap cluster concurrently
 
 Output: understanding.md + evidence.ndjson per investigation.

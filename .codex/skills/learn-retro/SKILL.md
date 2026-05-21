@@ -41,7 +41,7 @@ $ARGUMENTS — lens selection and scope flags.
 **Trend comparison** if prior `retro-*.json` exists.
 
 ### Phase 3: Decision Lens (skip if --lens git)
-**3a: Collect decisions** from wiki, specs, git log, phase context, specs/learnings.md.
+**3a: Collect decisions** from wiki, specs, git log, phase context, .workflow/specs/learnings.md.
 **3b: Build decision registry** per decision (id, title, source, rationale, alternatives, evidence).
 
 **3c: Multi-perspective evaluation** via spawn_agents_on_csv (3 parallel agents):
@@ -58,7 +58,7 @@ $ARGUMENTS — lens selection and scope flags.
 Write `KNW-retro-{date}.md` + `KNW-retro-{date}.json` with metrics, sessions, hotspots, decision health, combined insights, recommended actions.
 
 ### Phase 5: Persist
-Append insights to `specs/learnings.md` (source: "retro-git" or "retro-decision"). Display summary.
+Append insights to `.workflow/specs/learnings.md` (source: "retro-git" or "retro-decision"). Display summary.
 
 **Next steps:** `/learn-follow <path>`, `/quality-auto-test <area>`, `/learn-investigate <question>`
 </execution>
@@ -79,5 +79,5 @@ Append insights to `specs/learnings.md` (source: "retro-git" or "retro-decision"
 - [ ] Git lens: metrics computed, sessions detected, hotspots identified
 - [ ] Decision lens: decisions collected, 3 agents spawned in parallel, lifecycle classified
 - [ ] Unified report written to KNW-retro-{date}.md + KNW-retro-{date}.json
-- [ ] specs/learnings.md appended with insights (stable INS-ids)
+- [ ] .workflow/specs/learnings.md appended with insights (stable INS-ids)
 </success_criteria>

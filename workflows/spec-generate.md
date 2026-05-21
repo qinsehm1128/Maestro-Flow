@@ -11,6 +11,8 @@ brainstorm (optional) → init (REQUIRED) → spec-generate → plan → execute
 Alternative light path: init → roadmap (light mode) → plan (skip spec-generate)
 ```
 
+> **Relation to blueprint**: `spec-generate` is the full-pipeline superset of `blueprint` (adds P7 roadmap stage on top of P0–P6 spec chain). Use `blueprint` when only specs are needed; use `spec-generate` when downstream `roadmap → plan` execution is intended.
+
 ## Architecture
 
 ```

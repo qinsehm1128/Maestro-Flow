@@ -40,7 +40,7 @@ Unlike `retrospective.md` which is phase-scoped and post-execution, harvest oper
 | `--dry-run` | Preview extracted items without writing to any store |
 | `-y` / `--yes` | Skip confirmation prompts, accept all routing |
 | `--min-confidence N` | Minimum extraction confidence 0.0-1.0 (default: 0.5) |
-| `--prune` | State hygiene mode: classify artifacts, graduate harvested ones to knowhow, archive from state.json, prune accumulated_context |
+| `--prune` | State hygiene mode: classify artifacts, graduate harvested ones to knowhow, archive from state.json, prune accumulated_context. **Note:** `harvest --prune` *promotes* artifacts to knowhow (and trims state.json); this differs from `knowhow.md`'s `prune` operation which *deletes* knowhow entries. The two `--prune` flags share a name but operate on different stores in opposite directions. |
 | `--age N` | Graduation age threshold in days (default: 14). Only artifacts older than N days are prune candidates. Used with `--prune` |
 
 ---

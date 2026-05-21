@@ -38,6 +38,12 @@ $ARGUMENTS -- phase number for micro mode, topic text for macro/adhoc mode, no a
 - **Macro mode** (text argument): Explore impact surface of a topic/requirement. Produces coarse-grained context with `scope_verdict` to route next step. Use before roadmap or for standalone analysis.
 - **Micro mode** (numeric argument): Phase-level deep analysis within an existing roadmap. Produces fine-grained context for plan consumption. `analyze 1` = Phase 1 of current milestone.
 
+**Disambiguation rule (mode selection):**
+- First positional arg matches `^\d+$` (pure digits, e.g. `1`, `42`) → **micro mode** (treat as phase number)
+- First positional arg is non-numeric text (e.g. `auth-refactor`, `improve search`) → **macro mode** (treat as topic)
+- No positional arg → milestone-wide micro mode (when roadmap present) else macro fallback
+- Mixed input like `"1 phase"` is treated as text → macro mode (only bare numerics trigger micro)
+
 **Flags:**
 - `-y` / `--yes`: Auto mode — skip interactive scoping, use recommended defaults, auto-deepen
 - `-c` / `--continue`: Resume from existing session (auto-detect session folder + discussion.md)

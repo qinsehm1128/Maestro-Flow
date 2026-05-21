@@ -2,7 +2,7 @@
 name: maestro-ralph
 description: Use when the optimal command sequence is unclear and needs automated state-based determination
 argument-hint: "<intent> [-y] | status | continue"
-allowed-tools: Read, Write, Edit, Bash, Glob, Grep, request_user_input
+allowed-tools: Read, Write, Edit, Bash, Glob, Grep, Skill, request_user_input
 ---
 <purpose>
 Closed-loop decision engine for the maestro workflow lifecycle.

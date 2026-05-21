@@ -15,9 +15,9 @@ Archive completed milestone, move artifacts to history, and prepare for next.
 2. Check milestone audit status:
    - Read `.workflow/milestones/{milestone}/audit-report.md` if exists
    - If no audit report:
-     - WARN: "No audit report found. Run `/maestro-milestone-audit` first."
-     - Ask user: "Complete without audit?"
-     - If NO → exit
+     - ERROR E004: "No audit report found. Audit is a required hard contract — cannot complete without it."
+     - Guidance: "Run `/maestro-milestone-audit` first, then re-run this command."
+     - Exit (skipping audit is not permitted)
    - If verdict is FAIL: ERROR E002
 
 3. Verify all milestone artifacts have status "completed" → ERROR E003 if any incomplete (list ids and statuses)

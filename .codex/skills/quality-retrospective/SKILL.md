@@ -8,7 +8,7 @@ allowed-tools: Read, Write, Edit, Bash, Glob, Grep
 <purpose>
 Multi-lens retrospective for completed phases. Context-Agent Fork loads phase artifacts once;
 four parallel lens agents (technical, process, quality, decision) analyze independently;
-synthesizer distills insights; outputs are routed to spec stubs, knowhow tips, issues, and specs/learnings.md.
+synthesizer distills insights; outputs are routed to spec stubs, knowhow tips, issues, and .workflow/specs/learnings.md.
 
 ```
 +------------------------------------------------------------------+
@@ -132,7 +132,7 @@ Each artifact's type determines its outputs at `.workflow/{a.path}/`:
 7. **Archive before overwrite**: Move existing retrospective.{md,json} to `.history/` with timestamp before writing new ones
 8. **Spec learnings.md backward-compat**: Append to it only if it already exists -- never create it
 9. **Route confirmation**: Unless `-y`, present routing table and ask per-group before writing spec/issue/knowhow
-10. **Lessons always written**: Append to `specs/learnings.md` regardless of `--no-route` -- routing only controls spec/issue/knowhow creation
+10. **Lessons always written**: Append to `.workflow/specs/learnings.md` regardless of `--no-route` -- routing only controls spec/issue/knowhow creation
 </invariants>
 
 <execution>
@@ -294,6 +294,6 @@ Next steps: `$manage-status`, `$manage-issue "list --source retrospective"`, `$m
 - [ ] Synthesizer produces deduplicated insights with stable INS-ids
 - [ ] Routing applied per insight (spec/issue/knowhow/none) with confirmation
 - [ ] retrospective.{md,json} written to phase directory
-- [ ] Lessons appended to specs/learnings.md regardless of --no-route flag
+- [ ] Lessons appended to .workflow/specs/learnings.md regardless of --no-route flag
 - [ ] Existing retrospective archived before overwrite
 </success_criteria>

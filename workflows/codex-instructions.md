@@ -121,7 +121,18 @@ Before starting work, scan recent sessions (7 days) to avoid conflicts and reuse
 - Complementary findings → feed into current task context
 
 
-## Knowledge Capture
+## Knowledge System
+
+### Search — Query Before Acting
+
+**Before planning or implementing any task, search wiki and spec first** — the knowledge base contains reusable methods, tools, and hard-won experience. Load the right knowledge at the right time: search before you plan, load relevant entries before you implement, and revisit when you hit unfamiliar territory mid-task.
+
+- `maestro spec load --category <cat>` — load rules by category (coding/arch/debug/test/review/learning)
+- `maestro spec load --keyword <kw>` — cross-category keyword match
+- `maestro wiki search "<query>"` — full-text search across all knowhow
+- `maestro wiki list --category <cat>` → `maestro wiki load <id>` — browse then load full detail
+
+### Knowledge Capture
 
 - **Spec writes** → always `<spec-entry>` closed-tag format with `category`, `keywords`, `date`, `source`. Never raw Markdown. Route through `spec-add` when possible.
 - **Capture signal** → when execution surfaces non-obvious knowledge (plan deviation, retry pattern, root cause, constraint violation), ask user once whether to persist it. Match category to content: decisions→`arch`, pitfalls→`debug`/`learning`, patterns→`coding`, rules→`quality`.
