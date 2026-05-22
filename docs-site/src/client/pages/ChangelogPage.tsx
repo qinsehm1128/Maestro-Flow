@@ -17,6 +17,18 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '0.4.16',
+    date: '2026-05',
+    changes: [
+      { type: 'feat', text_en: 'ralph: new maestro ralph CLI sub-commands (session/skills/next/check/complete) with scripted step loading', text_zh: 'ralph: 新增 maestro ralph CLI 子命令族（session/skills/next/check/complete）+ step 加载脚本化' },
+      { type: 'feat', text_en: 'knowledge-audit: new manage-knowledge-audit command as symmetric eviction entry for spec / wiki / knowhow tri-store', text_zh: 'knowledge-audit: 新增 manage-knowledge-audit 命令 — spec / wiki / knowhow 三存储淘汰对称入口' },
+      { type: 'fix', text_en: 'ralph: path expansion fix and emit format redesign', text_zh: 'ralph: 路径展开 + emit 格式重设计' },
+      { type: 'fix', text_en: 'statusline: simplified line 2 chain rendering with 48h expiry and legacy schema compat', text_zh: 'statusline: 简化 line 2 链式渲染 + 48h 过期 + 兼容旧 schema' },
+      { type: 'fix', text_en: 'install: manifest now records hook level; TUI defaults restored from last install', text_zh: 'install: manifest 记录 hook level + TUI 默认值从上次安装恢复' },
+      { type: 'docs', text_en: 'maestro / ralph-execute description trimmed: A_EXEC_STEP reduced to pure directives, aligned with new emit format', text_zh: 'maestro / ralph-execute 描述精简：A_EXEC_STEP 改为纯指令、对齐新 emit 格式' },
+    ],
+  },
+  {
     version: '0.4.15',
     date: '2026-05',
     changes: [
