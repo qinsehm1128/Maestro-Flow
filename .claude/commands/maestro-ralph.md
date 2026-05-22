@@ -75,7 +75,7 @@ Remaining     → intent
 5. **status.json 是唯一真源** — 不生成 markdown 清单或侧文件
 6. **每个 step 必须 `completion_confirmed: true`** — 基于 `--- COMPLETION STATUS ---` 的 `STATUS: DONE`；缺失则视为未完成
 7. **command_path 在 A_BUILD_STEPS 解析** — 全局优先 `~/.claude/commands/{name}.md`，fallback 项目 `.claude/commands/{name}.md`，写入 status.json
-8. **执行 step 加载契约** — ralph-execute 读 `command_path` 后，必须解析并加载该命令 `<required_reading>` 引用的所有文件（"入口 + workflow"形式的核心），并把 `<deferred_reading>` 路径记录到 `step.deferred_reads`；加载完成后输出 `✓ skill {name} 加载完成`。ralph 在 build 阶段只解析路径，不读 .md 内容
+8. **执行 step 加载契约** — 由 `maestro ralph next` CLI 在执行期完成：解析 frontmatter + `<required_reading>` + `<deferred_reading>`，自动读取 required 文件全文并拼入 prompt；缺失 required → 退出码 1（E007），pause session。ralph build 阶段只通过 `maestro ralph skills` 校验路径存在性，不读 .md 内容
 9. **Decomposition is outcome-oriented** — sub-goals 为可观测交付，禁止 lifecycle 复刻；`/goal` 用户绑定，ralph 输出提示词后继续 handoff，用户可在执行过程中随时输入 `/goal`
 10. **planning_mode governs arg granularity** — `unified` → skill args 无 `{phase}`；`independent` → 含 `{phase}`
 11. **task_decomposition 驱动 steps[] 动态生长** — `post-goal-audit` 按 unmet 子目标插入 scoped mini-loop；字段可选/累加，既有字段不删不改
@@ -412,11 +412,12 @@ Generate steps from `session.lifecycle_position` to `milestone-complete`.
 8. **占位符**：independent 保留 `{phase}` `{intent}`；unified 不带 `{phase}`
 9. **command_path 解析**（每个执行 step，decision 节点跳过）：
    - 取 skill 名（args 前的第一个 token）
-   - 全局优先：`~/.claude/commands/{name}.md` 存在 → `command_scope = "global"`
-   - Fallback：`.claude/commands/{name}.md` 存在 → `command_scope = "project"`
-   - 两者都缺 → `command_scope = "missing"`, `command_path = null`，A_CREATE_SESSION 报错 E006
-   - **不在 build 阶段读取 .md 内容**；`<required_reading>` / `<deferred_reading>` 解析与加载由 ralph-execute A_EXEC_STEP 负责（保持入口/工作流分离）
-10. **每个 step 初始化** `completion_confirmed: false`, `completion_status: null`, `completion_evidence: null`, `deferred_reads: []`
+   - **预校验通过 `Bash("maestro ralph skills --json --quiet")`** 一次性拉取所有可用 commands + skills（global + project，project 覆盖 global），匹配 skill 名得到：
+     - 命中 commands → `command_scope = "global" | "project"`，`command_path = <绝对路径>`
+     - 命中 skills → 同上（type=skill）
+     - 未命中 → `command_scope = "missing"`, `command_path = null`，A_CREATE_SESSION 报错 E006
+   - **不在 build 阶段读取 .md 内容**；`<required_reading>` / `<deferred_reading>` 解析与加载由 `maestro ralph next` CLI 在执行期完成
+10. **每个 step 初始化** `completion_confirmed: false`, `completion_status: null`, `completion_evidence: null`, `deferred_reads: []`, `load: null`（由 `ralph next` 写入）
 11. **scope_verdict gating**（仅当 chain 起点 = `analyze-macro`）：
     - `scope_verdict ∈ {medium, small}` → 跳过 `roadmap` + `analyze` 两 stage；`plan` 选 standalone 列（`--from analyze:{analyze_macro_id}`），不带 `{phase}`
     - `scope_verdict == large` → 保留 `roadmap` + `analyze`；`plan` 选 phase 列（`{phase}`）
@@ -595,6 +596,8 @@ Runs only when `task_decomposition` present.
 {
   "session_id": "ralph-{YYYYMMDD-HHmmss}",
   "source": "ralph", "status": "running",
+  "ralph_protocol_version": "1",   // CLI-driven; absent/0 → legacy inline ralph-execute
+  "active_step_index": null,       // CLI-managed; only one step held at a time
   "intent": "", "lifecycle_position": "",
   "phase": null, "phase_is_new": false,
   "milestone": "",                // D-007 反查结果，禁止读 current_milestone
@@ -626,7 +629,8 @@ Runs only when `task_decomposition` present.
     "completion_status": null,
     "completion_evidence": null,
     "completed_at": null,
-    "deferred_reads": []          // 由 ralph-execute A_EXEC_STEP 解析 .md 时填充
+    "deferred_reads": [],         // 由 ralph next CLI 解析 .md 时填充
+    "load": null                  // { loaded_at, required_files[], deferred_files[], resolve_version } —— 由 ralph next 写入
   }],
   "waves": [], "current_step": 0,
 

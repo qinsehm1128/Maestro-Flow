@@ -32,24 +32,24 @@ Also read `session.auto_mode` from status.json — if true, treat as `-y`.
 | Kind | Identifier | Execution | Flow after |
 |------|-----------|-----------|------------|
 | decision step | `step.decision` 非空 | `Skill("maestro-ralph")` | Execution ends here |
-| 执行 step | `step.decision == null` | `view_file({file_path: step.command_path})` + 内联解释执行 | Self-invoke next |
+| 执行 step | `step.decision == null` | `run_command("maestro ralph next")` → 内联按其 stdout 执行 → `run_command("maestro ralph complete N --status ...")` | Self-invoke next |
 
 HARD RULES:
-- 执行 step：通过 `view_file({command_path})` 把命令 .md 加载进当前会话，再按内容执行
-- **必须遵循 `<required_reading>` / `<deferred_reading>` 标签**：命令 .md 通常采用"入口 + workflow"形式，主体逻辑放在 workflow 文件中并通过 `<required_reading>` 引用；缺失 required_reading 视为加载失败
-- decision step：A_EXEC_DECISION 通过 `view_file(AbsolutePath="<agy-skills-dir>/maestro-ralph/SKILL.md") + execute inline` handoff 给 ralph 评估
-- `command_path` 由 ralph 在 A_BUILD_STEPS 写入 status.json（缺失 → 报错 E002）
-- 每个 step 必须产出 `--- COMPLETION STATUS ---` 块，否则视为 NEEDS_RETRY
+- 执行 step：**统一通过 `maestro ralph next` CLI 加载**。CLI 负责读 command_path、解析 `<required_reading>` + `<deferred_reading>`、拼接 prompt、写 `step.load.*` + `active_step_index` + `step.status="running"`。不要再在会话里手动 Read + 解析 required_reading
+- decision step：A_EXEC_DECISION 通过 `view_file(AbsolutePath="<agy-skills-dir>/maestro-ralph/SKILL.md") + execute inline` handoff 给 ralph 评估（不走 CLI）
+- `command_path` 由 ralph 在 A_BUILD_STEPS 写入 status.json（缺失 → ralph next 返回 E006/E007 并拒绝执行）
+- 每个 step 结束必须调用 `maestro ralph complete N --status <S>` 或 `maestro ralph retry N`。STATUS 仅 4 个合法值：`DONE | DONE_WITH_CONCERNS | NEEDS_RETRY | BLOCKED`（**`NEEDS_CONTEXT` 已废除**，context 容量由 harness 自动压缩处理）
 </context>
 
 <invariants>
-1. **执行 = Read + inline** — 通过 Read 读取 `step.command_path`，按其指令在当前 session 内执行
-2. **Required reading must be loaded** — 命令 .md 中的 `<required_reading>` 引用的所有文件必须立即 Read；缺一 → 视为加载失败，pause session（E007）
-3. **Deferred reading recorded only** — `<deferred_reading>` 列出的文件路径需记录，执行过程按需 Read；不在加载阶段读取
-4. **Skill loaded confirmation** — 所有 required_reading 加载完成后必须输出一行确认：`✓ skill {step.skill} 加载完成 (required: N, deferred: M)`
-5. **必须显式 completion confirmation** — 每个 step 完成时需有 `STATUS: DONE` 且写入 `step.completion_confirmed = true`
+1. **执行 = `ralph next` + inline + `ralph complete`** — 调 `maestro ralph next` 拿到完整 prompt（含 command .md + required_reading 全文），按 BEGIN COMMAND 块内联执行
+2. **Required reading 由 CLI 负责** — `ralph next` 自动展开 + 加载 `<required_reading>` 引用的所有文件，缺失 → 退出码 1（E007），不写 active_step_index，不进入执行
+3. **Deferred reading recorded only** — `<deferred_reading>` 路径由 CLI 记录到 `step.load.deferred_files`，执行阶段按需 Read
+4. **一致性取代锁** — 同一 session 同时最多一个 step 持 `active_step_index`；CLI 校验失败直接退出码 3，不静默推进
+5. **Completion 通过 CLI 调用** — 每个 step 末尾调 `maestro ralph complete N --status <S>` 或 `maestro ralph retry N`，由 CLI 写 `completion_*` + 清 `active_step_index`
 6. **Self-invocation chain** — 持续直到全部 `completion_confirmed` 或 paused
-7. **status.json 每步骤后写盘** — resume-safe
+7. **status.json 每步骤后由 CLI 原子写盘** — resume-safe
+8. **STATUS 枚举受限** — 仅 `DONE | DONE_WITH_CONCERNS | NEEDS_RETRY | BLOCKED`；`NEEDS_CONTEXT` 已废除
 </invariants>
 
 <state_machine>
@@ -80,7 +80,8 @@ S_EXECUTE:
   → S_HANDLE_FAIL   WHEN: step.decision == null + failure    DO: A_EXEC_STEP
 
 S_POST_EXEC:
-  → S_LOCATE        DO: A_MARK_COMPLETE + Skill("maestro-ralph-execute")
+  → S_LOCATE        DO: run_command("maestro ralph complete ...") + Skill("maestro-ralph-execute")
+                     NOTE: CLI 已写完 completion_*, status, active_step_index；无需额外写盘
 
 S_HANDLE_FAIL:
   → S_LOCATE        WHEN: auto + not retried               DO: A_RETRY
@@ -152,54 +153,38 @@ Write enriched args back to status.json.
 
 ### A_EXEC_STEP
 
-1. Validate `step.command_path != null`；否则 raise E002，pause session
-2. Mark step running, write status.json
-3. Display: `[{index}/{total}] {step.skill} [{step.command_scope}]`
-4. `view_file({ file_path: step.command_path })` — 把命令 .md 全文加载进当前会话
-5. **解析 reading 标签**（"入口 + workflow"形式核心步骤）：
-   - 抽取 frontmatter `argument-hint` / `allowed-tools`
-   - 抽取 `<required_reading>` 块的所有 `@path` 引用 → 立刻 `view_file({ file_path: <expanded path> })` 加载（`~/` / `@~/` 展开为用户主目录）；任一文件缺失或读取失败 → raise E007，pause session
-   - 抽取 `<deferred_reading>` 块的所有路径 → 仅记录到 `step.deferred_reads = [...]`，执行阶段按需 Read
-   - 抽取 `<purpose>/<context>/<state_machine>/<execution>/<actions>` 等指令块
-6. **加载完成确认**：required_reading 全部成功 Read 后，输出一行：
-   ```
-   ✓ skill {step.skill} 加载完成 (required: {N}, deferred: {M})
-   ```
-   其中 N = required_reading 引用数，M = deferred_reading 路径数（缺省块按 0 计）
-7. 计算 `effective_args`：`step.args` + (`auto ? " -y" : ""`)
-8. 按读到的指令在本会话中**内联执行**：调用允许的工具完成命令所规定的工作；执行过程中如触发 deferred_reading 引用的资源 → 按需 Read
-9. 执行结束：要求最后一段必须包含 `--- COMPLETION STATUS ---` 块（见 A_MARK_COMPLETE）
-10. Return success / failure
+CLI-driven, 4 steps total. The CLI owns state writes — this action only orchestrates.
 
-### A_MARK_COMPLETE
+1. **Load step via CLI** — `run_command("maestro ralph next", run_in_background: false)` （前台同步执行；stdout 即完整 prompt 块）
+   - CLI returns 退出码 0 → 收到 `===== MAESTRO RALPH NEXT =====` ... `===== END =====` 的拼接文本（含命令 .md 主体 + 所有 required_reading 全文 + deferred manifest + completion 协议提示）
+   - 退出码 2 → 无 pending 执行 step（可能下一步是 decision 节点或 session 已完成），交给 S_LOCATE 自然路由
+   - 退出码 3 → `active_step_index` 已被占用，提示用户先 `ralph complete` 或编辑 status.json
+   - 退出码 1 → E006/E007/E010 致命错误，pause session 并显示 CLI stderr
+2. **Inline execution** — 按 stdout 中 `BEGIN COMMAND .md` 块的指令在本会话内执行；deferred_reading 列表中的资源按需 Read
+3. **Confirm completion via CLI** — 末尾调用 CLI 写入完成状态（**不再使用 `--- COMPLETION STATUS ---` 文本块**）：
+   - 成功 → `run_command("maestro ralph complete N --status DONE [--evidence <path>]")`
+   - 有遗留问题 → `run_command("maestro ralph complete N --status DONE_WITH_CONCERNS --concerns \"...\"")`
+   - 工具/参数错误待重试 → `run_command("maestro ralph retry N")`
+   - 外部阻塞（缺依赖/被占用） → `run_command("maestro ralph complete N --status BLOCKED --reason \"...\"")`
+   - 注：CLI 拒绝 `NEEDS_CONTEXT`；context 不足由 harness 自动压缩处理
+4. **Propagate context signals** — 若执行过程中产出关键信号（`PHASE: N` / `scratch_dir: path` / `BLP-xxx` 等），调用 `Bash` 写入 `.workflow/.maestro/{session}/status.json` 的 `context` 字段（小幅 `jq`/Edit）—— 不再由 ralph-execute 内嵌扫描
 
-1. 从 step 输出中提取 `--- COMPLETION STATUS ---` 块（required）
-2. 解析并写入：
-   - `STATUS: DONE` → `step.status = "completed"`, `step.completion_confirmed = true`, `step.completion_status = "DONE"`
-   - `STATUS: DONE_WITH_CONCERNS` → `step.status = "completed"`, `step.completion_confirmed = true`, `step.completion_status = "DONE_WITH_CONCERNS"`, `step.concerns = <CONCERNS>`
-   - `STATUS: NEEDS_RETRY` → `step.status = "pending"`, `step.retried = true`, `step.completion_confirmed = false`, → S_HANDLE_FAIL
-   - `STATUS: BLOCKED` / `NEEDS_CONTEXT` → `session.status = "paused"`, `step.completion_status` 记录原因, `step.completion_confirmed = false`
-   - 缺失 `--- COMPLETION STATUS ---` 块 → 视为 NEEDS_RETRY（不允许 heuristic fallback）
-3. 写入 `step.completion_evidence`（artifact 路径 / 关键输出节选）
-4. 扫描输出抓取 context 信号：`PHASE: N` → session.phase；`scratch_dir: path` → context.scratch_dir；`BLP-xxx` → context.blueprint_session_id
-5. `step.completed_at = now`，写 status.json
-6. **Sub-goal evidence 校验**（task_decomposition 存在时）：若 `step.goal_ref` 对应子目标的 `lifecycle` 覆盖当前 stage 且 evidence artifact 已生成 → 暂不直接置 done，仍交由 post-goal-audit 决策；仅在 step 显式确认时更新 `task_decomposition[*].completion_confirmed = false` 占位（保持 pending）
-7. Display: `[{index}/{total}] ✓ {step.skill} completed (confirmed)`
+完成后：S_LOCATE 触发 `view_file(AbsolutePath="<agy-skills-dir>/maestro-ralph-execute/SKILL.md") + execute inline` 自调用，由 CLI 一致性校验决定推进或暂停。
 
 ### A_RETRY
 
-1. `step.retried = true`, `step.status = "pending"`, `step.error = null`, `step.completion_confirmed = false`
-2. Write status.json
+1. `run_command("maestro ralph retry N")` — CLI 设 `step.retried = true`, `step.status = "pending"`, `step.completion_confirmed = false`, 清 `active_step_index`
+2. Display: `[{index}/{total}] ↻ {step.skill} retry`
 
 ### A_SKIP_STEP
 
-1. `step.status = "skipped"`, `step.completion_confirmed = false`
-2. Write status.json
+跳过执行 step — 手动编辑 `status.json`：将该 step `status` 设为 `"skipped"`，`completion_confirmed` 设为 `false`，并清 `active_step_index`（若指向此 step）。
+（不提供 CLI 子命令；跳过是非常规操作，避免自动化误用。）
 
 ### A_PAUSE_SESSION
 
-1. `session.status = "paused"`, write status.json
-2. Display: `[{index}/{total}] ✗ {step.skill} 失败，会话已暂停。/maestro-ralph continue 恢复。`
+通常由 `ralph complete N --status BLOCKED --reason "..."` 触发，CLI 已写 `session.status = "paused"`。手动 pause 场景下直接编辑 status.json。
+Display: `[{index}/{total}] ✗ {step.skill} 失败，会话已暂停。/maestro-ralph continue 恢复。`
 
 ### A_COMPLETE_SESSION
 
@@ -234,29 +219,30 @@ Write enriched args back to status.json.
 | Code | Severity | Description | Recovery |
 |------|----------|-------------|----------|
 | E001 | error | No running session found | Suggest /maestro or /maestro-ralph |
-| E002 | error | step.command_path missing for 执行 step | Pause, ask ralph to rebuild step |
-| E003 | error | status.json corrupt | Show path, manual check |
-| E005 | error | COMPLETION STATUS block missing | Trigger NEEDS_RETRY |
-| E007 | error | required_reading file 缺失或读取失败 | List missing paths, pause session |
+| E006 | error | command_path missing/unreachable for 执行 step | `ralph next` 拒绝；编辑 status.json 或重 build |
+| E007 | error | required_reading 引用文件缺失 | `ralph next` 拒绝；CLI stderr 列出缺失路径 |
+| E008 | error | `ralph complete` idx ≠ active_step_index | 编辑 status.json 修正一致性 |
+| E009 | error | `ralph complete` step.status ≠ running | 重复 complete 或非法跳跃；编辑 status.json |
+| E010 | error | status.json schema 损坏 | `ralph check` 显示具体损坏字段 |
 | W001 | warning | Step completed with concerns | Log and continue |
-| W002 | warning | command .md 无 `<required_reading>` 标签 | 直接执行 .md 主体，跳过加载阶段 |
+| W005 | warning | active_step_index 指向已 completed step | `ralph next` 自动清理后继续 |
+| W007 | warning | step.skill ≠ command .md frontmatter.name | 提示但不阻塞 |
 
 ### Success Criteria
 
 - [ ] Session discovery covers maestro-* and ralph-*
 - [ ] `-y` parsed from args 或 session.auto_mode；auto=true 时透传 `-y` 到 skill args
 - [ ] Placeholders resolved；per-skill enrichment 正确
-- [ ] Decision 节点（`step.decision != null`）Skill("maestro-ralph") handoff
-- [ ] 执行 step 通过 view_file({step.command_path}) 内联执行
-- [ ] 执行 step Read 后必须解析并加载 `<required_reading>` 引用的文件；缺失 → E007 pause
-- [ ] `<deferred_reading>` 仅记录路径到 `step.deferred_reads`，执行阶段按需 Read
-- [ ] required_reading 加载完成后输出 `✓ skill {name} 加载完成 (required: N, deferred: M)`
-- [ ] 每个 step 强制 `--- COMPLETION STATUS ---`；缺失 → NEEDS_RETRY
-- [ ] step.completion_confirmed = true 仅在 STATUS: DONE/DONE_WITH_CONCERNS 时设置
-- [ ] step.completion_evidence 记录 artifact path / 输出节选
-- [ ] Context signals 传播 status.json
+- [ ] Decision 节点（`step.decision != null`）走 Skill("maestro-ralph") handoff（**不调 ralph next CLI**）
+- [ ] 执行 step 通过 `run_command("maestro ralph next")` 加载；CLI 返回拼好的 prompt + completion 协议
+- [ ] required_reading 由 CLI 自动加载并拼入 prompt；缺失 → CLI 退出码 1，pause session
+- [ ] `<deferred_reading>` 由 CLI 记录到 `step.load.deferred_files`，执行阶段按需 Read
+- [ ] 每个 step 末尾必须调 `maestro ralph complete N --status <S>` 或 `maestro ralph retry N`
+- [ ] STATUS 枚举仅 `DONE | DONE_WITH_CONCERNS | NEEDS_RETRY | BLOCKED`；CLI 拒绝 `NEEDS_CONTEXT`
+- [ ] active_step_index 一致性由 CLI 维护；E008/E009 直接退出，不静默推进
+- [ ] step.completion_evidence 通过 `--evidence` 传入并记录
+- [ ] Context signals 由执行 step 显式写回 status.json.context（非 ralph-execute 内嵌扫描）
 - [ ] Auto mode: retry 一次后 pause；interactive 提供 retry/skip/abort
 - [ ] 自调用持续到全部 completion_confirmed 或 paused
-- [ ] A_COMPLETE_SESSION 校验全部 step confirmed + sub-goal all_done
 
 </appendix>

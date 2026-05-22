@@ -50,11 +50,11 @@ $ARGUMENTS — user intent text, or special keywords.
 3. **Auto flag pass-through** — 仅当用户传入 `-y` 时透传 `-y` 到 skill args
 4. **Decomposition contract shared with maestro-ralph** — broad/lifecycle intents run S_DECOMPOSE producing the SAME additive block (`boundary_contract`, `execution_criteria`, `task_decomposition`)。Reference maestro-ralph `A_DECOMPOSE_TASKS`
 5. **status.json 唯一真源** — 不生成 `goal-checklist.md` 或外部清单
-6. **执行步骤统一 Read .md 内联** — chain 内每个执行 step 解析 `command_scope`/`command_path`（全局优先 `~/.claude/commands/{name}.md`，fallback 项目），由 ralph-execute `view_file({command_path})` 内联执行；CLI 仅在 decision 节点做只读分析
+6. **执行步骤统一通过 `maestro ralph next` 加载** — chain 内每个执行 step 解析 `command_scope`/`command_path`（通过 `maestro ralph skills --json --quiet` 预校验，project 覆盖 global），由 ralph-execute 调 `run_command("maestro ralph next")` 完成 command .md + `<required_reading>` 全文加载；CLI 仅在 decision 节点做只读分析（走 `Skill("maestro-ralph")` handoff，不走 `ralph next`）
 7. **Topology awareness** — chain catalog 含 brainstorm / blueprint / analyze-macro(text) / analyze(numeric phase) / roadmap / plan(三路径) / execute / verify / ...；scope_verdict 路由由 ralph 在 `post-analyze-scope` 决定
 8. **D-007 milestone 反查** — 数字 phase 步骤的 `milestone_id` 由 `state.json.milestones[].phase_slugs` 反查得出
-9. **每个 step 必须 `completion_confirmed: true`** — 基于 `--- COMPLETION STATUS ---` 的 `STATUS: DONE`
-10. **schema 向后兼容** — 新增字段全部可选；既有字段名不删不改
+9. **每个 step 必须 `completion_confirmed: true`** — 由 `maestro ralph complete N --status DONE`（或 DONE_WITH_CONCERNS）写入；CLI 是唯一合法写入路径，`--- COMPLETION STATUS ---` 文本块已废弃
+10. **schema 向后兼容** — 新增字段全部可选；既有字段名不删不改。`ralph_protocol_version: "1"` 标记 CLI-driven session
 </invariants>
 
 <state_machine>
@@ -140,7 +140,7 @@ S_FALLBACK:
    - 数字 phase 上下文 → `analyze {phase}` → `plan {phase}` → `execute {phase}` → `verify {phase}` → quality pipeline
    - 已有 analyze artifact 想直达执行 → `plan --from analyze:{ANL_ID}` → execute → verify
    - 已有 blueprint artifact → `plan --from blueprint:{BLP_ID}` → execute → verify
-4. 执行 step 解析 `command_scope` + `command_path`（全局优先 fallback 项目）；写入 `step.stage` / `step.scope` / `step.source_artifact_ref`（如 `--from` 注入时）。decision 节点通过 `step.decision` 字段标识
+4. 执行 step 解析 `command_scope` + `command_path` —— 通过 `run_command("maestro ralph skills --json --quiet")` 一次性预校验所有 skill 名（commands + skills，project 覆盖 global），命中即写入路径，未命中标 `missing`；同时写入 `step.stage` / `step.scope` / `step.source_artifact_ref`（如 `--from` 注入时）。decision 节点通过 `step.decision` 字段标识，不解析 command_path
 
 ### A_CLARIFY
 
@@ -170,6 +170,8 @@ S_FALLBACK:
    ```json
    {
      "session_id", "source": "maestro", "intent", "task_type", "chain_name",
+     "ralph_protocol_version": "1",     // CLI-driven; 缺失/0 → legacy inline ralph-execute
+     "active_step_index": null,         // CLI-managed; 同时最多持有一个 step
      "phase", "phase_is_new": false, "milestone": "",
      "scope_verdict": null, "analyze_macro_id": null, "blueprint_id": null,
      "auto_mode": false, "cli_tool": "claude",   // cli_tool: decision 节点 delegate 评估时的 CLI 工具
@@ -185,7 +187,9 @@ S_FALLBACK:
        "milestone_id": null, "source_artifact_ref": null,
        "status": "pending", "goal_ref": null,
        "completion_confirmed": false, "completion_status": null,
-       "completion_evidence": null, "completed_at": null
+       "completion_evidence": null, "completed_at": null,
+       "deferred_reads": [],             // 由 maestro ralph next 写入
+       "load": null                      // { loaded_at, required_files[], deferred_files[], resolve_version } —— 由 maestro ralph next 写入
      }],
      "waves": [], "current_step": 0, "status": "running",
      "boundary_contract": {}, "execution_criteria": [],
@@ -193,7 +197,7 @@ S_FALLBACK:
    }
    ```
    Decomposition 字段仅在 A_DECOMPOSE_TASKS 产出时写入（additive）
-3. Validate: 所有 step 的 `command_scope != "missing"`；否则 raise E005 列出缺失 skill
+3. Validate: 所有 step 的 `command_scope != "missing"`（通过 A_CLASSIFY_INTENT 步骤 4 已预调 `ralph skills` 校验）；否则 raise E005 列出缺失 skill
 4. Initialize tracking via `TodoWrite`
 5. If `--super`: read `maestro-super.md`, follow it completely
 
@@ -228,6 +232,8 @@ S_FALLBACK:
 - [ ] Chain selected and confirmed (or auto-confirmed)
 - [ ] Session dir created with status.json before execution; decomposition fields additive-only
 - [ ] 执行 step 含 `command_scope` + `command_path` + `completion_confirmed` 字段；decision step 通过 `step.decision` 字段标识
+- [ ] `command_scope`/`command_path` 通过 `maestro ralph skills --json --quiet` 预校验，命中 commands 或 skills 即合法（project 覆盖 global）
+- [ ] Session schema 含 `ralph_protocol_version: "1"` + `active_step_index: null`；每个 step 含 `load` 占位（由 ralph next 写入）
 - [ ] 用户传入 `-y` 时透传到 skill args
 - [ ] All chains dispatched via maestro-ralph-execute
 - [ ] Low-complexity intents routed to maestro-quick
