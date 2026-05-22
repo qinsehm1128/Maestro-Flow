@@ -46,9 +46,11 @@ export function registerRalphCommand(program: Command): void {
     .description('List effective commands + skills (project overrides global)')
     .option('--json', 'Machine-readable output (single JSON line per entry)')
     .option('--quiet', 'Suppress decorative output (for ralph build consumption)')
-    .action(async (opts: { json?: boolean; quiet?: boolean }) => {
+    .option('--platform <platform>', 'Filter by platform: claude (.claude/) or codex (.codex/)')
+    .action(async (opts: { json?: boolean; quiet?: boolean; platform?: string }) => {
       const run = await loadSkillsCmd();
-      const code = await run({ json: !!opts.json, quiet: !!opts.quiet });
+      const platform = opts.platform as ('claude' | 'codex' | undefined);
+      const code = await run({ json: !!opts.json, quiet: !!opts.quiet, platform });
       process.exit(code);
     });
 

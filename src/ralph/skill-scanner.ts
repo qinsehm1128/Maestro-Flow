@@ -1,11 +1,13 @@
 // ---------------------------------------------------------------------------
-// Skill scanner — discovers commands + skills (global + project).
+// Skill scanner — discovers commands + skills across claude and codex platforms.
 //
-// Sources (project overrides global by `name`):
-//   - <cwd>/.claude/commands/*.md           type: command, scope: project
-//   - ~/.claude/commands/*.md               type: command, scope: global
-//   - <cwd>/.claude/skills/*/SKILL.md       type: skill,   scope: project
-//   - ~/.claude/skills/*/SKILL.md           type: skill,   scope: global
+// Sources (project overrides global by `(platform, name)`):
+//   - <cwd>/.claude/commands/*.md           type: command, scope: project, platform: claude
+//   - ~/.claude/commands/*.md               type: command, scope: global,  platform: claude
+//   - <cwd>/.claude/skills/*/SKILL.md       type: skill,   scope: project, platform: claude
+//   - ~/.claude/skills/*/SKILL.md           type: skill,   scope: global,  platform: claude
+//   - <cwd>/.codex/skills/*/SKILL.md        type: skill,   scope: project, platform: codex
+//   - ~/.codex/skills/*/SKILL.md            type: skill,   scope: global,  platform: codex
 //
 // Agents are explicitly NOT scanned.
 // ---------------------------------------------------------------------------
@@ -15,9 +17,12 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseSkillManifest } from './skill-resolver.js';
 
+export type SkillPlatform = 'claude' | 'codex';
+
 export interface ScannedSkill {
   type: 'command' | 'skill';
   scope: 'global' | 'project';
+  platform: SkillPlatform;
   name: string;
   filePath: string;
   description: string;
@@ -56,6 +61,7 @@ function scanOne(
   filePath: string,
   type: 'command' | 'skill',
   scope: 'global' | 'project',
+  platform: SkillPlatform,
   fallbackName: string,
 ): ScannedSkill {
   try {
@@ -66,6 +72,7 @@ function scanOne(
     return {
       type,
       scope,
+      platform,
       name: fmName || fallbackName,
       filePath,
       description,
@@ -76,46 +83,73 @@ function scanOne(
     };
   } catch {
     return {
-      type, scope, name: fallbackName, filePath,
+      type, scope, platform, name: fallbackName, filePath,
       description: '(parse error)', argumentHint: '',
       requiredCount: 0, deferredCount: 0, missingRequired: [],
     };
   }
 }
 
-export function scanAllSkills(workflowRoot: string = resolve(process.cwd())): ScannedSkill[] {
+interface ScanSource {
+  files: string[];
+  type: 'command' | 'skill';
+  scope: 'global' | 'project';
+  platform: SkillPlatform;
+  nameFn: (p: string) => string;
+}
+
+export interface ScanOptions {
+  platform?: SkillPlatform;
+}
+
+export function scanAllSkills(
+  workflowRoot: string = resolve(process.cwd()),
+  opts: ScanOptions = {},
+): ScannedSkill[] {
   const home = homedir();
-  const sources: Array<{ files: string[]; type: 'command' | 'skill'; scope: 'global' | 'project'; nameFn: (p: string) => string }> = [
+  const commandName = (p: string) => p.split(/[\\/]/).pop()!.replace(/\.md$/, '');
+  const skillName = (p: string) => p.split(/[\\/]/).slice(-2, -1)[0];
+
+  const allSources: ScanSource[] = [
+    // Claude platform
     {
       files: collectCommandFiles(join(home, '.claude', 'commands')),
-      type: 'command', scope: 'global',
-      nameFn: p => p.split(/[\\/]/).pop()!.replace(/\.md$/, ''),
+      type: 'command', scope: 'global', platform: 'claude', nameFn: commandName,
     },
     {
       files: collectCommandFiles(join(workflowRoot, '.claude', 'commands')),
-      type: 'command', scope: 'project',
-      nameFn: p => p.split(/[\\/]/).pop()!.replace(/\.md$/, ''),
+      type: 'command', scope: 'project', platform: 'claude', nameFn: commandName,
     },
     {
       files: collectSkillFiles(join(home, '.claude', 'skills')),
-      type: 'skill', scope: 'global',
-      nameFn: p => p.split(/[\\/]/).slice(-2, -1)[0],
+      type: 'skill', scope: 'global', platform: 'claude', nameFn: skillName,
     },
     {
       files: collectSkillFiles(join(workflowRoot, '.claude', 'skills')),
-      type: 'skill', scope: 'project',
-      nameFn: p => p.split(/[\\/]/).slice(-2, -1)[0],
+      type: 'skill', scope: 'project', platform: 'claude', nameFn: skillName,
+    },
+    // Codex platform
+    {
+      files: collectSkillFiles(join(home, '.codex', 'skills')),
+      type: 'skill', scope: 'global', platform: 'codex', nameFn: skillName,
+    },
+    {
+      files: collectSkillFiles(join(workflowRoot, '.codex', 'skills')),
+      type: 'skill', scope: 'project', platform: 'codex', nameFn: skillName,
     },
   ];
 
-  // Project overrides global per (type, name). Build a Map keyed by `${type}::${name}`.
+  const sources = opts.platform
+    ? allSources.filter(s => s.platform === opts.platform)
+    : allSources;
+
+  // Project overrides global per (platform, type, name).
   const merged = new Map<string, ScannedSkill>();
   for (const src of sources) {
     for (const file of src.files) {
-      const entry = scanOne(file, src.type, src.scope, src.nameFn(file));
-      const key = `${entry.type}::${entry.name}`;
+      const entry = scanOne(file, src.type, src.scope, src.platform, src.nameFn(file));
+      const key = `${entry.platform}::${entry.type}::${entry.name}`;
       const existing = merged.get(key);
-      // Project entries always replace global entries.
       if (!existing || (existing.scope === 'global' && entry.scope === 'project')) {
         merged.set(key, entry);
       }
@@ -123,6 +157,7 @@ export function scanAllSkills(workflowRoot: string = resolve(process.cwd())): Sc
   }
 
   return Array.from(merged.values()).sort((a, b) => {
+    if (a.platform !== b.platform) return a.platform.localeCompare(b.platform);
     if (a.type !== b.type) return a.type.localeCompare(b.type);
     if (a.scope !== b.scope) return a.scope.localeCompare(b.scope);
     return a.name.localeCompare(b.name);
@@ -130,7 +165,11 @@ export function scanAllSkills(workflowRoot: string = resolve(process.cwd())): Sc
 }
 
 /** Look up a single skill/command by name. Returns null if not found. */
-export function findSkill(name: string, type?: 'command' | 'skill'): ScannedSkill | null {
-  const all = scanAllSkills();
+export function findSkill(
+  name: string,
+  type?: 'command' | 'skill',
+  platform?: SkillPlatform,
+): ScannedSkill | null {
+  const all = scanAllSkills(undefined, platform ? { platform } : {});
   return all.find(s => s.name === name && (!type || s.type === type)) ?? null;
 }

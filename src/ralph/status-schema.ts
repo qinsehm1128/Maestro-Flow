@@ -12,6 +12,7 @@ export type StepStatus = 'pending' | 'running' | 'completed' | 'skipped' | 'fail
 export type CompletionStatus = 'DONE' | 'DONE_WITH_CONCERNS' | 'NEEDS_RETRY' | 'BLOCKED';
 export type SessionStatus = 'running' | 'paused' | 'completed' | 'failed';
 export type CommandScope = 'global' | 'project' | 'missing' | null;
+export type SessionPlatform = 'claude' | 'codex';
 
 export interface RalphStepLoad {
   loaded_at: string | null;        // ISO timestamp
@@ -82,6 +83,7 @@ export interface RalphSession {
   analyze_macro_id?: string | null;
   blueprint_id?: string | null;
   cli_tool?: string;
+  platform?: SessionPlatform;       // 'claude' (.claude/) | 'codex' (.codex/); absent → claude
   passed_gates?: string[];
   context?: RalphSessionContext;
   steps: RalphStep[];
