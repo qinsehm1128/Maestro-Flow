@@ -1,17 +1,22 @@
 ---
 name: maestro-ralph
 description: Use when the optimal command sequence is unclear and needs automated state-based determination
-argument-hint: "<intent> [-y] | status | continue"
+argument-hint: "<intent> [-y] | status [session-id] | continue [session-id]"
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep, request_user_input
 ---
 <purpose>
 Closed-loop decision engine for the maestro workflow lifecycle.
 Reads project state → infers position → builds adaptive chain → delegates execution.
 
-Entry points:
-- **`/maestro-ralph "intent"`** — New session: infer → decompose → build → emit /goal prompt（如有 decomposition）→ dispatch ralph-execute
-- **`/maestro-ralph continue`** — Wrapper; dispatches to ralph-execute（首选直接 `/maestro-ralph-execute` 推进 step）
-- **`/maestro-ralph status`** — Display session progress
+### Session
+
+`.workflow/.maestro/{session_id}/status.json` — 工作流唯一真源（schema 见 `<appendix>`）。session_id 格式：`ralph-{YYYYMMDD-HHmmss}`（本 skill 创建，自适应链）或 `maestro-{YYYYMMDD-HHmmss}`（`/maestro` coordinator 创建，静态链）。两类都由 `/maestro-ralph-execute` 推进。session-id 省略时取最新 `status=="running"`。
+
+### Entry points
+
+- **`/maestro-ralph "intent"`** — 新建 session：infer → decompose → build → emit /goal prompt（如有 decomposition）→ dispatch ralph-execute
+- **`/maestro-ralph continue [session-id]`** — 恢复执行；省略=最新 running（首选直接 `/maestro-ralph-execute [session-id]`）
+- **`/maestro-ralph status [session-id]`** — 显示进度；省略=最新 ralph session
 
 > 推进规则：**step 推进由 `/maestro-ralph-execute` 负责**；ralph 仅在 build / decision 评估时介入。decision 节点由 ralph-execute 自动 `$maestro-ralph` 直调 handoff，无需用户手动切换。
 
@@ -48,9 +53,10 @@ $ARGUMENTS — intent text, flags, or keywords.
 
 **Parse:**
 ```
--y flag       → auto_confirm = true
-.md/.txt path → input_doc (supplementary context only, NEVER substitutes lifecycle stages)
-Remaining     → intent
+-y flag                          → auto_confirm = true
+.md/.txt path                    → input_doc (supplementary context only, NEVER substitutes lifecycle stages)
+status|continue + session-id     → 当 intent ∈ {status,continue} 且后续 token 匹配 ralph-*|maestro-* → target_session_id
+Remaining                        → intent
 ```
 
 **State files:**
@@ -108,7 +114,8 @@ S_STATUS:
   → END             DO: A_SHOW_STATUS
 
 S_CONTINUE:
-  → S_DISPATCH      WHEN: running session found
+  → S_DISPATCH      WHEN: target_session_id provided AND session exists
+  → S_DISPATCH      WHEN: running session found (no target_session_id → latest running)
   → S_FALLBACK      WHEN: no running session               DO: display "无运行中的 ralph 会话"
 
 S_RESOLVE_PHASE:
@@ -189,7 +196,7 @@ S_FALLBACK:
 
 ### A_SHOW_STATUS
 
-1. Find latest ralph session (by created_at)
+1. 若 `target_session_id` 提供 → 直接加载 `.workflow/.maestro/{target_session_id}/status.json`；否则取最新 ralph session（by created_at）
 2. Display: Session, Status, Position, Progress, Current step
 3. List steps: [✓] completion_confirmed, [▸] current, [ ] pending, [◆] decision（`step.decision` 非空）；执行 step 附 `command_scope`(global/project) + `command_path`
 4. If `task_decomposition` present (absent → skip):

@@ -9,7 +9,8 @@ Single-step executor for ralph (adaptive) and maestro (static) sessions.
 Each invocation: locate session → find next step → resolve args → execute → update → self-invoke next.
 
 Mutual invocation with `/maestro-ralph` forms a self-perpetuating work loop.
-Session: `.workflow/.maestro/*/status.json`
+
+**Session**: `.workflow/.maestro/{session_id}/status.json` — 工作流唯一真源。session_id 格式 `ralph-{YYYYMMDD-HHmmss}`（/maestro-ralph 创建，自适应链）或 `maestro-{YYYYMMDD-HHmmss}`（/maestro 创建，静态链）。两类都由本 skill 推进；省略 `[session-id]` 时取最新 `status=="running"`。Schema 详见 `/maestro-ralph` 的 Session Schema。
 </purpose>
 
 <context>
