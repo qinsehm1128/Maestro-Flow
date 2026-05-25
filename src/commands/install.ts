@@ -253,7 +253,11 @@ function forceInstall(
   const hookLevel = (opts.hooks ?? 'none') as HookLevel;
 
   const manifest = createManifest(mode, targetPath, {
-    hookLevel,
+    // Only persist hookLevel when actually installing Claude hooks; avoids
+    // the next install reading back a stale 'none' as the default level.
+    ...(hookLevel !== 'none' && HOOK_LEVELS.includes(hookLevel)
+      ? { hookLevel }
+      : {}),
     selectedComponentIds: toInstall.map(c => c.def.id),
   });
   const totalStats: CopyStats = { files: 0, dirs: 0, skipped: 0 };

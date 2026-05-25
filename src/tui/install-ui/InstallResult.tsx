@@ -63,6 +63,9 @@ export function InstallResult({ result }: InstallResultProps) {
           value={result.codexMcpRegistered ? 'maestro-tools registered' : t.install.confirmSkipped}
           valueColor={result.codexMcpRegistered ? C.success : C.neutral}
         />
+        {result.agyHooksInstalled > 0 && (
+          <Row label="Agy Hooks:" value={t.install.resultHooks.replace('{count}', String(result.agyHooksInstalled))} />
+        )}
         {(result.extraMcpRegistered.length > 0 || result.extraMcpFailed.length > 0) && (
           <Row
             label="Extra MCP:"

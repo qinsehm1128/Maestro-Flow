@@ -27,6 +27,7 @@ import {
   findManifest,
   recordClaudeHooks,
   recordCodexHooks,
+  recordAgyHooks,
   recordStatusline,
   recordClaudeMcp,
   recordCodexMcp,
@@ -35,6 +36,7 @@ import {
 import {
   installHooksByLevel,
   installCodexHooksByLevel,
+  installAgyHooksByLevel,
   installStatusline as installStatuslineFn,
 } from '../../commands/hooks.js';
 import type { InstallFlowConfig } from './InstallConfirm.js';
@@ -59,6 +61,7 @@ export interface InstallFlowResult {
   mcpRegistered: boolean;
   codexHooksInstalled: number;
   codexMcpRegistered: boolean;
+  agyHooksInstalled: number;
   extraMcpRegistered: string[];
   extraMcpFailed: string[];
   manifestPath: string;
@@ -99,6 +102,7 @@ export function InstallExecution({ config, pkgRoot, version, onComplete }: Insta
         let mcpRegistered = false;
         let codexHooksInstalled = 0;
         let codexMcpRegistered = false;
+        let agyHooksInstalled = 0;
         const extraMcpRegistered: string[] = [];
         const extraMcpFailed: string[] = [];
         let statuslineInstalled = false;
@@ -129,9 +133,14 @@ export function InstallExecution({ config, pkgRoot, version, onComplete }: Insta
         }
 
         // --- Fresh manifest ---
+        // Note: top-level `hookLevel` is a legacy field. Only write it when
+        // Claude hooks are actually being installed; otherwise omit so the
+        // next install's defaults aren't poisoned by a stale 'none'.
         paths.ensure(paths.home);
         const manifest = createManifest(config.mode, targetPath, {
-          hookLevel: config.installHooks ? config.hookLevel : 'none',
+          ...(config.installHooks && config.hookLevel !== 'none'
+            ? { hookLevel: config.hookLevel }
+            : {}),
           selectedComponentIds: config.installComponents ? config.selectedComponentIds : [],
         });
 
@@ -240,6 +249,22 @@ export function InstallExecution({ config, pkgRoot, version, onComplete }: Insta
           }
         }
 
+        // --- Agy (Antigravity) Hooks ---
+        if (config.installAgyHooks && config.agyHookLevel !== 'none') {
+          if (cancelled) return;
+          setStatus(t.install.execInstallingAgyHooks.replace('{level}', config.agyHookLevel));
+          const result = installAgyHooksByLevel(config.agyHookLevel, {
+            project: config.mode === 'project',
+            projectPath: config.mode === 'project' ? config.projectPath : undefined,
+          });
+          agyHooksInstalled = result.installedHooks.length;
+          recordAgyHooks(manifest, {
+            settingsPath: result.settingsPath,
+            installed: result.installedHooks,
+            level: config.agyHookLevel,
+          });
+        }
+
         // --- Extra MCP targets ---
         if (config.installExtraMcp) {
           for (const targetId of config.extraMcpTargetIds) {
@@ -282,6 +307,7 @@ export function InstallExecution({ config, pkgRoot, version, onComplete }: Insta
           filesInstalled, dirsCreated, filesSkipped,
           hooksInstalled, mcpRegistered,
           codexHooksInstalled, codexMcpRegistered,
+          agyHooksInstalled,
           extraMcpRegistered, extraMcpFailed,
           manifestPath,
           statuslineInstalled, backupPath, migrationWarnings: warnings,
