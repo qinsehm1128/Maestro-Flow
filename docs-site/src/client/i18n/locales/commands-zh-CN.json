@@ -605,6 +605,83 @@
       "prev_commands": ["maestro-tools-register"],
       "next_commands": [],
       "flags": ["[tool-name] (工具名称)", "--role <role> (按角色推荐)"]
+    },
+    "maestro-swarm-workflow": {
+      "name": "maestro-swarm-workflow",
+      "name_zh": "并行加速层",
+      "description": "Parallel workflow accelerator — routes user intent to 8 pre-built Workflow scripts for multi-agent concurrent execution",
+      "description_zh": "并行工作流加速层 — 将用户意图路由到 8 个预构建的 Workflow 脚本，实现多 agent 并发执行。覆盖 analyze/brainstorm/review/verify/grill/plan/execute/milestone-audit",
+      "workflow": "独立使用或作为 ralph chain 中的步骤",
+      "workflow_zh": "可独立调用，也可集成到 ralph 生命周期链中作为并行加速步骤",
+      "prev_commands": [],
+      "next_commands": [],
+      "flags": ["\"<intent>\" (意图描述)", "--script <name> (指定脚本)", "--dims <d1,d2> (限制分析维度)", "--roles <r1,r2> (限制角色)", "--count N (角色数量)", "--tier quick|standard (审查层级)", "--resume <runId> (恢复运行)"]
+    },
+    "maestro-companion": {
+      "name": "maestro-companion",
+      "name_zh": "知识伴侣",
+      "description": "Knowledge companion — side-car utility for task context loading, structured companion doc recording, insight capture, and skill routing",
+      "description_zh": "知识伴侣 — 伴随任意任务的知识上下文加载、结构化记录、洞察捕获和技能路由。不创建 session，不修改工作流状态",
+      "workflow": "before（任务前）→ note（任务中）→ after（任务后）→ route（推荐下一步）",
+      "workflow_zh": "四模式操作：before 加载上下文、note 记录洞察、after 沉淀知识、route 推荐技能",
+      "prev_commands": [],
+      "next_commands": [],
+      "flags": ["[before|note|after|route] (模式)", "--task <description> (任务描述)", "--type <task_type> (任务类型)", "--category <cat> (Spec 分类过滤)"]
+    },
+    "maestro-next": {
+      "name": "maestro-next",
+      "name_zh": "单命令推荐",
+      "description": "Single-command recommendation engine — parses intent and project state, recommends one atomic command via routing-table scoring",
+      "description_zh": "单命令推荐引擎 — 解析意图和项目状态，通过路由表评分推荐一个原子命令。不创建 session，不写 status.json",
+      "workflow": "独立使用，轻量路由入口",
+      "workflow_zh": "与 /maestro 和 /maestro-ralph 的区别：不触发链，始终推荐 1 个命令 + 2-3 备选",
+      "prev_commands": [],
+      "next_commands": [],
+      "flags": ["<intent> (意图描述)", "-y (跳过确认)", "--dry-run (仅显示推荐)", "--top N (显示前 N 候选)", "--list (列出候选池)"]
+    },
+    "manage-knowledge-audit": {
+      "name": "manage-knowledge-audit",
+      "name_zh": "知识审计",
+      "description": "Audit and prune spec/knowhow/artifact tri-store — detect contradictions, staleness, orphans; apply keep/deprecate/delete decisions",
+      "description_zh": "审计 spec/knowhow/artifact 三存储 — 检测矛盾、过期、孤立条目；应用 keep/deprecate/delete 三态决策清理",
+      "workflow": "与 manage-harvest 对称：harvest 积累知识，audit 清理知识",
+      "workflow_zh": "8 类 28 子场景审计：显式/隐式矛盾、过期、元数据质量、Maestro 特定、Timeline 产物、Knowhow 漂移、Artifact 残留",
+      "prev_commands": ["manage-harvest"],
+      "next_commands": [],
+      "flags": ["--scope <spec|knowhow|artifact|all> (审计范围)", "--level P0|P1|P2 (严重级别)", "--since YYYY-MM-DD (时间过滤)", "--milestone <name> (里程碑限定)", "--interactive (交互式决策)", "--mark (仅标记)", "--delete (软删除)", "--purge (物理擦除)", "--dry-run (预览)", "--report (仅生成报告)"]
+    },
+    "maestro-grill": {
+      "name": "maestro-grill",
+      "name_zh": "压力测试",
+      "description": "Socratic stress-testing — adversarial questioning against codebase reality, verifying assumptions with code evidence",
+      "description_zh": "苏格拉底式压力测试 — 对抗性提问验证方案假设，用代码证据挑战模糊术语，产出验证过的 context-package",
+      "workflow": "**grill** → brainstorm → analyze/roadmap",
+      "workflow_zh": "在 brainstorm 之前使用，验证方案假设后再进行头脑风暴",
+      "prev_commands": [],
+      "next_commands": ["maestro-brainstorm", "maestro-analyze", "maestro-roadmap"],
+      "flags": ["<topic|plan> (主题或计划)", "-y (自动模式)", "-c (恢复会话)", "--session ID (指定会话)", "--depth shallow|standard|deep (深度)", "--from <source> (导入上游材料)"]
+    },
+    "maestro-blueprint": {
+      "name": "maestro-blueprint",
+      "name_zh": "正式规格",
+      "description": "Generate formal spec package (Product Brief, PRD, Architecture, Epics) through 6-phase document chain with multi-CLI analysis",
+      "description_zh": "生成正式规格文档包（产品简报、PRD、架构、Epics）— 6 阶段文档链 + 多 CLI 分析 + 交互式精炼。纯文档，不生成代码",
+      "workflow": "brainstorm (可选) → **blueprint** → analyze → roadmap → plan",
+      "workflow_zh": "与 brainstorm 互补：brainstorm 是发散探索（轻量），blueprint 是收敛文档（重量级 6 阶段）",
+      "prev_commands": ["maestro-brainstorm"],
+      "next_commands": ["maestro-analyze", "maestro-roadmap"],
+      "flags": ["<idea|@file> (想法或文件)", "-y (自动模式)", "-c (恢复会话)", "--from <source> (导入上游 context)", "--from-brainstorm SESSION-ID (从 brainstorm 导入)"]
+    },
+    "maestro-ralph-beta": {
+      "name": "maestro-ralph-beta",
+      "name_zh": "Ralph Beta",
+      "description": "Beta version of Ralph lifecycle engine with loop-runner endpoint for testing new features",
+      "description_zh": "Ralph 生命周期引擎 Beta 版，包含 loop-runner 端点用于测试新功能",
+      "workflow": "测试环境使用，替代 maestro-ralph",
+      "workflow_zh": "Beta 测试通道，新功能在此验证后合入正式版",
+      "prev_commands": [],
+      "next_commands": [],
+      "flags": ["\"<intent>\" (意图描述)", "-y (自动模式)", "-c (恢复会话)"]
     }
   },
   "skills": {
@@ -707,6 +784,16 @@
       "workflow_zh": "从命令/文本描述/需求文档/现有 skill 四种输入源生成完整 skill 包",
       "roles": ["designer (设计器)"],
       "phases_zh": ["需求分析", "编排器设计", "阶段文件设计", "验证与集成"]
+    },
+    "team-swarm": {
+      "name": "team-swarm",
+      "name_zh": "蚁群智能",
+      "description": "ACO-driven swarm intelligence with pheromone optimizer — 4 roles + Python controller + 5 specs for collective problem solving",
+      "description_zh": "ACO 蚁群智能技能 — 信息素优化器驱动的群体问题求解。4 角色（协调器、蚁群、分析师、评分器）+ Python 控制器 + 5 份 spec",
+      "workflow": "适用于需要多路径探索和群体收敛的复杂问题",
+      "workflow_zh": "蚁群算法驱动，多 agent 并行探索解空间，通过信息素机制收敛到最优解",
+      "roles": ["coordinator (协调器)", "ant (蚁群代理)", "analyst (分析师)", "scorer (评分器)"],
+      "phases_zh": ["初始化信息素图", "蚁群探索", "路径评估", "信息素更新", "收敛检查"]
     }
   }
 }
