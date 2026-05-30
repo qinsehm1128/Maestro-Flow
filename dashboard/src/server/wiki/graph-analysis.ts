@@ -137,7 +137,7 @@ export function detectDeadEnds(graph: WikiGraph): BrokenLink[] {
 
 function isKgEntry(entry: WikiEntry): boolean {
   const vk = entry.ext?.virtualKind;
-  return vk === 'ua-kg-node' || vk === 'ua-kg-layer' || vk === 'ua-kg-tour-step';
+  return vk === 'kg-node' || vk === 'kg-layer' || vk === 'kg-tour-step';
 }
 
 /**

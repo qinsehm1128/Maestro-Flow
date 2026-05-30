@@ -7,7 +7,7 @@ import { parseSpecEntries, parseKnowhowEntries } from './spec-entry-parser.js';
 import {
   adaptCodebaseDocIndex,
   adaptIssueRow,
-  adaptUaKgGraph,
+  adaptKnowledgeGraph,
   crossReferenceKgWithDocIndex,
   loadSessionArchiveEntries,
   loadVirtualEntries,
@@ -405,7 +405,7 @@ export class WikiIndexer {
     const kgPath = join(this.workflowRoot, 'codebase', 'knowledge-graph.json');
     if (existsSync(kgPath) && this.isInsideRoot(kgPath)) {
       const kgRel = toForwardSlash(relative(this.workflowRoot, kgPath));
-      const kgEntries = await loadVirtualJsonEntries(kgPath, adaptUaKgGraph, kgRel);
+      const kgEntries = await loadVirtualJsonEntries(kgPath, adaptKnowledgeGraph, kgRel);
       crossReferenceKgWithDocIndex(kgEntries, out);
       out.push(...kgEntries);
     }
@@ -545,7 +545,7 @@ export class WikiIndexer {
       generatedAt: index.generatedAt,
       entries: index.entries.map((e): PersistedEntry => {
         const isKg = typeof e.ext?.virtualKind === 'string'
-          && (e.ext.virtualKind as string).startsWith('ua-kg-');
+          && (e.ext.virtualKind as string).startsWith('kg-');
         return {
           id: e.id,
           type: e.type,

@@ -1,28 +1,21 @@
-#!/usr/bin/env node
 // ---------------------------------------------------------------------------
-// merge-batch-graphs.mjs -- Merge and normalize batch analysis results.
+// merger.ts -- Merge and normalize batch analysis results.
 //
-// Node.js port of merge-batch-graphs.py from Understand-Anything.
-// Combines batch-*.json files from the intermediate directory into a single
-// assembled graph with normalized IDs, complexity values, and cleaned edges.
-//
-// Usage:
-//   node scripts/merge-batch-graphs.mjs <project-root>
-//   node scripts/merge-batch-graphs.mjs <project-root> --intermediate-dir <path>
-//
-// Input:
-//   <project-root>/.understand-anything/intermediate/batch-*.json
-//
-// Output:
-//   <project-root>/.understand-anything/intermediate/assembled-graph.json
+// TypeScript port of merge-batch-graphs.mjs.
+// Combines batch data into a single assembled graph with normalized IDs,
+// complexity values, and cleaned edges.
 //
 // No external dependencies -- uses only Node.js built-in modules.
 // ---------------------------------------------------------------------------
 
-import { readFileSync, writeFileSync, readdirSync, statSync, existsSync, mkdirSync } from 'node:fs';
-import { join, resolve, basename, extname, dirname } from 'node:path';
+import { readFileSync, existsSync } from 'node:fs';
+import { basename } from 'node:path';
 
-// ── Configuration ──────────────────────────────────────────────────────────
+import type { GraphNode, GraphEdge, BatchData, MergeResult } from './types.js';
+
+// ---------------------------------------------------------------------------
+// Configuration
+// ---------------------------------------------------------------------------
 
 const VALID_NODE_PREFIXES = new Set([
   'file', 'func', 'function', 'class', 'module', 'concept',
@@ -34,7 +27,7 @@ const VALID_NODE_PREFIXES = new Set([
 ]);
 
 /** node.type -> canonical ID prefix */
-const TYPE_TO_PREFIX = {
+const TYPE_TO_PREFIX: Record<string, string> = {
   file: 'file',
   function: 'function',
   func: 'function',
@@ -60,7 +53,7 @@ const TYPE_TO_PREFIX = {
   source: 'source',
 };
 
-const COMPLEXITY_MAP = {
+const COMPLEXITY_MAP: Record<string, string> = {
   low: 'simple',
   easy: 'simple',
   medium: 'moderate',
@@ -72,7 +65,9 @@ const COMPLEXITY_MAP = {
 
 const VALID_COMPLEXITY = new Set(['simple', 'moderate', 'complex']);
 
-// ── tested_by linker configuration ─────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// tested_by linker configuration
+// ---------------------------------------------------------------------------
 
 const _JS_TS_EXTS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.vue'];
 const _JS_TS_TEST_EXTS = new Set(_JS_TS_EXTS);
@@ -80,7 +75,7 @@ const _JS_TS_TEST_EXTS = new Set(_JS_TS_EXTS);
 const _MIRROR_PRODUCTION_ROOTS = ['src', 'app', 'lib', ''];
 
 // Per-extension test-name patterns: ext -> [prefixes, suffixes]
-const _TEST_NAME_PATTERNS = {
+const _TEST_NAME_PATTERNS: Record<string, [string[], string[]]> = {
   '.go': [[], ['_test']],
   '.py': [['test_'], ['_test']],
   '.java': [[], ['Test', 'Tests', 'IT']],
@@ -91,18 +86,17 @@ const _TEST_NAME_PATTERNS = {
   '.cc': [['test_'], ['_test']],
 };
 
-const _DIRECTION_ALIASES = { both: 'bidirectional', mutual: 'bidirectional' };
+const _DIRECTION_ALIASES: Record<string, string> = { both: 'bidirectional', mutual: 'bidirectional' };
 const _VALID_DIRECTIONS = new Set(['forward', 'backward', 'bidirectional']);
 
-
-// ── Utility functions ──────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Utility functions
+// ---------------------------------------------------------------------------
 
 /**
  * Canonicalize an edge `direction` value to one of the schema enum members.
- * @param {*} value
- * @returns {string}
  */
-function normalizeDirection(value) {
+export function normalizeDirection(value: unknown): string {
   const candidate = typeof value === 'string' ? value.toLowerCase() : '';
   const mapped = _DIRECTION_ALIASES[candidate] ?? candidate;
   return _VALID_DIRECTIONS.has(mapped) ? mapped : 'forward';
@@ -110,52 +104,20 @@ function normalizeDirection(value) {
 
 /**
  * Coerce a value to number for safe comparison (handles string weights).
- * @param {*} v
- * @returns {number}
  */
-function _num(v) {
+function _num(v: unknown): number {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
 }
 
-// ── Batch loading ──────────────────────────────────────────────────────────
-
-/**
- * Load a batch JSON file, tolerating malformed files.
- * @param {string} filePath
- * @returns {object|null}
- */
-function loadBatch(filePath) {
-  let data;
-  try {
-    const raw = readFileSync(filePath, 'utf-8');
-    data = JSON.parse(raw);
-  } catch (e) {
-    process.stderr.write(`  Warning: skipping ${basename(filePath)}: ${e.message}\n`);
-    return null;
-  }
-
-  if (!Array.isArray(data?.nodes)) {
-    process.stderr.write(`  Warning: skipping ${basename(filePath)}: missing or invalid 'nodes' array\n`);
-    return null;
-  }
-  if (!Array.isArray(data?.edges)) {
-    process.stderr.write(`  Warning: skipping ${basename(filePath)}: missing or invalid 'edges' array\n`);
-    return null;
-  }
-
-  return data;
-}
-
-// ── ID normalization ───────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// ID normalization
+// ---------------------------------------------------------------------------
 
 /**
  * Return a human-readable pattern label for an ID correction.
- * @param {string} original
- * @param {string} corrected
- * @returns {string}
  */
-function classifyIdFix(original, corrected) {
+function classifyIdFix(original: string, corrected: string): string {
   // Double prefix: "file:file:..." -> "file:..."
   for (const prefix of VALID_NODE_PREFIXES) {
     if (original.startsWith(`${prefix}:${prefix}:`)) {
@@ -189,7 +151,7 @@ function classifyIdFix(original, corrected) {
 
 /**
  * Build a regex pattern that matches any valid prefix followed by a colon.
- * Used in normalize_node_id for project-name prefix stripping.
+ * Used in normalizeNodeId for project-name prefix stripping.
  */
 const _VALID_PREFIX_PATTERN = new RegExp(
   '^[^:]+:(' + [...VALID_NODE_PREFIXES].map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + '):(.+)$'
@@ -197,11 +159,8 @@ const _VALID_PREFIX_PATTERN = new RegExp(
 
 /**
  * Normalize a node ID, returning the corrected version.
- * @param {string} nodeId
- * @param {object} node
- * @returns {string}
  */
-function normalizeNodeId(nodeId, node) {
+export function normalizeNodeId(nodeId: string, node: Partial<GraphNode>): string {
   let nid = nodeId;
 
   // Strip double prefix: "file:file:src/foo.ts" -> "file:src/foo.ts"
@@ -253,11 +212,9 @@ function normalizeNodeId(nodeId, node) {
 
 /**
  * Normalize a complexity value.
- * @param {*} value
- * @returns {[string, string]} [normalized, status]
- *   status: "valid" | "mapped" | "unknown"
+ * Returns [normalized, status] where status is "valid" | "mapped" | "unknown".
  */
-function normalizeComplexity(value) {
+export function normalizeComplexity(value: unknown): [string, string] {
   if (typeof value === 'string') {
     const lower = value.trim().toLowerCase();
     if (VALID_COMPLEXITY.has(lower)) return [lower, 'valid'];
@@ -273,33 +230,29 @@ function normalizeComplexity(value) {
   return ['moderate', 'unknown'];
 }
 
-
-// ── Deterministic tested_by linker ─────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Deterministic tested_by linker
+// ---------------------------------------------------------------------------
 
 /**
  * Split a relative POSIX-style path into segments (ignoring empties).
- * @param {string} p
- * @returns {string[]}
  */
-function _pathSegments(p) {
+function _pathSegments(p: string): string[] {
   return p.split('/').filter(s => s !== '');
 }
 
 /**
- * @param {string} p
- * @returns {string}
+ * Get the basename of a POSIX-style path.
  */
-function _basename(p) {
+function _basename(p: string): string {
   const idx = p.lastIndexOf('/');
   return idx >= 0 ? p.slice(idx + 1) : p;
 }
 
 /**
  * Get stem (filename without extension) and extension.
- * @param {string} filename
- * @returns {[string, string]}
  */
-function _splitext(filename) {
+function _splitext(filename: string): [string, string] {
   const dot = filename.lastIndexOf('.');
   if (dot <= 0) return [filename, ''];
   return [filename.slice(0, dot), filename.slice(dot)];
@@ -307,10 +260,8 @@ function _splitext(filename) {
 
 /**
  * Return true if `path` looks like a test file by basename convention.
- * @param {string} p
- * @returns {boolean}
  */
-function isTestPath(p) {
+export function isTestPath(p: string): boolean {
   const name = _basename(p);
   const [stem, ext] = _splitext(name);
 
@@ -329,10 +280,8 @@ function isTestPath(p) {
 /**
  * For a JS/TS-family stem like `foo.test` or `foo.spec`, strip the
  * trailing `.test` / `.spec`. Returns null if no infix is present.
- * @param {string} stem
- * @returns {string|null}
  */
-function _stripTestInfix(stem) {
+function _stripTestInfix(stem: string): string | null {
   for (const infix of ['.test', '.spec']) {
     if (stem.endsWith(infix)) {
       return stem.slice(0, -infix.length);
@@ -341,50 +290,37 @@ function _stripTestInfix(stem) {
   return null;
 }
 
-/**
- * @param {string} dirPath
- * @param {string} name
- * @returns {string}
- */
-function _joinPath(dirPath, name) {
+function _joinPath(dirPath: string, name: string): string {
   return dirPath ? `${dirPath}/${name}` : name;
 }
 
 /**
  * Append path to out unless it is empty or already present.
- * @param {string[]} out
- * @param {string} p
  */
-function _addUnique(out, p) {
+function _addUnique(out: string[], p: string): void {
   if (p && !out.includes(p)) out.push(p);
 }
 
 /**
  * Build sibling candidates for a JS/TS family base stem.
- * @param {string} dirPath
- * @param {string} baseStem
- * @returns {string[]}
  */
-function _jsTsSiblingCandidates(dirPath, baseStem) {
+function _jsTsSiblingCandidates(dirPath: string, baseStem: string): string[] {
   return _JS_TS_EXTS.map(e => _joinPath(dirPath, `${baseStem}${e}`));
 }
 
 /**
  * For a test file path, return ordered candidate production paths.
- * @param {string} testPath
- * @returns {string[]}
  */
-function productionCandidates(testPath) {
+export function productionCandidates(testPath: string): string[] {
   const name = _basename(testPath);
   const [stem, ext] = _splitext(name);
   const segs = _pathSegments(testPath);
   const dirSegs = segs.slice(0, -1);
   const dirPath = dirSegs.join('/');
 
-  /** @type {string[]} */
-  const candidates = [];
+  const candidates: string[] = [];
 
-  // ── JS/TS family ───────────────────────────────────────────────────
+  // -- JS/TS family --
   if (_JS_TS_TEST_EXTS.has(ext)) {
     const baseStem = _stripTestInfix(stem);
     if (baseStem !== null) {
@@ -416,12 +352,12 @@ function productionCandidates(testPath) {
       }
     }
   }
-  // ── Go ─────────────────────────────────────────────────────────────
+  // -- Go --
   else if (ext === '.go' && stem.endsWith('_test')) {
     const baseStem = stem.slice(0, -'_test'.length);
     _addUnique(candidates, _joinPath(dirPath, `${baseStem}.go`));
   }
-  // ── Python ─────────────────────────────────────────────────────────
+  // -- Python --
   else if (ext === '.py' && (stem.startsWith('test_') || stem.endsWith('_test'))) {
     const baseStem = stem.startsWith('test_')
       ? stem.slice('test_'.length)
@@ -445,7 +381,7 @@ function productionCandidates(testPath) {
       }
     }
   }
-  // ── Java ───────────────────────────────────────────────────────────
+  // -- Java --
   else if (ext === '.java') {
     for (const suffix of ['Tests', 'Test', 'IT']) {
       if (stem.endsWith(suffix)) {
@@ -466,7 +402,7 @@ function productionCandidates(testPath) {
       }
     }
   }
-  // ── Kotlin ─────────────────────────────────────────────────────────
+  // -- Kotlin --
   else if (ext === '.kt') {
     for (const suffix of ['Tests', 'Test']) {
       if (stem.endsWith(suffix)) {
@@ -485,7 +421,7 @@ function productionCandidates(testPath) {
       }
     }
   }
-  // ── C# ─────────────────────────────────────────────────────────────
+  // -- C# --
   else if (ext === '.cs') {
     for (const suffix of ['Tests', 'Test']) {
       if (stem.endsWith(suffix)) {
@@ -494,7 +430,7 @@ function productionCandidates(testPath) {
         _addUnique(candidates, _joinPath(dirPath, `${baseStem}.cs`));
 
         // Walk out of in-service tests/ directory
-        let testsIdx = null;
+        let testsIdx: number | null = null;
         for (let i = dirSegs.length - 1; i >= 0; i--) {
           if (['tests', 'test'].includes(dirSegs[i].toLowerCase())) {
             testsIdx = i;
@@ -515,7 +451,7 @@ function productionCandidates(testPath) {
         // .NET-style sibling-project mirror
         if (dirSegs.length > 0) {
           const top = dirSegs[0];
-          let sibling = null;
+          let sibling: string | null = null;
           if (top.endsWith('.Tests')) {
             sibling = top.slice(0, -'.Tests'.length);
           } else if (top.endsWith('.Test')) {
@@ -530,9 +466,9 @@ function productionCandidates(testPath) {
       }
     }
   }
-  // ── C/C++ ──────────────────────────────────────────────────────────
+  // -- C/C++ --
   else if (['.c', '.cpp', '.cc'].includes(ext)) {
-    let baseStem = null;
+    let baseStem: string | null = null;
     if (stem.startsWith('test_')) {
       baseStem = stem.slice('test_'.length);
     } else if (stem.endsWith('_test')) {
@@ -548,10 +484,8 @@ function productionCandidates(testPath) {
 
 /**
  * Return the relative project path for a `file:`-prefixed node, else null.
- * @param {object} node
- * @returns {string|null}
  */
-function _fileNodePath(node) {
+function _fileNodePath(node: GraphNode): string | null {
   const nid = node.id;
   if (typeof nid !== 'string' || !nid.startsWith('file:')) return null;
   if (typeof node.filePath === 'string' && node.filePath) return node.filePath;
@@ -561,11 +495,8 @@ function _fileNodePath(node) {
 /**
  * Flip an inverted tested_by edge so source becomes production and
  * target becomes the test file. Mutates edge in place.
- * @param {object} edge
- * @param {string} originalSrc
- * @param {string} originalTgt
  */
-function _swapTestedByInPlace(edge, originalSrc, originalTgt) {
+function _swapTestedByInPlace(edge: GraphEdge, originalSrc: string, originalTgt: string): void {
   edge.source = originalTgt;
   edge.target = originalSrc;
   edge.direction = 'forward';
@@ -578,16 +509,21 @@ function _swapTestedByInPlace(edge, originalSrc, originalTgt) {
 /**
  * Append "tested" to node.tags, coercing malformed tags to a fresh list.
  * Returns true if the tag was newly added.
- * @param {object} node
- * @returns {boolean}
  */
-function _ensureTestedTag(node) {
+function _ensureTestedTag(node: GraphNode): boolean {
   if (!Array.isArray(node.tags)) {
     node.tags = [];
   }
   if (node.tags.includes('tested')) return false;
   node.tags.push('tested');
   return true;
+}
+
+interface LinkTestsResult {
+  added: number;
+  dropped: number;
+  tagged: number;
+  swapped: number;
 }
 
 /**
@@ -598,19 +534,12 @@ function _ensureTestedTag(node) {
  *   Pass 2: Supplement with path-convention pairings
  *
  * Mutates nodesById (adds "tested" tag) and edges (rewrites in place).
- *
- * @param {Map<string, object>} nodesById
- * @param {object[]} edges
- * @returns {{added: number, dropped: number, tagged: number, swapped: number}}
  */
-function linkTests(nodesById, edges) {
+export function linkTests(nodesById: Map<string, GraphNode>, edges: GraphEdge[]): LinkTestsResult {
   // Index file nodes by relative path; classify each as test/production.
-  /** @type {Map<string, object>} */
-  const filePathsToNodes = new Map();
-  /** @type {Map<string, string>} id -> "test" | "prod" */
-  const nodeIdToClassification = new Map();
-  /** @type {Array<[string, object]>} */
-  const testNodes = [];
+  const filePathsToNodes = new Map<string, GraphNode>();
+  const nodeIdToClassification = new Map<string, 'test' | 'prod'>();
+  const testNodes: Array<[string, GraphNode]> = [];
 
   for (const node of nodesById.values()) {
     const path = _fileNodePath(node);
@@ -624,13 +553,13 @@ function linkTests(nodesById, edges) {
     }
   }
 
-  // ── Pass 1: walk existing tested_by edges, canonicalize or drop.
-  /** @type {Set<string>} serialized (prod_id, test_id) pairs */
-  const covered = new Set();
-  /** @type {Map<string, number>} pair key -> index in edges */
-  const pairToIdx = new Map();
-  /** @type {Set<string>} pairs that came from a swap */
-  const swappedPairs = new Set();
+  // -- Pass 1: walk existing tested_by edges, canonicalize or drop.
+  /** serialized (prod_id, test_id) pairs */
+  const covered = new Set<string>();
+  /** pair key -> index in edges */
+  const pairToIdx = new Map<string, number>();
+  /** pairs that came from a swap */
+  const swappedPairs = new Set<string>();
   let dropped = 0;
   let writeIdx = 0;
 
@@ -646,8 +575,8 @@ function linkTests(nodesById, edges) {
     const srcClass = nodeIdToClassification.get(src);
     const tgtClass = nodeIdToClassification.get(tgt);
 
-    let pair;
-    let needsSwap;
+    let pair: string;
+    let needsSwap: boolean;
 
     if (srcClass === 'prod' && tgtClass === 'test') {
       pair = `${src}\0${tgt}`;
@@ -662,7 +591,7 @@ function linkTests(nodesById, edges) {
 
     if (covered.has(pair)) {
       // Duplicate pair: keep the heavier-weight edge
-      const existingIdx = pairToIdx.get(pair);
+      const existingIdx = pairToIdx.get(pair)!;
       const existing = edges[existingIdx];
       if (_num(edge.weight ?? 0) > _num(existing.weight ?? 0)) {
         if (needsSwap) {
@@ -689,8 +618,8 @@ function linkTests(nodesById, edges) {
   edges.length = writeIdx;
   const swapped = swappedPairs.size;
 
-  // ── Pass 2: path-convention supplement for tests not yet paired.
-  const pairedTestIds = new Set();
+  // -- Pass 2: path-convention supplement for tests not yet paired.
+  const pairedTestIds = new Set<string>();
   for (const pairKey of covered) {
     const testId = pairKey.split('\0')[1];
     pairedTestIds.add(testId);
@@ -719,7 +648,7 @@ function linkTests(nodesById, edges) {
     }
   }
 
-  // ── Tag every production node that ended up sourcing a tested_by edge.
+  // -- Tag every production node that ended up sourcing a tested_by edge.
   let tagged = 0;
   for (const pairKey of covered) {
     const prodId = pairKey.split('\0')[0];
@@ -731,32 +660,32 @@ function linkTests(nodesById, edges) {
   return { added, dropped, tagged, swapped };
 }
 
+// ---------------------------------------------------------------------------
+// Main merge + normalize
+// ---------------------------------------------------------------------------
 
-// ── Main merge + normalize ─────────────────────────────────────────────────
+function sumValues(map: Map<string, number>): number {
+  let s = 0;
+  for (const v of map.values()) s += v;
+  return s;
+}
 
 /**
  * Merge batch results and normalize.
- * @param {object[]} batches
- * @returns {{ assembled: object, report: string[] }}
  */
-export function mergeGraphs(batches) {
-  // ── Pattern counters ────────────────────────────────────────────────
-  /** @type {Map<string, number>} */
-  const idFixPatterns = new Map();
-  /** @type {Map<string, number>} */
-  const complexityFixPatterns = new Map();
-  /** @type {string[]} */
-  const unfixable = [];
+export function mergeGraphs(batches: BatchData[]): MergeResult {
+  // -- Pattern counters --
+  const idFixPatterns = new Map<string, number>();
+  const complexityFixPatterns = new Map<string, number>();
+  const unfixable: string[] = [];
 
-  function incCounter(map, key) {
+  function incCounter(map: Map<string, number>, key: string): void {
     map.set(key, (map.get(key) || 0) + 1);
   }
 
-  // ── Step 1: Combine all nodes and edges ──────────────────────────
-  /** @type {object[]} */
-  const allNodes = [];
-  /** @type {object[]} */
-  const allEdges = [];
+  // -- Step 1: Combine all nodes and edges --
+  const allNodes: GraphNode[] = [];
+  const allEdges: GraphEdge[] = [];
   for (const batch of batches) {
     if (Array.isArray(batch.nodes)) allNodes.push(...batch.nodes);
     if (Array.isArray(batch.edges)) allEdges.push(...batch.edges);
@@ -765,13 +694,10 @@ export function mergeGraphs(batches) {
   const totalInputNodes = allNodes.length;
   const totalInputEdges = allEdges.length;
 
-  // ── Step 2: Normalize node IDs and build ID mapping ──────────────
-  /** @type {Map<string, string>} original -> corrected */
-  const idMapping = new Map();
-  /** @type {object[]} */
-  const nodesWithIds = [];
-  /** @type {Map<string, number>} */
-  const unknownNodeTypes = new Map();
+  // -- Step 2: Normalize node IDs and build ID mapping --
+  const idMapping = new Map<string, string>();
+  const nodesWithIds: GraphNode[] = [];
+  const unknownNodeTypes = new Map<string, number>();
 
   for (let i = 0; i < allNodes.length; i++) {
     const node = allNodes[i];
@@ -797,9 +723,8 @@ export function mergeGraphs(batches) {
     }
   }
 
-  // ── Step 3: Normalize complexity ─────────────────────────────────
-  /** @type {Map<string, number>} */
-  const complexityUnknownPatterns = new Map();
+  // -- Step 3: Normalize complexity --
+  const complexityUnknownPatterns = new Map<string, number>();
 
   for (const node of nodesWithIds) {
     const original = node.complexity;
@@ -816,7 +741,7 @@ export function mergeGraphs(batches) {
     node.complexity = normalized;
   }
 
-  // ── Step 4: Rewrite edge references ──────────────────────────────
+  // -- Step 4: Rewrite edge references --
   let edgesRewritten = 0;
   for (const edge of allEdges) {
     const src = edge.source || '';
@@ -830,24 +755,22 @@ export function mergeGraphs(batches) {
     }
   }
 
-  // ── Step 5: Deduplicate nodes by ID (keep last) ─────────────────
+  // -- Step 5: Deduplicate nodes by ID (keep last) --
   let duplicateCount = 0;
-  /** @type {Map<string, object>} */
-  const nodesById = new Map();
+  const nodesById = new Map<string, GraphNode>();
   for (const node of nodesWithIds) {
     const nid = node.id || '';
     if (nodesById.has(nid)) duplicateCount++;
     nodesById.set(nid, node);
   }
 
-  // ── Step 5b: Deterministic tested_by linker ──────────────────────
+  // -- Step 5b: Deterministic tested_by linker --
   const { added: testedByAdded, dropped: testedByDropped, tagged: testedByTagged, swapped: testedBySwapped } =
     linkTests(nodesById, allEdges);
 
-  // ── Step 6: Deduplicate edges, drop dangling ─────────────────────
+  // -- Step 6: Deduplicate edges, drop dangling --
   const nodeIds = new Set(nodesById.keys());
-  /** @type {Map<string, object>} */
-  const edgesByKey = new Map();
+  const edgesByKey = new Map<string, GraphEdge>();
   for (const edge of allEdges) {
     const src = edge.source || '';
     const tgt = edge.target || '';
@@ -856,7 +779,7 @@ export function mergeGraphs(batches) {
     edge.direction = direction;
 
     if (!nodeIds.has(src) || !nodeIds.has(tgt)) {
-      const missing = [];
+      const missing: string[] = [];
       if (!nodeIds.has(src)) missing.push(`source '${src}'`);
       if (!nodeIds.has(tgt)) missing.push(`target '${tgt}'`);
       unfixable.push(`Edge ${src} -> ${tgt} (${etype}): dropped, missing ${missing.join(', ')}`);
@@ -870,18 +793,17 @@ export function mergeGraphs(batches) {
     }
   }
 
-  // ── Build report ─────────────────────────────────────────────────
-  /** @type {string[]} */
-  const report = [];
+  // -- Build report --
+  const report: string[] = [];
   report.push(`Input: ${totalInputNodes} nodes, ${totalInputEdges} edges`);
 
   // Sort counters by count descending
-  function sortedEntries(map) {
+  function sortedEntries(map: Map<string, number>): Array<[string, number]> {
     return [...map.entries()].sort((a, b) => b[1] - a[1]);
   }
 
   // Fixed section
-  const fixedLines = [];
+  const fixedLines: string[] = [];
   if (idFixPatterns.size > 0) {
     for (const [pattern, count] of sortedEntries(idFixPatterns)) {
       fixedLines.push(`  ${String(count).padStart(4)} x ${pattern}`);
@@ -957,23 +879,23 @@ export function mergeGraphs(batches) {
   return { assembled, report };
 }
 
-function sumValues(map) {
-  let s = 0;
-  for (const v of map.values()) s += v;
-  return s;
+// ---------------------------------------------------------------------------
+// Imports-edge recovery from importMap
+// ---------------------------------------------------------------------------
+
+interface ImportRecoveryResult {
+  recovered: number;
+  reportLines: string[];
 }
-
-
-// ── Imports-edge recovery from importMap ────────────────────────────────────
 
 /**
  * Re-emit any `imports` edges that exist in scan-result.json#importMap
  * but never made it into a batch's output.
- * @param {object} assembled
- * @param {string} scanResultPath
- * @returns {{ recovered: number, reportLines: string[] }}
  */
-function recoverImportsFromScan(assembled, scanResultPath) {
+export function recoverImportsFromScan(
+  assembled: { nodes: GraphNode[]; edges: GraphEdge[] },
+  scanResultPath: string,
+): ImportRecoveryResult {
   if (!existsSync(scanResultPath)) {
     return {
       recovered: 0,
@@ -981,13 +903,14 @@ function recoverImportsFromScan(assembled, scanResultPath) {
     };
   }
 
-  let scan;
+  let scan: Record<string, unknown>;
   try {
-    scan = JSON.parse(readFileSync(scanResultPath, 'utf-8'));
+    scan = JSON.parse(readFileSync(scanResultPath, 'utf-8')) as Record<string, unknown>;
   } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
     return {
       recovered: 0,
-      reportLines: [`  importMap recovery skipped -- could not parse ${basename(scanResultPath)}: ${e.message}`],
+      reportLines: [`  importMap recovery skipped -- could not parse ${basename(scanResultPath)}: ${msg}`],
     };
   }
 
@@ -1000,13 +923,13 @@ function recoverImportsFromScan(assembled, scanResultPath) {
   }
 
   // Build the set of file: node ids
-  const fileNodeIds = new Set();
+  const fileNodeIds = new Set<string>();
   for (const node of assembled.nodes) {
     if (node.type === 'file') fileNodeIds.add(node.id || '');
   }
 
   // Build the set of existing (source, target) imports edges
-  const existing = new Set();
+  const existing = new Set<string>();
   for (const edge of assembled.edges) {
     if (edge.type === 'imports') {
       existing.add(`${edge.source || ''}\0${edge.target || ''}`);
@@ -1017,7 +940,8 @@ function recoverImportsFromScan(assembled, scanResultPath) {
   let skippedNoSrcNode = 0;
   let skippedNoTgtNode = 0;
 
-  for (const [srcPath, targets] of Object.entries(importMap)) {
+  const importMapObj = importMap as Record<string, unknown>;
+  for (const [srcPath, targets] of Object.entries(importMapObj)) {
     if (!Array.isArray(targets)) continue;
     const srcId = `file:${srcPath}`;
     if (!fileNodeIds.has(srcId)) {
@@ -1047,9 +971,9 @@ function recoverImportsFromScan(assembled, scanResultPath) {
     }
   }
 
-  const lines = [];
+  const lines: string[] = [];
   lines.push(
-    `  Recovered ${recovered} \`imports\` edges from importMap (${Object.keys(importMap).length} entries scanned)`
+    `  Recovered ${recovered} \`imports\` edges from importMap (${Object.keys(importMapObj).length} entries scanned)`
   );
   if (skippedNoSrcNode) {
     lines.push(`  Skipped ${skippedNoSrcNode} importMap source files with no \`file:\` node in graph`);
@@ -1059,234 +983,3 @@ function recoverImportsFromScan(assembled, scanResultPath) {
   }
   return { recovered, reportLines: lines };
 }
-
-
-// ── Main ───────────────────────────────────────────────────────────────────
-
-function printHelp() {
-  const help = `
-merge-batch-graphs.mjs -- Merge and normalize batch analysis results.
-
-Combines batch-*.json files from the intermediate directory into a single
-assembled graph with normalized IDs, complexity values, and cleaned edges.
-
-Usage:
-  node scripts/merge-batch-graphs.mjs <project-root> [options]
-
-Options:
-  --intermediate-dir <path>   Custom intermediate directory
-                              (default: <project-root>/.understand-anything/intermediate)
-  --help                      Show this help message
-
-Input:
-  <project-root>/.understand-anything/intermediate/batch-*.json
-  (or custom intermediate directory)
-
-Output:
-  <intermediate-dir>/assembled-graph.json
-
-Processing Steps:
-  1. Load all batch-*.json and batch-*-part-*.json files
-  2. Normalize node IDs (strip double prefixes, project-name prefixes, etc.)
-  3. Normalize complexity values (low->simple, medium->moderate, high->complex)
-  4. Rewrite edge references to use normalized IDs
-  5. Deduplicate nodes by ID (keep last occurrence)
-  6. Link test files to production files (tested_by linker)
-  7. Deduplicate edges by (source, target, type, direction)
-  8. Remove dangling edges (source/target not in node set)
-  9. Recover imports edges from scan-result.json importMap
-  10. Write assembled-graph.json
-`.trim();
-  console.log(help);
-}
-
-function main() {
-  const args = process.argv.slice(2);
-
-  // Handle --help
-  if (args.includes('--help') || args.includes('-h')) {
-    printHelp();
-    process.exit(0);
-  }
-
-  // Parse arguments
-  let projectRoot = null;
-  let customIntermediateDir = null;
-
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--intermediate-dir' && i + 1 < args.length) {
-      customIntermediateDir = args[++i];
-    } else if (!args[i].startsWith('-')) {
-      projectRoot = args[i];
-    }
-  }
-
-  if (!projectRoot) {
-    process.stderr.write('Usage: node merge-batch-graphs.mjs <project-root> [--intermediate-dir <path>]\n');
-    process.exit(1);
-  }
-
-  projectRoot = resolve(projectRoot);
-  const intermediateDir = customIntermediateDir
-    ? resolve(customIntermediateDir)
-    : join(projectRoot, '.understand-anything', 'intermediate');
-
-  if (!existsSync(intermediateDir)) {
-    process.stderr.write(`Error: ${intermediateDir} does not exist\n`);
-    process.exit(1);
-  }
-
-  // Discover batch files
-  const allFiles = readdirSync(intermediateDir);
-  const batchFileNames = allFiles
-    .filter(f => f.startsWith('batch-') && f.endsWith('.json'))
-    .sort((a, b) => {
-      const numA = a.match(/batch-(\d+)/);
-      const numB = b.match(/batch-(\d+)/);
-      return (numA ? parseInt(numA[1]) : 0) - (numB ? parseInt(numB[1]) : 0);
-    });
-
-  if (batchFileNames.length === 0) {
-    process.stderr.write('Error: no batch-*.json files found in intermediate/\n');
-    process.exit(1);
-  }
-
-  // Group by logical batch index
-  /** @type {Map<number, Array<{name: string, part: number|null}>>} */
-  const byBatch = new Map();
-  /** @type {string[]} */
-  const unrecognizedBatchFiles = [];
-  const batchPattern = /^batch-(\d+)(?:-part-(\d+))?\.json$/;
-
-  for (const f of batchFileNames) {
-    const m = f.match(batchPattern);
-    if (m) {
-      const batchIdx = parseInt(m[1]);
-      if (!byBatch.has(batchIdx)) byBatch.set(batchIdx, []);
-      byBatch.get(batchIdx).push({
-        name: f,
-        part: m[2] !== undefined ? parseInt(m[2]) : null,
-      });
-    } else {
-      unrecognizedBatchFiles.push(f);
-    }
-  }
-
-  if (unrecognizedBatchFiles.length > 0) {
-    const preview = unrecognizedBatchFiles.slice(0, 5).join(', ');
-    const suffix = unrecognizedBatchFiles.length > 5
-      ? ` (+${unrecognizedBatchFiles.length - 5} more)`
-      : '';
-    process.stderr.write(
-      `Warning: merge-batch-graphs: ${unrecognizedBatchFiles.length} ` +
-      `batch file(s) with unrecognized filenames will be DROPPED -- ` +
-      `files: ${preview}${suffix} -- fix the file-analyzer agent to use ` +
-      `only batch-<N>.json or batch-<N>-part-<K>.json patterns\n`
-    );
-  }
-
-  const logicalCount = byBatch.size;
-  const multiPart = [...byBatch.values()].filter(entries => entries.length > 1).length;
-  process.stderr.write(
-    `Found ${batchFileNames.length} batch files ` +
-    `(${logicalCount} logical batches, ${multiPart} multi-part):\n`
-  );
-
-  // Missing-part detection
-  const missingPartWarnings = [];
-  for (const [idx, entries] of byBatch) {
-    const partNums = entries.map(e => e.part).filter(p => p !== null);
-    if (partNums.length === 0) continue;
-    const present = new Set(partNums);
-    const maxPart = Math.max(...partNums);
-    const missing = [];
-    for (let i = 1; i <= maxPart; i++) {
-      if (!present.has(i)) missing.push(i);
-    }
-    if (missing.length > 0) {
-      const msg =
-        `batch ${idx} has parts [${[...present].sort((a, b) => a - b).join(', ')}] but ` +
-        `missing part [${missing.join(', ')}] -- possible truncated write -- ` +
-        `affected nodes/edges may be lost`;
-      process.stderr.write(`Warning: merge: ${msg}\n`);
-      missingPartWarnings.push(msg);
-    }
-  }
-
-  // Load batches
-  const unrecognizedSet = new Set(unrecognizedBatchFiles);
-  const batches = [];
-  for (const f of batchFileNames) {
-    if (unrecognizedSet.has(f)) continue;
-    const filePath = join(intermediateDir, f);
-    const batch = loadBatch(filePath);
-    if (batch !== null) {
-      batches.push(batch);
-      const n = Array.isArray(batch.nodes) ? batch.nodes.length : 0;
-      const e = Array.isArray(batch.edges) ? batch.edges.length : 0;
-      process.stderr.write(`  ${f}: ${n} nodes, ${e} edges\n`);
-    }
-  }
-
-  if (batches.length === 0) {
-    process.stderr.write('Error: no valid batch files loaded\n');
-    process.exit(1);
-  }
-
-  // Merge and normalize
-  const { assembled, report } = mergeGraphs(batches);
-
-  // Surface missing multi-part files to the report
-  if (missingPartWarnings.length > 0) {
-    report.push('');
-    report.push(
-      `Warning: ${missingPartWarnings.length} batch(es) with missing parts ` +
-      `-- some nodes/edges silently dropped:`
-    );
-    for (const w of missingPartWarnings) {
-      report.push(`  - ${w}`);
-    }
-  }
-
-  // Surface unrecognized-filename drops to the report
-  if (unrecognizedBatchFiles.length > 0) {
-    const preview = unrecognizedBatchFiles.slice(0, 5).join(', ');
-    const suffix = unrecognizedBatchFiles.length > 5
-      ? ` (+${unrecognizedBatchFiles.length - 5} more)`
-      : '';
-    report.push('');
-    report.push(
-      `Warning: dropped ${unrecognizedBatchFiles.length} batch file(s) ` +
-      `with unrecognized filenames -- files: ${preview}${suffix} -- ` +
-      `fix the file-analyzer agent to use only batch-<N>.json or ` +
-      `batch-<N>-part-<K>.json patterns (every node/edge in these ` +
-      `files was excluded from the final graph)`
-    );
-  }
-
-  // Recover imports edges from scan-result.json
-  const scanResultPath = join(intermediateDir, 'scan-result.json');
-  const { recovered, reportLines: recoveryReport } = recoverImportsFromScan(assembled, scanResultPath);
-  if (recoveryReport.length > 0) {
-    report.push('');
-    report.push('Imports edge recovery:');
-    report.push(...recoveryReport);
-  }
-
-  // Print report
-  process.stderr.write('\n');
-  for (const line of report) {
-    process.stderr.write(line + '\n');
-  }
-
-  // Write output
-  const outputPath = join(intermediateDir, 'assembled-graph.json');
-  writeFileSync(outputPath, JSON.stringify(assembled, null, 2), 'utf-8');
-
-  const sizeKb = statSync(outputPath).size / 1024;
-  process.stderr.write(`\nWritten to ${outputPath} (${Math.round(sizeKb)} KB)\n`);
-}
-
-
-// Run main if invoked directly
-main();

@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 
+import type { GraphNode, GraphEdge, Layer, TourStep, KnowledgeGraph } from '../../../../src/graph/types.js';
 import type { WikiEntry, WikiStatus } from './wiki-types.js';
 
 function slugify(s: string): string {
@@ -150,62 +151,11 @@ export async function loadVirtualJsonEntries(
   }
 }
 
-// ── UA Knowledge Graph adapter ─────────────────────────────────────────
+// ── Knowledge Graph adapter ───────────────────────────────────────────
 // Maps .workflow/codebase/knowledge-graph.json → virtual knowhow entries.
 // Nodes become searchable wiki entries; edges are stored in ext.kgEdges
 // for high-fidelity traversal while related[] feeds standard graph analysis.
 // Layers and tour steps get their own entries for macro navigation.
-
-interface KgNode {
-  id: string;
-  type: string;
-  name: string;
-  filePath?: string;
-  summary: string;
-  tags: string[];
-  complexity?: string;
-}
-
-interface KgEdge {
-  source: string;
-  target: string;
-  type: string;
-  direction?: string;
-  description?: string;
-  weight?: number;
-}
-
-interface KgLayer {
-  id: string;
-  name: string;
-  description: string;
-  nodeIds: string[];
-}
-
-interface KgTourStep {
-  order: number;
-  title: string;
-  description: string;
-  nodeIds: string[];
-  languageLesson?: string;
-}
-
-interface KnowledgeGraphData {
-  version?: string;
-  valid?: boolean;
-  project?: {
-    name?: string;
-    languages?: string[];
-    frameworks?: string[];
-    description?: string;
-    analyzedAt?: string;
-    gitCommitHash?: string;
-  };
-  nodes?: KgNode[];
-  edges?: KgEdge[];
-  layers?: KgLayer[];
-  tour?: KgTourStep[];
-}
 
 export interface KgAdapterOptions {
   maxRelatedPerNode: number;
@@ -251,13 +201,13 @@ function stableKgId(raw: string): string {
   return raw.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 }
 
-export function adaptUaKgGraph(
+export function adaptKnowledgeGraph(
   parsed: unknown,
   sourcePath: string,
   opts: KgAdapterOptions = DEFAULT_KG_OPTIONS,
 ): WikiEntry[] {
   if (!parsed || typeof parsed !== 'object') return [];
-  const graph = parsed as KnowledgeGraphData;
+  const graph = parsed as Partial<KnowledgeGraph>;
   const nodes = graph.nodes ?? [];
   const edges = graph.edges ?? [];
   const layers = graph.layers ?? [];
@@ -268,7 +218,7 @@ export function adaptUaKgGraph(
   const out: WikiEntry[] = [];
 
   // Build outgoing edge index: nodeId → edges from that node (limited)
-  const outEdges = new Map<string, KgEdge[]>();
+  const outEdges = new Map<string, GraphEdge[]>();
   for (const e of edges) {
     if (!e.source || !e.target) continue;
     const list = outEdges.get(e.source) ?? [];
@@ -298,7 +248,7 @@ export function adaptUaKgGraph(
       body: '',
       raw: n,
       ext: {
-        virtualKind: 'ua-kg-node',
+        virtualKind: 'kg-node',
         kgNodeId: n.id,
         nodeType: n.type,
         filePath: n.filePath ?? null,
@@ -334,7 +284,7 @@ export function adaptUaKgGraph(
       source: { kind: 'virtual', path: sourcePath },
       body: '',
       raw: l,
-      ext: { virtualKind: 'ua-kg-layer', kgLayerId: l.id },
+      ext: { virtualKind: 'kg-layer', kgLayerId: l.id },
       scope: null,
       category: 'arch',
       createdBy: 'manage-codebase-rebuild',
@@ -361,7 +311,7 @@ export function adaptUaKgGraph(
       source: { kind: 'virtual', path: sourcePath },
       body: '',
       raw: step,
-      ext: { virtualKind: 'ua-kg-tour-step', order: step.order, languageLesson: step.languageLesson ?? null },
+      ext: { virtualKind: 'kg-tour-step', order: step.order, languageLesson: step.languageLesson ?? null },
       scope: null,
       category: 'arch',
       createdBy: 'manage-codebase-rebuild',
@@ -391,7 +341,7 @@ export function crossReferenceKgWithDocIndex(
   }
 
   for (const kg of kgEntries) {
-    if (kg.ext.virtualKind !== 'ua-kg-node') continue;
+    if (kg.ext.virtualKind !== 'kg-node') continue;
     const fp = kg.ext.filePath as string | null;
     if (!fp) continue;
     const peer = compByPath.get(fp.replace(/\\/g, '/').toLowerCase());
