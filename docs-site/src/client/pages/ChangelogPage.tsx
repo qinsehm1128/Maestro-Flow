@@ -17,6 +17,13 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '0.4.22',
+    date: '2026-05',
+    changes: [
+      { type: 'fix', text_en: 'swarm: fix GBK encoding errors in Python scripts on Chinese Windows', text_zh: 'swarm: 修复 Python 脚本在中文 Windows 下的 GBK 编码错误' },
+    ],
+  },
+  {
     version: '0.4.21',
     date: '2026-05',
     changes: [
