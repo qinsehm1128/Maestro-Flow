@@ -232,10 +232,10 @@ export function adaptKnowledgeGraph(
     const nodeEdges = outEdges.get(n.id) ?? [];
     const relatedIds = nodeEdges
       .slice(0, opts.maxRelatedPerNode)
-      .map(e => `uakg-${stableKgId(e.target)}`);
+      .map(e => `kg-${stableKgId(e.target)}`);
 
     out.push({
-      id: `uakg-${stableKgId(n.id)}`,
+      id: `kg-${stableKgId(n.id)}`,
       type: 'knowhow',
       title: n.name || n.id,
       summary: (n.summary || '').slice(0, opts.maxSummaryLength),
@@ -254,7 +254,7 @@ export function adaptKnowledgeGraph(
         filePath: n.filePath ?? null,
         complexity: n.complexity ?? null,
         kgEdges: nodeEdges.map(e => ({
-          target: `uakg-${stableKgId(e.target)}`,
+          target: `kg-${stableKgId(e.target)}`,
           type: e.type,
           weight: e.weight ?? 1,
           direction: e.direction,
@@ -272,7 +272,7 @@ export function adaptKnowledgeGraph(
   for (const l of layers) {
     if (!l?.id) continue;
     out.push({
-      id: `uakg-layer-${stableKgId(l.id)}`,
+      id: `kg-layer-${stableKgId(l.id)}`,
       type: 'knowhow',
       title: l.name || l.id,
       summary: (l.description || '').slice(0, opts.maxSummaryLength),
@@ -280,7 +280,7 @@ export function adaptKnowledgeGraph(
       status: 'active',
       created: ts,
       updated: ts,
-      related: (l.nodeIds ?? []).slice(0, opts.maxRelatedPerNode).map(id => `uakg-${stableKgId(id)}`),
+      related: (l.nodeIds ?? []).slice(0, opts.maxRelatedPerNode).map(id => `kg-${stableKgId(id)}`),
       source: { kind: 'virtual', path: sourcePath },
       body: '',
       raw: l,
@@ -297,7 +297,7 @@ export function adaptKnowledgeGraph(
   let prevTourId: string | null = null;
   for (const step of tour) {
     if (!step?.title) continue;
-    const stepId = `uakg-tour-${step.order}`;
+    const stepId = `kg-tour-${step.order}`;
     out.push({
       id: stepId,
       type: 'knowhow',
@@ -307,7 +307,7 @@ export function adaptKnowledgeGraph(
       status: 'active',
       created: ts,
       updated: ts,
-      related: (step.nodeIds ?? []).slice(0, opts.maxRelatedPerNode).map(id => `uakg-${stableKgId(id)}`),
+      related: (step.nodeIds ?? []).slice(0, opts.maxRelatedPerNode).map(id => `kg-${stableKgId(id)}`),
       source: { kind: 'virtual', path: sourcePath },
       body: '',
       raw: step,

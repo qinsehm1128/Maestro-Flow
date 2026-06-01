@@ -401,7 +401,7 @@ export class WikiIndexer {
     }
 
     // Knowledge Graph: .workflow/codebase/knowledge-graph.json → KG nodes/layers/tour
-    // Loaded after doc-index so cross-referencing can link uakg-* ↔ codebase-comp-*
+    // Loaded after doc-index so cross-referencing can link kg-* ↔ codebase-comp-*
     const kgPath = join(this.workflowRoot, 'codebase', 'knowledge-graph.json');
     if (existsSync(kgPath) && this.isInsideRoot(kgPath)) {
       const kgRel = toForwardSlash(relative(this.workflowRoot, kgPath));

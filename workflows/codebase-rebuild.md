@@ -194,123 +194,36 @@ Suggest next:
 
 ---
 
-## Knowledge Graph Pipeline (Steps 10–17)
+## Knowledge Graph Pipeline (Step 10)
 
-> **Optional.** Only runs when UA vendor is installed at
-> `~/.maestro/vendor/ua/understand-anything-plugin/packages/core/dist/index.js`.
-> If not found, skip Steps 10–17 with warning:
-> *"KG pipeline skipped: run `scripts/ua-vendor-setup.sh` first"*
+Uses the native `maestro kg index` command (`src/graph/analyzers/fs-analyzer.ts`) to scan the codebase and generate the knowledge graph. No external dependencies required.
 
-All intermediate artifacts are written to `.workflow/codebase/.kg-tmp/`.
-
-### Step 10: KG Pipeline — Project Scan
+### Step 10: Generate Knowledge Graph
 
 ```
-node ~/.maestro/vendor/ua/understand-anything-plugin/skills/understand/scan-project.mjs \
-  "$PROJECT_ROOT" \
-  "$PROJECT_ROOT/.workflow/codebase/.kg-tmp/scan-result.json"
+maestro kg index --src "$PROJECT_ROOT/src"
 ```
 
-Output: `.workflow/codebase/.kg-tmp/scan-result.json`
+This single command performs:
+  - File system scan and code entity extraction (nodes, edges)
+  - Import/call graph analysis and test pairing (tested_by edges)
+  - Layer classification and topological tour generation
+  - Validation (referential integrity, layer coverage, tour structure)
+  - Write to `.workflow/codebase/knowledge-graph.json`
 
-### Step 11: KG Pipeline — Compute Batches
+If validation fails: the graph is still written with `"valid": false` flag.
 
-```
-node ~/.maestro/vendor/ua/understand-anything-plugin/skills/understand/compute-batches.mjs \
-  "$PROJECT_ROOT"
-```
-
-Output: `.workflow/codebase/.kg-tmp/batches.json`
-
-### Step 12: KG Pipeline — File Analysis (Parallel Delegates)
-
-```
-For each batch in batches.json, dispatch a delegate:
-
-  maestro delegate "<prompt from kg-file-analyze template>" \
-    --rule kg-file-analyze --mode analysis --cd "$PROJECT_ROOT"
-
-Run up to 5 delegates concurrently (run_in_background: true).
-Each produces batch-N.json in .kg-tmp/
-```
-
-### Step 13: KG Pipeline — Merge Batch Graphs
-
-```
-node scripts/merge-batch-graphs.mjs "$PROJECT_ROOT" \
-  --intermediate-dir "$PROJECT_ROOT/.workflow/codebase/.kg-tmp"
-```
-
-Output: `.workflow/codebase/.kg-tmp/assembled-graph.json`
-
-### Step 14: KG Pipeline — Architecture Analysis
-
-```
-maestro delegate "<prompt>" --rule kg-architecture --mode analysis
-```
-
-This **replaces** the original Architecture mapper (Mapper 2).
-Mapper 2 no longer runs independently — its output is produced here instead.
-
-Output: `.workflow/codebase/.kg-tmp/layers.json`
-
-### Step 15: KG Pipeline — Tour Generation
-
-```
-maestro delegate "<prompt>" --rule kg-tour-build --mode analysis
-```
-
-Output: `.workflow/codebase/.kg-tmp/tour.json`
-
-### Step 16: KG Pipeline — Validation
-
-```
-Run inline validation (Node.js script from UA, adapted):
-  - Check all nodes have required fields (id, type, name, filePath)
-  - Check referential integrity (all edge source/target refs exist as node ids)
-  - Check layer coverage (every file-type node appears in exactly 1 layer)
-  - Check tour structure (all tour step refs resolve to valid nodes)
-
-If validation fails: log errors but still write the graph (with "valid": false flag).
-```
-
-### Step 17: KG Pipeline — Save Knowledge Graph
-
-```
-Assemble final KnowledgeGraph JSON:
-
-{
-  "version": "1.0.0",
-  "valid": true|false,
-  "project": {
-    "name": "<from state.json or package.json>",
-    "languages": [<detected>],
-    "frameworks": [<detected>],
-    "description": "<from project.md>",
-    "analyzedAt": "<ISO timestamp>",
-    "gitCommitHash": "<current HEAD>"
-  },
-  "nodes": [<from assembled-graph.json>],
-  "edges": [<from assembled-graph.json>],
-  "layers": [<from Step 14 layers.json>],
-  "tour": [<from Step 15 tour.json>]
-}
-
-Write to: .workflow/codebase/knowledge-graph.json
-Clean up: remove .workflow/codebase/.kg-tmp/ directory
-```
-
-### Step 18: KG → Wiki Index Integration
+### Step 11: KG → Wiki Index Integration
 
 ```
 When knowledge-graph.json is successfully written:
-  The WikiIndexer will automatically index KG nodes as virtual wiki entries
-  on next wiki access (via adaptUaKgGraph virtual adapter).
+  The WikiIndexer automatically indexes KG nodes as virtual wiki entries
+  on next wiki access (via adaptKnowledgeGraph virtual adapter).
 
   Generated virtual entries:
-    - uakg-{node-id} for each GraphNode (type: knowhow, virtualKind: ua-kg-node)
-    - uakg-layer-{id} for each Layer (virtualKind: ua-kg-layer)
-    - uakg-tour-{order} for each TourStep (virtualKind: ua-kg-tour-step)
+    - kg-{node-id} for each GraphNode (type: knowhow, virtualKind: kg-node)
+    - kg-layer-{id} for each Layer (virtualKind: kg-layer)
+    - kg-tour-{order} for each TourStep (virtualKind: kg-tour-step)
 
   Cross-referencing:
     - KG nodes are linked to existing codebase-comp-* entries via filePath matching
@@ -330,8 +243,6 @@ When knowledge-graph.json is successfully written:
 | .workflow/ missing | Fail: "Run /workflow:init first" |
 | File read errors | Log warning, skip file, continue scan |
 | Existing codebase/ without --force | Prompt user for confirmation |
-| UA vendor not installed | Skip Steps 10–18 with warning, continue normally |
-| KG batch delegate failed | Log warning, continue with remaining batches |
 | KG validation failed | Write knowledge-graph.json with `"valid": false`, log errors |
 | Wiki index rebuild failed | Non-fatal — KG data still written, wiki indexing retries on next access |
 
@@ -344,7 +255,7 @@ When knowledge-graph.json is successfully written:
 | `.workflow/codebase/tech-registry/{slug}.md` | Per-component documentation |
 | `.workflow/codebase/feature-maps/_index.md` | Feature index |
 | `.workflow/codebase/feature-maps/{slug}.md` | Per-feature documentation |
-| `.workflow/codebase/knowledge-graph.json` | Knowledge Graph with nodes, edges, layers, and tour (if UA vendor installed) |
+| `.workflow/codebase/knowledge-graph.json` | Knowledge Graph with nodes, edges, layers, and tour |
 | `.workflow/wiki-index.json` | Updated on next wiki access: KG nodes indexed as virtual entries (automatic) |
 | `.workflow/state.json` | Updated: last_codebase_rebuild timestamp |
 | `.workflow/project.md` | Updated: Tech Stack section refreshed |
