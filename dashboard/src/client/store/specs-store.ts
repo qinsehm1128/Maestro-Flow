@@ -6,6 +6,8 @@ import { SPECS_API_ENDPOINTS } from '@/shared/constants.js';
 // ---------------------------------------------------------------------------
 
 export type SpecType = 'coding' | 'arch' | 'quality' | 'debug' | 'test' | 'review' | 'learning' | 'bug' | 'pattern' | 'decision' | 'rule' | 'validation' | 'general';
+export type SpecScope = 'project' | 'global';
+export type ScopeFilter = 'all' | SpecScope;
 
 export interface SpecEntry {
   id: string;
@@ -16,6 +18,7 @@ export interface SpecEntry {
   timestamp: string;
   category: string;
   keywords: string[];
+  scope: SpecScope;
 }
 
 export interface SpecFile {
@@ -24,6 +27,7 @@ export interface SpecFile {
   title: string;
   category: string;
   entryCount: number;
+  scope: SpecScope;
 }
 
 type TypeFilter = 'all' | SpecType;
@@ -36,6 +40,7 @@ export interface SpecsStore {
   error: string | null;
   activeView: SpecsView;
   typeFilter: TypeFilter;
+  scopeFilter: ScopeFilter;
   categoryFilter: string; // 'all' or category name
   keywordFilter: string; // 'all' or keyword
   search: string;
@@ -44,6 +49,7 @@ export interface SpecsStore {
 
   setActiveView: (view: SpecsView) => void;
   setTypeFilter: (filter: TypeFilter) => void;
+  setScopeFilter: (filter: ScopeFilter) => void;
   setCategoryFilter: (filter: string) => void;
   setKeywordFilter: (filter: string) => void;
   setSearch: (q: string) => void;
@@ -74,6 +80,7 @@ export const useSpecsStore = create<SpecsStore>((set, get) => ({
   error: null,
   activeView: 'kanban',
   typeFilter: 'all',
+  scopeFilter: 'all',
   categoryFilter: 'all',
   keywordFilter: 'all',
   search: '',
@@ -82,6 +89,7 @@ export const useSpecsStore = create<SpecsStore>((set, get) => ({
 
   setActiveView: (view) => set({ activeView: view }),
   setTypeFilter: (filter) => set({ typeFilter: filter }),
+  setScopeFilter: (filter) => set({ scopeFilter: filter }),
   setCategoryFilter: (filter) => set({ categoryFilter: filter }),
   setKeywordFilter: (filter) => set({ keywordFilter: filter }),
   setSearch: (q) => set({ search: q }),
@@ -151,8 +159,9 @@ export const useSpecsStore = create<SpecsStore>((set, get) => ({
   },
 
   filteredEntries: () => {
-    const { entries, typeFilter, categoryFilter, keywordFilter, search } = get();
+    const { entries, typeFilter, scopeFilter, categoryFilter, keywordFilter, search } = get();
     let result = entries;
+    if (scopeFilter !== 'all') result = result.filter((e) => e.scope === scopeFilter);
     if (typeFilter !== 'all') result = result.filter((e) => e.type === typeFilter);
     if (categoryFilter !== 'all') result = result.filter((e) => e.category === categoryFilter);
     if (keywordFilter !== 'all') result = result.filter((e) => e.keywords.includes(keywordFilter));
