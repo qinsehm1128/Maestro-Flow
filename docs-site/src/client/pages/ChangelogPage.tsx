@@ -17,6 +17,17 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '0.4.25',
+    date: '2026-06',
+    changes: [
+      { type: 'feat', text_en: 'spec: add scope filtering for project-level or global spec loading', text_zh: '规范加载新增范围过滤，支持按项目或全局维度' },
+      { type: 'feat', text_en: 'graph: integrate codegraph enhancements into native graph module', text_zh: '集成 codegraph 增强功能至原生 graph 模块' },
+      { type: 'feat', text_en: 'docs-site: add new commands with Chinese descriptions, enhance QuickStartPage', text_zh: '新增多个命令及中文描述，增强快速启动页面' },
+      { type: 'fix', text_en: 'fix AskUserQuestion parenthetical annotation causing interactions to be skipped', text_zh: '修复 AskUserQuestion 括注式写法导致交互被跳过的问题' },
+      { type: 'docs', text_en: 'sync command docs, mark deprecated commands, remove duplicates', text_zh: '同步命令文档，标记废弃命令，移除重复条目' },
+    ],
+  },
+  {
     version: '0.4.24',
     date: '2026-06',
     changes: [
