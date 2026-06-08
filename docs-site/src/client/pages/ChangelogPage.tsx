@@ -17,6 +17,14 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '0.4.26',
+    date: '2026-06',
+    changes: [
+      { type: 'feat', text_en: 'delegate: add proxy config in cli-tools.json — per-tool proxy toggle, subprocess-only env injection', text_zh: 'delegate: cli-tools.json 新增代理配置，支持 per-tool 开关，仅注入子进程环境变量' },
+      { type: 'fix', text_en: 'codex adapter: classify Rust tracing stderr (RMCP/MCP errors) as non-fatal thinking instead of error', text_zh: 'codex adapter: 将 Rust tracing stderr（RMCP/MCP 错误）归类为非致命诊断信息而非错误' },
+    ],
+  },
+  {
     version: '0.4.25',
     date: '2026-06',
     changes: [

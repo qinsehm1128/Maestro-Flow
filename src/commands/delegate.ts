@@ -10,7 +10,7 @@ import { CliAgentRunner } from '../agents/cli-agent-runner.js';
 import { CliHistoryStore, type EntryLike } from '../agents/cli-history-store.js';
 import type { ExecutionMeta } from '../agents/cli-history-store.js';
 import { generateCliExecId } from '../agents/cli-agent-runner.js';
-import { loadCliToolsConfig, selectTool, selectToolByRole } from '../config/cli-tools-config.js';
+import { loadCliToolsConfig, selectTool, selectToolByRole, resolveProxyEnv } from '../config/cli-tools-config.js';
 import { paths } from '../config/paths.js';
 import { DelegateBrokerClient, type JsonObject, type DelegateJobEvent, type DelegateJobRecord, type DelegateQueuedMessage } from '../async/index.js';
 import { handleDelegateMessage } from '../async/delegate-control.js';
@@ -63,6 +63,8 @@ export interface DelegateExecutionRequest {
   reasoningEffort?: 'low' | 'medium' | 'high' | 'max';
   /** Stale-stream silence window (ms) before force-terminating a silent CLI */
   streamTimeout?: number;
+  /** Proxy environment variables resolved from cli-tools.json proxy config */
+  proxyEnv?: Record<string, string>;
 }
 
 interface ChildProcessLike {
@@ -421,6 +423,7 @@ export function registerDelegateCommand(program: Command): void {
       const execId = opts.id ?? generateCliExecId(toolName);
       const resume = opts.resume === true ? 'last' : opts.resume;
       const includeDirs = opts.includeDirs?.split(',').map(d => d.trim()).filter(Boolean);
+      const proxyEnv = resolveProxyEnv(config, toolName);
       const request: DelegateExecutionRequest = {
         prompt,
         tool: toolName,
@@ -438,6 +441,7 @@ export function registerDelegateCommand(program: Command): void {
         role: opts.role,
         reasoningEffort,
         streamTimeout,
+        proxyEnv,
       };
 
       try {
