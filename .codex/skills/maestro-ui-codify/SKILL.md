@@ -90,9 +90,9 @@ id,wave,title,description,agent_type,deps
 | `agent_type` | Input | Agent type: discover/extract-style/extract-animation/extract-layout/package/knowhow |
 | `deps` | Input | Semicolon-separated dependency task IDs |
 | `result_status` | Output | `completed` / `failed` (returned via output_schema) |
-| `findings` | Output | Key findings summary (max 500 chars) |
-| `output_path` | Output | Path to generated artifact |
-| `error` | Output | Error message if failed |
+| `findings` | Output | Key findings summary (max 500 chars, via output_schema) |
+| `output_path` | Output | Path to generated artifact (via output_schema) |
+| `error` | Output | Error message if failed (via output_schema) |
 
 ### Session Structure
 

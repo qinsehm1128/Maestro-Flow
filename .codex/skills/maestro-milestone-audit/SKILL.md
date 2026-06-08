@@ -44,7 +44,7 @@ id,title,description,scope,check_targets,deps,wave,status,findings,gaps_found,se
 | `check_targets` | Input | Specific verification commands/grep patterns |
 | `deps` | Input | Dependencies (empty — all wave 1) |
 | `wave` | Computed | Wave number (always 1 — single parallel wave) |
-| `status` | Lifecycle | `pending` (initial) → `pass`/`fail`/`warning`/`failed` (set by merge step from worker's `result_status`) |
+| `status` | Lifecycle | `pending` (initial) → `completed`/`failed` (set by merge step from worker's `result_status`) |
 | `findings` | Lifecycle | Detailed findings per dimension (max 500 chars; merged) |
 | `gaps_found` | Lifecycle | Semicolon-separated list of integration gaps (merged) |
 | `severity` | Lifecycle | `critical` / `warning` / `info` per gap (merged) |
@@ -105,18 +105,19 @@ spawn_agents_on_csv({
     type: "object",
     properties: {
       id:            { type: "string" },
-      result_status: { type: "string", enum: ["pass", "fail", "warning", "failed"] },
+      result_status: { type: "string", enum: ["completed", "failed"] },
+      audit_verdict: { type: "string", enum: ["pass", "fail", "warning"], description: "Audit check outcome" },
       findings:      { type: "string", maxLength: 500 },
       gaps_found:    { type: "string", description: "Semicolon-separated list of gaps" },
       severity:      { type: "string", enum: ["critical", "warning", "info", ""] },
       error:         { type: "string" }
     },
-    required: ["id", "result_status", "findings", "severity"]
+    required: ["id", "result_status", "audit_verdict", "findings", "severity"]
   }
 })
 ```
 
-4. Merge results into master `tasks.csv`: map `result_status` → master `status` column, copy `findings`, `gaps_found`, `severity`, `error`. Delete temporary files (`wave-1.csv`, `wave-1-results.csv`) after merge.
+4. Merge results into master `tasks.csv`: map `result_status` → master `status` column, copy `audit_verdict`, `findings`, `gaps_found`, `severity`, `error`. Delete temporary files (`wave-1.csv`, `wave-1-results.csv`) after merge.
 
 #### Integration Checker Worker Contract (AUDIT_INTEGRATION_INSTRUCTION)
 
@@ -134,9 +135,9 @@ REQUIRED STEPS:
   5. Call report_agent_job_result EXACTLY ONCE
 
 TERMINATION CONTRACT (mandatory — NO worker may end without calling report_agent_job_result):
-  - Pass path  → no gaps found → result_status=pass, severity="info"
-  - Warning path → minor gaps → result_status=warning, severity="warning"
-  - Fail path → critical contract drift or broken dependencies → result_status=fail, severity="critical"
+  - Pass path  → no gaps found → result_status=completed, audit_verdict=pass, severity="info"
+  - Warning path → minor gaps → result_status=completed, audit_verdict=warning, severity="warning"
+  - Fail path → critical contract drift or broken dependencies → result_status=completed, audit_verdict=fail, severity="critical"
   - Failure path → cannot read scope, tool error → result_status=failed with error message
   - Timeout path → near 600s, finalize current findings → report with what was collected
   - NEVER skip report_agent_job_result.
@@ -144,7 +145,8 @@ TERMINATION CONTRACT (mandatory — NO worker may end without calling report_age
 OUTPUT (must match output_schema):
   {
     "id": "<your row id>",
-    "result_status": "pass" | "warning" | "fail" | "failed",
+    "result_status": "completed" | "failed",
+    "audit_verdict": "pass" | "warning" | "fail",
     "findings": "<one-sentence summary, max 500 chars>",
     "gaps_found": "<semicolon-separated list of gaps, each with file:line; empty if pass>",
     "severity": "critical" | "warning" | "info" | "",
@@ -157,7 +159,7 @@ CONSTRAINTS:
   - Do NOT call spawn_agents_on_csv (no recursion).
 ```
 5. Parse `gaps_found` from all workers — aggregate into `.workflow/milestones/{milestone}/audit-report.md`
-6. Any worker with `result_status == fail` and `severity == critical` → milestone verdict = FAIL
+6. Any worker with `audit_verdict == fail` and `severity == critical` → milestone verdict = FAIL
 
 ### Step 6: Verdict
 

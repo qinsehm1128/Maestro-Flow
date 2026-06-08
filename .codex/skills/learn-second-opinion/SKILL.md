@@ -64,7 +64,7 @@ Wave 1: 3 persona agents in parallel (filter `wave==1 AND status=="pending"`). W
     "summary":       { "type": "string", "maxLength": 500 },
     "error":         { "type": "string" }
   },
-  "required": ["id", "result_status", "summary"]
+  "required": ["id", "result_status", "findings", "summary"]
 }
 ```
 
