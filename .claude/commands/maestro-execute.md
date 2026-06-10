@@ -76,6 +76,29 @@ If exit code is 1, present warnings and ask whether to proceed.
 
 Follow '~/.maestro/workflows/execute.md' completely.
 
+### Phase Gates (MANDATORY, BLOCKING)
+
+**GATE 1: Plan Load → Task Execution**
+- REQUIRED: plan.json found and parsed with valid task definitions.
+- REQUIRED: `.task/TASK-*.json` files exist for all tasks in plan.
+- BLOCKED if no pending tasks: error E004.
+
+**GATE 2: Per-Task Execution → Summary**
+- REQUIRED: Each completed task has `.summaries/TASK-{NNN}-summary.md` written with concrete evidence (files changed, tests run, verification results).
+- REQUIRED: `.task/TASK-{NNN}.json` status updated to completed|blocked.
+- Do NOT silently skip failed tasks — mark as blocked with reason.
+
+**GATE 3: All Tasks → Completion**
+- REQUIRED: All waves executed in dependency order.
+- REQUIRED: EXC artifact registered in state.json.
+
+### Evidence Requirement
+
+Task summaries MUST include:
+- Files actually modified (not just planned targets)
+- Convergence criteria verification results (pass/fail with evidence)
+- Any deviations from the plan with rationale
+
 ### Post-task Knowledge Inquiry
 
 After each task completion, check triggers:

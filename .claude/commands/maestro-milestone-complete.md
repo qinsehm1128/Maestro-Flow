@@ -46,6 +46,24 @@ Follow '~/.maestro/workflows/milestone-complete.md' completely.
 
 Archive flow steps (validation, directory archival, artifact history, knowhow extraction, state advancement, cleanup) are defined in workflow `milestone-complete.md`.
 
+### Phase Gates (MANDATORY, BLOCKING)
+
+**GATE 1: Validation → Archival**
+- REQUIRED: Audit report verified as PASS (E002 if not).
+- REQUIRED: No incomplete artifacts remain (E003 if any).
+
+**GATE 2: Archival → Knowhow Extraction**
+- REQUIRED: Scratch artifacts moved to `milestones/{M}/artifacts/`.
+- REQUIRED: Artifact entries archived to milestone_history in state.json.
+
+**GATE 3: Knowhow Extraction → State Advancement**
+- REQUIRED: Knowhow extraction attempted (may produce 0 entries — W001).
+- REQUIRED: `project.md` Context updated with milestone summary.
+
+**GATE 4: State Advancement → Completion**
+- REQUIRED: state.json updated — next milestone as current (standard) or current_milestone=null (adhoc).
+- REQUIRED: Roadmap snapshot saved (standard only).
+
 ### Knowledge Promotion Inquiry
 
 After knowhow extraction (step 4), scan `learnings.md` for promotion candidates:

@@ -77,6 +77,9 @@ Wave 1: truth + artifact/exists (parallel). Wave 2: substance + wiring (parallel
 5. **Skip on failure**: Artifact existence failed -> skip its substance/wiring checks
 6. **Respect skip flags**: --skip-tests and --skip-antipattern mark wave 3 tasks as skipped, not removed
 7. **Goal-backward**: Verify goals are achieved, not just tasks completed
+8. **Invariant violation = BLOCK** — violating any invariant above blocks the current operation.
+9. **Evidence required on verdicts** — every truth/artifact/link verdict MUST include concrete evidence (file exists + content grep match, test passes, import chain verified). "Assumed working" without structural check is INVALID evidence. Each FAIL verdict MUST include: what was expected, what was found, suggested fix.
+10. **Artifact verification before completion** — verification.json MUST exist with per-layer results and evidence before reporting completion. If missing: DO NOT report completion.
 </invariants>
 
 <state_machine>
@@ -235,6 +238,7 @@ Protocol: read before analysis, append-only, dedup by type+key.
 | Substance check on missing artifact | Auto-skip (dep failed) |
 | Test framework not detected | Skip coverage calculation, warn |
 | Continue mode: no session found | List available sessions |
+| LOW CONFIDENCE verdict | When a check produces UNCERTAIN or relies on heuristic-only evidence (no direct structural proof), flag verdict as LOW_CONFIDENCE in findings. LOW_CONFIDENCE verdicts do NOT count toward pass — they require manual review or re-verification with stronger evidence. Aggregate: any LOW_CONFIDENCE → overall status = human_needed |
 </error_codes>
 
 <success_criteria>

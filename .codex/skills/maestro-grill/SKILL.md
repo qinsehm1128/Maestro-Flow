@@ -83,12 +83,18 @@ Resume routing:
 - More branches to walk → `$maestro-grill "{topic}" -c`
 </execution>
 
+<invariants>
+1. **Invariant violation = BLOCK** — violating any invariant above blocks the current operation.
+2. **Code-grounded questions required** — grill questions MUST reference specific code (file:line) when challenging the user's proposal. Generic questions without code grounding are INVALID. If codebase scan failed, flag ALL locked decisions as LOW CONFIDENCE.
+3. **Artifact verification before completion** — verify grill-report.md (with Branch Log + Q&A + synthesis), terminology.md (≥5 terms), and context-package.json all exist before reporting completion. If any missing: DO NOT report completion.
+</invariants>
+
 <error_codes>
 | Code | Severity | Condition | Recovery |
 |------|----------|-----------|----------|
 | E001 | error | No topic/plan and no --from/--continue flag | Prompt user for topic text |
 | E002 | error | --session ID not found | Show available sessions |
-| W001 | warning | Codebase scan failed or returned empty | Continue without code grounding, note limitation |
+| W001 | warning | Codebase scan failed or returned empty | Retry once. If still fails: flag ALL subsequent locked decisions as LOW CONFIDENCE |
 | W002 | warning | CLI exploration timeout in auto mode | Skip question, mark as open |
 | W003 | warning | Max branch depth reached without resolution | Force synthesis, offer continuation |
 </error_codes>

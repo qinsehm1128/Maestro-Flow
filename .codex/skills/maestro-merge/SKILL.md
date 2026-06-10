@@ -48,6 +48,10 @@ After successful merge, ask user once: "Record milestone learnings?" If yes, per
 - Audit milestone → `$maestro-milestone-audit`
 </execution>
 
+<invariants>
+**Phase order enforcement** — git merge MUST complete before artifact sync. Do NOT sync artifacts until git merge succeeds — prevents partial state corruption.
+</invariants>
+
 <error_codes>
 | Code | Severity | Condition | Recovery |
 |------|----------|-----------|----------|

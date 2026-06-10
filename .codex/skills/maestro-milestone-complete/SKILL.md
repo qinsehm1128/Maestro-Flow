@@ -27,6 +27,7 @@ $maestro-milestone-complete --force "M1"  # skip audit check
 3. **Learnings are mandatory** — always extract before archiving
 4. **Clean after archive** — remove scratch dirs only after successful copy
 5. **Advance state** — always set next milestone or mark project complete
+6. **Prerequisite enforcement** — audit report MUST be verified as PASS before archival proceeds. Artifact verification: milestones/{M}/artifacts/ directory, milestone_history in state.json, project.md update all MUST exist before reporting completion.
 </invariants>
 
 <execution>

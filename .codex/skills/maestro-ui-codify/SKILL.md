@@ -115,6 +115,9 @@ id,wave,title,description,agent_type,deps
 6. **Idempotent Package**: --overwrite required to replace existing package directory
 7. **Cleanup Temp Files**: Remove wave-{N}.csv after results merged, remove temp workspace after Wave 4
 8. **DO NOT STOP**: Continuous execution until all waves complete
+
+### Artifact Verification
+Before reporting completion, verify: design-tokens.json, layout-templates.json, preview.html, preview.css, knowhow-manifest.json all exist. If any missing: DO NOT report completion.
 </invariants>
 
 <execution>

@@ -155,4 +155,7 @@ Display created files and next steps: `$maestro-blueprint` (full spec), `$maestr
 - [ ] `config.json` written with configuration
 - [ ] `specs/` initialized with convention files
 - [ ] Completion report displayed with next steps
+
+### Artifact Verification
+Before reporting completion, verify: .workflow/project.md, .workflow/state.json, .workflow/config.json all exist. If any missing: DO NOT report completion.
 </success_criteria>

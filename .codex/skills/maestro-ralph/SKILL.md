@@ -78,6 +78,8 @@ Remaining                        → intent
 10. **planning_mode governs arg granularity** — `unified` → skill args 无 `{phase}`；`independent` → 含 `{phase}`
 11. **task_decomposition 驱动 steps[] 动态生长** — `post-goal-audit` 按 unmet 子目标插入 scoped mini-loop；字段可选/累加，既有字段不删不改
 12. **Platform** — `session.platform = "codex"`；CLI 调用一律带 `--platform codex`
+13. **Invariant violation = BLOCK** — violating any invariant above blocks the current operation. Do NOT bypass for "efficiency" or "clear intent" reasons. Especially invariants about ralph never executing steps and completion_confirmed by CLI.
+14. **Delegate fallback must be marked** — when A_DELEGATE_EVALUATE verdict parse fails and falls back to "fix", MUST record `parse_failed: true, confidence_score: 0` in decisions.ndjson. Subsequent steps inherit LOW CONFIDENCE flag.
 </invariants>
 
 <state_machine>

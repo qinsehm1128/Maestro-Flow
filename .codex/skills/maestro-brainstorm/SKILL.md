@@ -210,6 +210,9 @@ CONSTRAINTS:
 5. **9 valid roles only**: data-architect, product-manager, product-owner, scrum-master, subject-matter-expert, system-architect, test-strategist, ui-designer, ux-expert
 6. **Wave 3 is read-only at the agent boundary**: the reviewer emits structured findings (conflicts / gaps / synergies with `patch_targets[]`). The orchestrator (not the agent) applies the patches via Edit.
 7. **DO NOT STOP**: Continuous until all waves complete; only pause at [CHECKPOINT] (skipped with -y).
+8. **Invariant violation = BLOCK** — violating any invariant above blocks the current operation. Do NOT bypass for "efficiency" or "clear intent" reasons.
+9. **Evidence required** — role analysis findings in {role}/analysis.md §2 Decision Digest MUST cite concrete evidence: code references (file:line), API endpoints, data models from codebase exploration. Decisions without evidence are flagged LOW CONFIDENCE.
+10. **Artifact verification before completion** — before reporting completion, verify ALL expected artifacts exist: guidance-specification.md, {role}/analysis.md (per selected role), {role}/analysis-F-*.md (per feature). If any missing: DO NOT report completion.
 </invariants>
 
 <spawn_contract>
@@ -288,7 +291,7 @@ S_CHECK_1 → END        WHEN: user "Abort"
 
 S_DESIGN → S_WAVE_2    WHEN: DESIGN.md exists OR explore completed    DO: A_DESIGN_EXPLORE
 S_DESIGN → S_WAVE_2    WHEN: DESIGN.md already exists (skip explore)
-S_DESIGN → S_WAVE_2    WHEN: explore failed → W004 → continue without
+S_DESIGN → S_WAVE_2    WHEN: explore failed → W004 → retry once. If still fails: flag downstream outputs as LOW CONFIDENCE, continue without
 
 S_WAVE_2 → S_CHECK_2   DO: spawn wave-2 (parallel), merge results — each agent writes {role}/analysis.md + sub-files
 S_WAVE_2 → S_AGGREGATE WHEN: all failed       DO: skip review
@@ -405,8 +408,8 @@ Protocol: read before analysis, append-only, dedup by type+key.
 | Condition | Recovery |
 |-----------|----------|
 | Guidance agent failed | Abort pipeline (W2 depends on guidance) |
-| All role agents failed | Skip review, report partial |
-| Review agent failed | Use analysis files directly, no resolution writeback |
+| All role agents failed | Skip review, report partial. Retry once. If still fails: flag downstream outputs as LOW CONFIDENCE |
+| Review agent failed | Use analysis files directly, no resolution writeback. Retry once. If still fails: flag downstream outputs as LOW CONFIDENCE |
 | Role count > 9 | Cap at 9 with warning |
 | E006 --review-only but no */analysis.md | Run auto mode or single roles first |
 | E007 --review-only but missing guidance-specification.md | Run auto mode first |

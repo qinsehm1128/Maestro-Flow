@@ -79,6 +79,8 @@ Remaining     → intent
 9. **Decomposition is outcome-oriented** — sub-goals 为可观测交付，禁止 lifecycle 复刻；`/goal` 用户绑定，ralph 输出提示词后继续 handoff，用户可在执行过程中随时输入 `/goal`
 10. **planning_mode governs arg granularity** — `unified` → skill args 无 `{phase}`；`independent` → 含 `{phase}`
 11. **task_decomposition 驱动 steps[] 动态生长** — `post-goal-audit` 按 unmet 子目标插入 scoped mini-loop；字段可选/累加，既有字段不删不改
+12. **Invariant violation = BLOCK** — 违反上述任一 invariant 即阻断当前操作。不得以 "效率" 或 "意图明确" 为由绕过。特别是 invariant 1（ralph 不执行 step）和 invariant 6（completion_confirmed 由 CLI 写入）不可隐性违反。
+13. **Delegate fallback 必须标记** — A_DELEGATE_EVALUATE 解析 verdict 失败时 fallback 为 "fix"，但 MUST 在 decisions.ndjson 记录 `"parse_failed": true, "confidence_score": 0`，后续 step 继承 LOW CONFIDENCE 标记。
 </invariants>
 
 <state_machine>
@@ -460,13 +462,14 @@ Generate steps from `session.lifecycle_position` to `milestone-complete`.
    CONSTRAINTS: 只评估 | 置信度<60% 倾向 fix | retry {n}/{max} 达上限必须 escalate"
    --role analyze --mode analysis
    ```
-6. On callback: parse verdict; if parse fails → fallback STATUS="fix"
+6. On callback: parse verdict; if parse fails → fallback STATUS="fix", BUT MUST set `parse_failed: true` and `confidence_score: 0` in decision log (invariant 13). Subsequent steps inherit LOW CONFIDENCE flag.
 7. Confidence adjustment: <60 + proceed → fix; >95 + fix + retry>0 → suggest proceed
 8. **Decision log**: Append to `{session_dir}/decisions.ndjson`:
    ```json
    { "id": "DEC-{timestamp}", "timestamp": "{ISO}", "source": "ralph",
      "node_id": "{step.decision}", "type": "quality-gate",
      "verdict": "{adjusted_verdict}", "confidence_score": {N},
+     "parse_failed": false,
      "close_call": {N>=50 && N<=70}, "summary": "{REASON}" }
    ```
 

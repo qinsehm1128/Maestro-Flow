@@ -67,6 +67,9 @@ id,title,description,scope,check_targets,deps,wave,status,findings,gaps_found,se
 2. **Non-blocking warnings** — missing analyze is warning, missing execute is error
 3. **Integration check is required** — always spawn checker via CSV wave
 4. **Clear verdict** — PASS or FAIL with specific reasons
+5. **Invariant violation = BLOCK** — violating any invariant above blocks the current operation.
+6. **Evidence required on audit checks** — every audit check result MUST cite what was examined and what was found. PASS: "Phase 1 chain complete: ANL-001 → PLN-001 → EXC-001". FAIL: "Phase 2 missing EXC artifact". Do NOT mark checks as PASS without verifying the artifact exists and contains expected content.
+7. **Artifact verification before completion** — audit-report.md with clear PASS/FAIL verdict MUST exist before reporting completion. If missing: DO NOT report completion.
 </invariants>
 
 <execution>

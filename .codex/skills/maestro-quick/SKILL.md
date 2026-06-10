@@ -106,6 +106,9 @@ Display report: task description, scratch path, status (completed/completed-with
 
 </execution>
 
+### Artifact Verification
+Before reporting completion, verify: plan.json exists AND .summaries/TASK-*-summary.md exists for each task. Task summaries MUST include concrete evidence of completion. If missing: DO NOT report completion.
+
 <error_codes>
 
 | Code | Severity | Description | Recovery |

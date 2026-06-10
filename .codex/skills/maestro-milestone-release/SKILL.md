@@ -46,6 +46,10 @@ Changelog: {N} entries
 ```
 </execution>
 
+<invariants>
+**Prerequisite enforcement** — milestone MUST be completed (audit PASS + milestone-complete run). Working tree MUST be clean. Artifact verification: CHANGELOG.md entry, version manifest update, release commit, git tag (unless --no-tag) all MUST exist before reporting completion.
+</invariants>
+
 <error_codes>
 | Code | Severity | Condition | Recovery |
 |------|----------|-----------|----------|

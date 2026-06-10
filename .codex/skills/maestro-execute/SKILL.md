@@ -164,6 +164,9 @@ Each wave generates `wave-{N}.csv` with extra `prev_context` column populated fr
 8. **Max 3 Fix Attempts**: Per task, auto-fix convergence failures up to 3 times, then mark blocked
 9. **Breakpoint Resume**: Always detect completed tasks and skip them on re-run
 10. **DO NOT STOP**: Continuous execution until all waves complete or user explicitly stops
+11. **Invariant violation = BLOCK** — violating any invariant above blocks the current operation.
+12. **Evidence required in task summaries** — task summaries MUST include: files actually modified (not just planned targets), convergence criteria verification results (pass/fail with evidence), any deviations from plan with rationale. "Task completed successfully" without evidence is INVALID.
+13. **Artifact verification before completion** — for each completed task, .summaries/TASK-{NNN}-summary.md MUST exist with concrete evidence. EXC artifact MUST be registered in state.json. If any missing: DO NOT report completion.
 </invariants>
 
 <execution>

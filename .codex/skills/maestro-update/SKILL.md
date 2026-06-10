@@ -148,6 +148,11 @@ Next steps:
 
 </execution>
 
+### Phase Gates
+- Backup MUST be created BEFORE executing any migration
+- Each migration step MUST be confirmed by user (or --force)
+- If migration fails: backup path MUST be displayed
+
 <error_codes>
 | Code | Severity | Condition | Recovery |
 |------|----------|-----------|----------|

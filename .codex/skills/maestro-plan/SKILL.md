@@ -108,6 +108,9 @@ Wave 1: N exploration rows (parallel). Wave 2: 1 planning row (sequential).
 3. **Discovery board append-only**: Never modify/delete
 4. **Skip on failure**: If all explorations fail, planner proceeds with available context
 5. **DO NOT STOP**: Continuous until all waves complete
+6. **Invariant violation = BLOCK** — violating any invariant above blocks the current operation.
+7. **Verifiable convergence criteria required** — every task MUST have convergence.criteria[] with grep-verifiable conditions (no subjective language like "well-structured" or "properly implemented"). If any task lacks verifiable criteria: DO NOT report completion — fix the criteria first.
+8. **Artifact verification before completion** — plan.json and .task/TASK-*.json files MUST exist. PLN artifact MUST be registered in state.json. If any missing: DO NOT report completion.
 </invariants>
 
 <state_machine>

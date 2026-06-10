@@ -70,7 +70,10 @@ Wave 1: 3 analysis rows (parallel). Wave 2: 1 assembly row.
 2. **CSV is source of truth**: Master tasks.csv holds all state
 3. **Context propagation**: prev_context from master CSV, not memory
 4. **Discovery board append-only**: Never modify/delete discoveries.ndjson
-5. **Graceful degradation**: Wave 1 fails -> Wave 2 proceeds with seed input only
+5. **Graceful degradation**: Wave 1 fails -> Wave 2 proceeds with seed input only. When degradation activates, flag downstream outputs as LOW CONFIDENCE.
+6. **Invariant violation = BLOCK** — violating any invariant above blocks the current operation.
+7. **Requirement mapping completeness** — every Active requirement from project.md MUST be mapped to exactly one phase. No circular dependencies in phase ordering.
+8. **Artifact verification before completion** — .workflow/roadmap.md MUST exist with Milestone > Phase hierarchy and progress table. Artifact MUST be registered in state.json. If missing: DO NOT report completion.
 </invariants>
 
 <state_machine>

@@ -55,6 +55,8 @@ $ARGUMENTS — user intent text, or special keywords.
 9. **D-007 milestone 反查** — 数字 phase 的 `milestone_id` 由 `state.json.milestones[].phase_slugs` 反查
 10. **每个 step 必须 `completion_confirmed: true`** — 由 `maestro ralph complete N --status DONE|DONE_WITH_CONCERNS` 写入
 11. **schema** — `ralph_protocol_version: "1"` 标记 CLI-driven session；新增字段全部可选
+12. **Invariant violation = BLOCK** — 违反上述任一 invariant 即阻断当前操作，不可绕过。特别是 invariant 1（dispatch via ralph-execute）和 invariant 2（session before execution）和 invariant 10（completion_confirmed 由 CLI 写入）为硬约束。
+13. **Classification evidence** — S_CLASSIFY 的 chain 选择决策 MUST 记录到 status.json 的 `classification_rationale` 字段：匹配了哪个 pattern、排除了哪些备选、confidence level。无记录的分类不可进入 S_CREATE。
 </invariants>
 
 <state_machine>

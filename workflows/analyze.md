@@ -231,7 +231,9 @@ Orchestrator performs targeted web searches, then hands results to `workflow-pha
 `researchContext` is passed into Step 4.2 CLI Analysis and Step 8 Decision Extraction.
 If `external_research` not selected: `researchContext = null`.
 
-**Step 4.1: Codebase Exploration** (cli-explore-agent)
+**Step 4.1: Codebase Exploration** (cli-explore-agent) — MANDATORY, NOT SUBSTITUTABLE
+
+MUST spawn cli-explore-agent. Manual Read/Grep by the orchestrator is NOT a substitute — it provides preparation context, not independent evidence. The agent produces exploration-codebase.json which is a prerequisite for Step 5.
 
 Spawn cli-explore-agent with 3-layer exploration:
 
@@ -243,7 +245,9 @@ Spawn cli-explore-agent with 3-layer exploration:
 
 Output: `exploration-codebase.json` (single) or `explorations/{perspective}.json` (multi-perspective, parallel up to 4)
 
-**Step 4.2: CLI Analysis** (AFTER exploration)
+**Step 4.2: CLI Analysis** (AFTER exploration) — MANDATORY, NOT SUBSTITUTABLE
+
+MUST invoke at least one maestro delegate CLI call. The orchestrator's own analysis is NOT independent verification — CLI tools provide cross-validation from a separate model/perspective.
 
 Build exploration context from Step 4.1 findings, then spawn CLI analysis.
 If `researchContext` is set (from Step 4.0), include it as additional context in each CLI call:
@@ -704,6 +708,7 @@ Record immediately when any occur:
 > - **Options considered**: [Alternatives]
 > - **Chosen**: [Approach] — **Reason**: [Rationale]
 > - **Rejected**: [Why other options were discarded]
+> - **Evidence Source**: [cli-explore-agent | maestro delegate | user input | exploration-codebase.json anchor] — REQUIRED, manual Read/Grep alone is INVALID
 > - **Impact**: [Effect on analysis]
 ```
 
@@ -782,7 +787,7 @@ Replaceable blocks (overwritten each round):
 
 | Error | Resolution |
 |-------|------------|
-| cli-explore-agent fails | Continue with available context, note limitation |
+| cli-explore-agent fails | Retry once. If still fails: log W001 warning in discussion.md, flag all subsequent decisions as LOW CONFIDENCE (evidence gap), continue with available context |
 | CLI timeout | Retry with shorter prompt, or skip perspective |
 | Max rounds reached | Force synthesis, offer continuation |
 | No relevant findings | Broaden search, ask user for clarification |

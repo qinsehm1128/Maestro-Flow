@@ -137,6 +137,13 @@ LOOP for step_index = 1 to N:
 5. Continue loop to next step
 ```
 
+### Phase Gates (MANDATORY, BLOCKING)
+
+**GATE Step 1 → Step 2**: state.json loaded, current version extracted.
+**GATE Step 2 → Step 3**: Migration CLI dry-run completed, plan parsed (not assumed).
+**GATE Step 3 → Step 4**: Each migration step confirmed by user (or --force).
+**GATE Step 4 → Step 5**: Backup created BEFORE executing migration. If migration fails, backup path displayed.
+
 ### Step 5: Summary
 
 After all steps completed (or user aborted):

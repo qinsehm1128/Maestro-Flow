@@ -87,6 +87,9 @@ Available exploration dimensions: architecture, implementation, performance, sec
 8. **Tri-output**: context.md + context-package.json always. analysis.md (full only) + conclusions.json (full + quick — quick writes minimal with `scope_verdict` + `implementation_scope[]`). Gaps mode writes to issues.jsonl + context.md + context-package.json
 9. **D-007 milestone resolution**: numeric scope MUST reverse-lookup `state.json.milestones[].phase_slugs`. NEVER read `current_milestone` directly for phase-scoped artifact registration.
 10. **scope_verdict mandatory** (D-003): macro/adhoc/standalone scopes MUST produce `scope_verdict ∈ {small, medium, large}` in conclusions.json. Drives downstream chain (roadmap vs plan).
+11. **Invariant violation = BLOCK** — violating any invariant above blocks the current operation. Do NOT bypass for "efficiency" or "clear intent" reasons.
+12. **Evidence required on decisions** — every decision in context.md MUST cite evidence from Wave 1 exploration findings or Wave 2 scores. Decisions citing only orchestrator's manual file reading are flagged LOW CONFIDENCE.
+13. **Degradation must be marked** — when graceful degradation (invariant 7) activates, ALL downstream outputs inherit a LOW CONFIDENCE flag. Record in discoveries.ndjson: `{ type: "degradation_event", data: { wave, failed_tasks, impact } }`.
 </invariants>
 
 <state_machine>
@@ -250,6 +253,16 @@ Gray area detection: domain-aware (things users SEE/CALL/RUN/READ), phase-specif
 
 </actions>
 
+### Artifact Verification (before S_AGGREGATE)
+
+Before transitioning to S_AGGREGATE, verify ALL expected outputs exist:
+```
+FULL_MODE_REQUIRED = ["tasks.csv", "context.md", "context-package.json", "analysis.md", "conclusions.json"]
+QUICK_MODE_REQUIRED = ["tasks.csv", "context.md", "context-package.json", "conclusions.json"]
+GAPS_MODE_REQUIRED = ["tasks.csv", "context.md", "context-package.json"]
+```
+If any artifact is missing for the active mode: DO NOT proceed to S_AGGREGATE. Go back and produce the missing artifact.
+
 </state_machine>
 
 <discovery_board>
@@ -272,8 +285,8 @@ Protocol: read before analysis, append-only, dedup by type+key.
 | --gaps but no issues found | Abort: "No open/registered issues" |
 | --gaps ISS-ID not found | Abort: "Issue not found" |
 | Phase directory not found | List available phases, abort |
-| All exploration agents failed | Proceed to scoring with limited context |
-| All scoring agents failed | Skip analysis.md, decision extraction only |
+| All exploration agents failed | Retry once. If still fails: proceed to scoring but flag ALL downstream decisions as LOW CONFIDENCE in discoveries.ndjson |
+| All scoring agents failed | Retry once. If still fails: produce decision-only context.md but flag ALL decisions as LOW CONFIDENCE |
 | Synthesis agent failed | Minimal context.md from raw scores/exploration |
 | Continue mode: no session found | List available sessions |
 </error_codes>

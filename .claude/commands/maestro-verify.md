@@ -68,6 +68,42 @@ Output paths and VRF artifact registration schema are defined in workflow `verif
 <execution>
 Follow '~/.maestro/workflows/verify.md' completely.
 
+### Phase Gates (MANDATORY, BLOCKING)
+
+**GATE 1: Setup → Verification** (Pre-load → V1)
+- REQUIRED: Must-haves established from convergence.criteria in task definitions.
+- REQUIRED: At least one executed plan found with `.summaries/` directory.
+- BLOCKED if no executed plans: error E001 — run maestro-execute first.
+
+**GATE 2: V1 → V2** (Goal-Backward → Anti-Pattern Scan)
+- REQUIRED: All truths verified with status and evidence (Layer 1: Existence).
+- REQUIRED: All artifacts checked at L1/L2/L3 (Layer 2: Substance + Wiring).
+- REQUIRED: All key links verified with evidence (Layer 3: Connection).
+- Do NOT skip layers or mark as "assumed pass" without evidence.
+- BLOCKED if any layer incomplete: complete verification before scanning.
+
+**GATE 3: V2 → Report** (Scan → Output)
+- REQUIRED: Anti-pattern scan completed (unless --skip-antipattern).
+- REQUIRED: Nyquist test coverage assessed (unless --skip-tests).
+- REQUIRED: `verification.json` written with per-layer results and evidence.
+- BLOCKED if missing: produce verification output before reporting.
+
+### Evidence Requirement
+
+Every truth/artifact/link verdict MUST include concrete evidence:
+- Valid evidence: file exists + content grep match, test passes, import chain verified
+- INVALID: "Assumed working based on code reading" without structural check
+- Each FAIL verdict MUST include: what was expected, what was found, suggested fix
+
+### Artifact Verification (before completion)
+
+```
+REQUIRED_ARTIFACTS = [
+  "verification.json"    // Per-layer results, evidence, gaps, fix plans
+]
+```
+If missing: DO NOT report completion.
+
 ### Post-verify Knowledge Inquiry
 
 | Condition | Ask | Route |

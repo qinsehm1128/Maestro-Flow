@@ -41,6 +41,18 @@ Parse for:
 <execution>
 Follow '~/.maestro/workflows/quick.md' completely.
 
+### Artifact Verification (before completion)
+
+```
+REQUIRED_ARTIFACTS = [
+  "plan.json",                              // Task definitions
+  ".summaries/TASK-*-summary.md" (per task)  // Execution results
+]
+```
+If any artifact is missing: DO NOT report completion. Complete the missing step first.
+
+Task summaries MUST include concrete evidence of completion (files changed, tests run, commands executed) — not just "task completed successfully."
+
 **Next-step routing on completion:**
 - Task done, --full verification passed → /manage-status
 - Task done, verification found gaps → /quality-debug {issue}

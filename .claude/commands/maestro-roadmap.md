@@ -92,6 +92,32 @@ Sub-modes:
 - **Revise** (`--revise`): Follow workflow roadmap.md "Mode: Revise" section
 - **Review** (`--review`): Follow workflow roadmap.md "Mode: Review" section
 
+### Phase Gates (MANDATORY, BLOCKING — Create mode)
+
+**GATE 1: Input → Decomposition**
+- REQUIRED: Requirement parsed with goal, constraints, stakeholders.
+- REQUIRED: Upstream context loaded via --from (if specified).
+
+**GATE 2: Decomposition → Refinement**
+- REQUIRED: Milestones defined with deliverable targets.
+- REQUIRED: Phases defined within milestones with dependencies.
+- REQUIRED: Every Active requirement from project.md mapped to exactly one phase.
+- REQUIRED: No circular dependencies in phase ordering.
+
+**GATE 3: Refinement → Completion**
+- REQUIRED: User approved roadmap (or auto-approved with -y).
+- REQUIRED: `.workflow/roadmap.md` written with Milestone > Phase hierarchy.
+- REQUIRED: Artifact registered in state.json with milestone entries.
+
+### Artifact Verification (before completion)
+
+```
+REQUIRED_ARTIFACTS = [
+  ".workflow/roadmap.md"    // Milestone > Phase hierarchy with progress table
+]
+```
+If missing: DO NOT report completion.
+
 </execution>
 
 <completion>
