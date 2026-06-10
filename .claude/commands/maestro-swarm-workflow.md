@@ -228,7 +228,7 @@ Ralph 可以在 A_BUILD_STEPS 中将某些 step 的执行方式标记为 `swarm-
   "args": "--script wf-analyze {phase}",
   "stage": "analyze",
   "command_scope": "project",
-  "command_path": "<resolved by maestro ralph skills>"
+  "command_path": "<resolved by maestro ralph skills --platform claude>"
 }
 ```
 

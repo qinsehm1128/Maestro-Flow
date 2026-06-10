@@ -49,7 +49,7 @@ $ARGUMENTS — user intent text, or special keywords.
 3. **Auto flag pass-through** — 仅当用户传入 `-y` 时透传 `-y` 到 skill args
 4. **Decomposition contract shared with maestro-ralph** — broad/lifecycle intents run S_DECOMPOSE producing the SAME additive block (`boundary_contract`, `execution_criteria`, `task_decomposition`)。Reference maestro-ralph `A_DECOMPOSE_TASKS`
 5. **status.json 唯一真源** — 不生成 `goal-checklist.md` 或外部清单
-6. **执行步骤统一通过 `maestro ralph next` 加载** — `command_scope`/`command_path` 由 `maestro ralph skills --json --quiet` 预校验（project 覆盖 global）；decision 节点不走 CLI，走 `Skill("maestro-ralph")` handoff
+6. **执行步骤统一通过 `maestro ralph next` 加载** — `command_scope`/`command_path` 由 `maestro ralph skills --platform claude --json --quiet` 预校验（project 覆盖 global，限定 `.claude/`）；decision 节点不走 CLI，走 `Skill("maestro-ralph")` handoff
 7. **Topology awareness** — chain catalog 含 grill / brainstorm / blueprint / analyze-macro / analyze / roadmap / plan(三路径) / execute / verify / ...；scope_verdict 由 ralph 在 `post-analyze-scope` 决定
 8. **Grill is interactive-only** — `-y` auto mode MUST skip grill stage and route directly to brainstorm; grill requires Socratic Q&A with the user
 9. **D-007 milestone 反查** — 数字 phase 的 `milestone_id` 由 `state.json.milestones[].phase_slugs` 反查
@@ -144,7 +144,7 @@ S_FALLBACK:
    - 数字 phase 上下文 → `analyze {phase}` → `plan {phase}` → `execute {phase}` → `verify {phase}` → quality pipeline
    - 已有 analyze artifact 想直达执行 → `plan --from analyze:{ANL_ID}` → execute → verify
    - 已有 blueprint artifact → `plan --from blueprint:{BLP_ID}` → execute → verify
-4. 执行 step：`Bash("maestro ralph skills --json --quiet")` 预校验 skill 名，命中写绝对路径到 `command_path`，未命中标 `missing`；同时写 `step.stage` / `step.scope` / `step.source_artifact_ref`。decision 节点不解析 command_path
+4. 执行 step：`Bash("maestro ralph skills --platform claude --json --quiet")` 预校验 skill 名，命中写绝对路径到 `command_path`，未命中标 `missing`；同时写 `step.stage` / `step.scope` / `step.source_artifact_ref`。decision 节点不解析 command_path
 
 ### A_CLARIFY
 
@@ -231,7 +231,7 @@ S_FALLBACK:
 - [ ] Chain selected and confirmed (or auto-confirmed)
 - [ ] Session dir created with status.json before execution; decomposition fields additive-only
 - [ ] 执行 step 含 `command_scope` + `command_path` + `completion_confirmed`；decision step 由 `step.decision` 标识
-- [ ] `command_scope`/`command_path` 由 `maestro ralph skills --json --quiet` 预校验（project 覆盖 global）
+- [ ] `command_scope`/`command_path` 由 `maestro ralph skills --platform claude --json --quiet` 预校验（project 覆盖 global）
 - [ ] Session schema 含 `ralph_protocol_version: "1"` + `active_step_index: null` + step.load 占位
 - [ ] 用户传入 `-y` 时透传到 skill args
 - [ ] All chains dispatched via maestro-ralph-execute

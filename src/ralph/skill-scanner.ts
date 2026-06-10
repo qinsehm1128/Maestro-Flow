@@ -17,7 +17,7 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseSkillManifest } from './skill-resolver.js';
 
-export type SkillPlatform = 'claude' | 'codex';
+export type SkillPlatform = 'claude' | 'codex' | 'agent' | 'agy';
 
 export interface ScannedSkill {
   type: 'command' | 'skill';
@@ -136,6 +136,20 @@ export function scanAllSkills(
     {
       files: collectSkillFiles(join(workflowRoot, '.codex', 'skills')),
       type: 'skill', scope: 'project', platform: 'codex', nameFn: skillName,
+    },
+    // Agent Skills open-standard (.agents/)
+    {
+      files: collectSkillFiles(join(workflowRoot, '.agents', 'skills')),
+      type: 'skill', scope: 'project', platform: 'agent', nameFn: skillName,
+    },
+    // Agy / Antigravity (.agy/)
+    {
+      files: collectSkillFiles(join(home, '.agy', 'skills')),
+      type: 'skill', scope: 'global', platform: 'agy', nameFn: skillName,
+    },
+    {
+      files: collectSkillFiles(join(workflowRoot, '.agy', 'skills')),
+      type: 'skill', scope: 'project', platform: 'agy', nameFn: skillName,
     },
   ];
 
