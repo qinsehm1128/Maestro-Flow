@@ -33,3 +33,18 @@ export { matchReference, tokenize } from './resolution/name-matcher.js';
 export { ImportResolver } from './resolution/import-resolver.js';
 export { runCallbackSynthesis } from './resolution/callback-synthesizer.js';
 export { getRegisteredFrameworks, detectFrameworks } from './resolution/frameworks/index.js';
+
+// Query
+export { searchUnified, searchCodeOnly, searchKnowledgeOnly, parseQuery } from './query/search.js';
+export { bfs, traceCallChain, getCallers, getCallees, getImpactRadius, findShortestPath } from './query/traversal.js';
+export { buildContext, getAgentCategories } from './query/context-builder.js';
+export { computeScore, kindBonus, scorePathRelevance, nameMatchBonus } from './query/scoring.js';
+
+// Sync
+export { FileLock, runIncrementalSync, computeFileHash, hasFileChanged } from './sync/incremental-sync.js';
+export { isWSL2, isOnDrvFs, decideWatchStrategy, areGitHooksInstalled } from './sync/watch-policy.js';
+
+// Surface
+export { registerKgCommands } from './surface/cli.js';
+export { KG_MCP_TOOLS, handleMcpTool, precheckKg } from './surface/mcp-tools.js';
+export { evaluateUnifiedInjection, isUnifiedInjectorActive } from './surface/hook-injector.js';
