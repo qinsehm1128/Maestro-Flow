@@ -1,7 +1,7 @@
 ---
 name: odyssey-review-test
 description: Deep review cycle — archaeology, exploration, multi-dimensional review, generalization, discovery, and detailed knowledge persistence
-argument-hint: "<target> [--scope <path>] [--dimensions <list>] [--skip-generalize] [--auto] [-y] [-c]"
+argument-hint: "<target> [--dimensions <list>] [--skip-generalize] [--auto] [-y] [-c]"
 allowed-tools:
   - Read
   - Write
@@ -40,7 +40,6 @@ $ARGUMENTS — target and optional flags.
 | PR number | `git diff main...HEAD` |
 
 **Flags:**
-- `--scope <path>`: Restrict generalization scan (default: entire project)
 - `--dimensions <list>`: Comma-separated subset (default: correctness,security,performance,architecture)
 - `--skip-generalize`: Skip generalization and discovery
 - `--auto`: CLI delegate calls without confirmation
@@ -62,7 +61,7 @@ SESSION_DIR/
 ```json
 {
   "session_id": "review-odyssey-{YYYYMMDD-HHmmss}",
-  "target": "", "scope": null, "dimensions": [],
+  "target": "", "dimensions": [],
   "flags": { "skip_generalize": false, "auto": false, "auto_confirm": false },
   "current_state": "S_INTAKE", "review_result": null, "pattern": null,
   "phase_goals": [], "phase_goals_all_done": false,
@@ -217,7 +216,7 @@ Spawn 4 Agents in single message:
 
 | Agent | 策略 | 输入 | 范围 |
 |-------|------|------|------|
-| Syntax grep | Grep syntax-layer patterns | P*.signature (regex) | `--scope` 或全项目 |
+| Syntax grep | Grep syntax-layer patterns | P*.signature (regex) | 全项目 |
 | Semantic scan | 理解 semantic-layer 描述，逐文件检查同类问题 | P*.description | 相关模块 |
 | Structural match | 找结构相似的文件，检查是否有相同反模式 | 原始 finding 的文件结构特征 | 全项目 |
 | Historical grep | `git log -S "{pattern}" --oneline` 查找曾经引入/修复同类问题的历史 | P*.signature | git 全历史 |

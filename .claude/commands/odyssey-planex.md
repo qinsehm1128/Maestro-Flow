@@ -1,7 +1,7 @@
 ---
 name: odyssey-planex
 description: Requirement-driven iterative cycle — plan, execute, strict verify, fix loop until acceptance criteria met
-argument-hint: "<requirement> [--scope <path>] [--max-iterations N] [--auto] [-y] [-c]"
+argument-hint: "<requirement> [--max-iterations N] [--auto] [-y] [-c]"
 allowed-tools:
   - Read
   - Write
@@ -31,7 +31,6 @@ Core philosophy:
 $ARGUMENTS — requirement description and optional flags.
 
 **Flags:**
-- `--scope <path>`: Restrict implementation scope (default: inferred from requirement)
 - `--max-iterations N`: Max verify→fix cycles before escalation (default: 3)
 - `--auto`: CLI delegate calls without confirmation
 - `-y`: Auto-confirm — decisions recorded as `deferred`, no blocking prompts
@@ -51,7 +50,7 @@ SESSION_DIR/
 ```json
 {
   "session_id": "planex-odyssey-{YYYYMMDD-HHmmss}",
-  "requirement": "", "scope": null,
+  "requirement": "",
   "flags": { "max_iterations": 3, "auto": false, "auto_confirm": false },
   "current_state": "S_INTAKE",
   "acceptance_criteria": [],
@@ -140,7 +139,7 @@ S_RECORD:
 
 ### A_INTAKE
 
-1. Parse requirement, flags, scope
+1. Parse requirement, flags
 2. Generate slug, create `SESSION_DIR`
 3. **Define acceptance criteria** — the core of this command:
    - Analyze requirement → derive testable criteria
@@ -321,7 +320,6 @@ Max iterations (default 3) prevents infinite loops. Each iteration records:
 | Code | Severity | Condition | Recovery |
 |------|----------|-----------|----------|
 | E001 | error | No requirement provided | Provide requirement |
-| E002 | error | --scope path not found | Check path |
 | E003 | error | Resume but no session | Start new |
 | E004 | error | Delegate failed | Retry or proceed |
 | W001 | warning | No acceptance criteria derived | Manual definition needed |

@@ -1,7 +1,7 @@
 ---
 name: odyssey-review-test
 description: Deep review cycle — archaeology, exploration, multi-dimensional review, generalization, discovery, and detailed knowledge persistence
-argument-hint: "<target> [--scope <path>] [--dimensions <list>] [--skip-generalize] [--auto] [-y] [-c]"
+argument-hint: "<target> [--dimensions <list>] [--skip-generalize] [--auto] [-y] [-c]"
 allowed-tools: spawn_agents_on_csv, Read, Write, Edit, Bash, Glob, Grep, request_user_input
 ---
 
@@ -33,7 +33,6 @@ $ARGUMENTS — target and optional flags.
 | PR number | `git diff main...HEAD` |
 
 **Flags:**
-- `--scope <path>`: Restrict generalization scan
 - `--dimensions <list>`: Comma-separated (default: correctness,security,performance,architecture)
 - `--skip-generalize`: Skip generalization and discovery
 - `--auto`: CLI delegates without confirmation

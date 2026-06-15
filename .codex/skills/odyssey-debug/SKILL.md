@@ -1,7 +1,7 @@
 ---
 name: odyssey-debug
 description: Long-running debug cycle — archaeology, diagnosis, fix, confirmation, generalization, discovery, and knowledge persistence
-argument-hint: "<issue> [--scope <path>] [--skip-fix] [--skip-generalize] [--auto] [-y] [-c]"
+argument-hint: "<issue> [--skip-fix] [--skip-generalize] [--auto] [-y] [-c]"
 allowed-tools: spawn_agents_on_csv, Read, Write, Edit, Bash, Glob, Grep, request_user_input
 ---
 
@@ -25,7 +25,6 @@ Core philosophy:
 $ARGUMENTS — issue description and optional flags.
 
 **Flags:**
-- `--scope <path>`: Restrict archaeology and generalization scan (default: entire project)
 - `--skip-fix`: Analysis-only — archaeology + diagnosis + generalize, no code changes
 - `--skip-generalize`: Skip generalization and discovery (quick fix without learning)
 - `--auto`: CLI delegate calls run without per-step confirmation
@@ -70,7 +69,7 @@ Phase-specific fields:
 ```json
 {
   "session_id": "debug-odyssey-{YYYYMMDD-HHmmss}",
-  "issue": "", "scope": null,
+  "issue": "",
   "flags": { "skip_fix": false, "skip_generalize": false, "auto": false, "auto_confirm": false },
   "current_state": "S_INTAKE", "diagnosis_retries": 0,
   "root_cause": null, "pattern": null, "confirmation": null,
@@ -167,13 +166,13 @@ id,title,description,task_type,deps,wave,status,findings,evidence,error
 
 ### Stage 1: Intake (S_INTAKE)
 
-1. Parse arguments: issue description, flags, scope
+1. Parse arguments: issue description, flags
 2. Generate slug, create `SESSION_DIR`
 3. Search prior knowledge:
    - `maestro search "<issue keywords>"` → related specs/knowhow
    - `Glob(".workflow/scratch/*-debug-odyssey-*")` → prior odyssey sessions
    - Read `.workflow/codebase/ARCHITECTURE.md` if exists
-4. Identify relevant files: Grep issue keywords; if `--scope` → filter
+4. Identify relevant files: Grep issue keywords
 5. Derive `phase_goals[]`: start with G1-G6 template, apply `skip_when` from flags
 6. Write `session.json` + `understanding.md` §1
 7. Display **Goal Prompt block** (Appendix: Goal Prompt Template)，不阻塞流程，继续执行
@@ -333,7 +332,7 @@ Write to `session.json.pattern`:
 
 Append Wave 2 generalization rows to `tasks.csv`:
 ```csv
-"gen-pattern","Pattern Grep","Grep for pattern '${signature}' across ${scope || 'project'}. Return [{file, line, context, risk_level}] in findings.","generalization","","2","pending","","",""
+"gen-pattern","Pattern Grep","Grep for pattern '${signature}' across project. Return [{file, line, context, risk_level}] in findings.","generalization","","2","pending","","",""
 "gen-structural","Structural Search","Read files with similar imports/structure to ${buggy_files}. Check for same anti-pattern. Return [{file, line, description, risk}] in findings.","generalization","","2","pending","","",""
 ```
 
@@ -487,7 +486,6 @@ Stage 完成时 MUST 标记对应 goal。未标记 = invariant 5 violation = BLO
 | Code | Severity | Condition | Recovery |
 |------|----------|-----------|----------|
 | E001 | error | No issue description and no session to resume | Provide issue or use -c |
-| E002 | error | --scope path not found | Check path exists |
 | E003 | error | Resume requested but no session found | Start new session |
 | E004 | error | Delegate execution failed | Retry or proceed without CLI |
 | W001 | warning | No relevant git history found | Proceed with limited context |

@@ -1,7 +1,7 @@
 ---
 name: odyssey-debug
 description: Long-running debug cycle — archaeology, diagnosis, fix, confirmation, generalization, discovery, and knowledge persistence
-argument-hint: "<issue> [--scope <path>] [--skip-fix] [--skip-generalize] [--auto] [-y] [-c]"
+argument-hint: "<issue> [--skip-fix] [--skip-generalize] [--auto] [-y] [-c]"
 allowed-tools:
   - Read
   - Write
@@ -33,7 +33,6 @@ Entry points:
 $ARGUMENTS — issue description and optional flags.
 
 **Flags:**
-- `--scope <path>`: Restrict archaeology and generalization scan to files under this path (default: entire project)
 - `--skip-fix`: Analysis-only mode — run archaeology, diagnosis, and generalization but do not modify code
 - `--skip-generalize`: Skip the generalization and discovery phases (quick fix without learning)
 - `--auto`: CLI delegate calls run without per-step confirmation
@@ -57,7 +56,7 @@ SESSION_DIR/
 {
   "session_id": "debug-odyssey-{YYYYMMDD-HHmmss}",
   "issue": "",
-  "scope": null,
+ 
   "flags": { "skip_fix": false, "skip_generalize": false, "auto": false, "auto_confirm": false },
   "current_state": "S_INTAKE",
   "diagnosis_retries": 0,
@@ -202,18 +201,18 @@ S_RECORD:
 
 ### A_INTAKE
 
-1. Parse arguments: extract issue description, flags, scope
+1. Parse arguments: extract issue description, flags
 2. Generate slug from issue, create `SESSION_DIR`
 3. Search prior knowledge:
    - `maestro search "<issue keywords>"` → related specs/knowhow
    - `Glob(".workflow/scratch/*-debug-odyssey-*")` → prior odyssey sessions
    - Read `.workflow/codebase/ARCHITECTURE.md` if exists → module map
-4. Identify relevant files: Grep issue keywords → candidate file list; if `--scope` → filter
+4. Identify relevant files: Grep issue keywords → candidate file list
 5. Derive `phase_goals[]` from flags:
    - Start with full G1-G6 template
    - For each goal with `skip_when`: if `flags[skip_when] == true` → set `status: "skipped"`, `completion_confirmed: true`, `completed_at: now()`
    - Remaining goals stay `status: "pending"`
-6. Write initial `session.json` (with phase_goals) + `understanding.md` §1 (issue statement, scope, prior knowledge summary)
+6. Write initial `session.json` (with phase_goals) + `understanding.md` §1 (issue statement, prior knowledge summary)
 7. Emit Goal Prompt (see Appendix: Goal Prompt Template)
 
 ### A_RESUME_SESSION
@@ -415,7 +414,7 @@ Write to `session.json.pattern`:
 
 | Agent | Strategy | Scope |
 |-------|----------|-------|
-| Pattern grep | `Grep` with signature regex | `--scope` or full project |
+| Pattern grep | `Grep` with signature regex | full project |
 | Structural | Read similar files, check for same anti-pattern | Related modules |
 
 **Step 3 — Write understanding.md §7:**
@@ -549,7 +548,6 @@ Goal audit 在 A_RECORD Step 4 执行。`phase_goals_all_done` 仅当所有 goal
 | Code | Severity | Condition | Recovery |
 |------|----------|-----------|----------|
 | E001 | error | No issue description and no session to resume | Provide issue or use -c |
-| E002 | error | --scope path not found | Check path exists |
 | E003 | error | Resume requested but no session found | Start new session |
 | E004 | error | Delegate execution failed | Retry or proceed without CLI |
 | W001 | warning | No relevant git history found | Proceed with limited context |

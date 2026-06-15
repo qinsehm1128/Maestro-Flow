@@ -1,7 +1,7 @@
 ---
 name: odyssey-planex
 description: Requirement-driven iterative cycle — plan, execute, strict verify, fix loop until acceptance criteria met
-argument-hint: "<requirement> [--scope <path>] [--max-iterations N] [--auto] [-y] [-c]"
+argument-hint: "<requirement> [--max-iterations N] [--auto] [-y] [-c]"
 allowed-tools: spawn_agents_on_csv, Read, Write, Edit, Bash, Glob, Grep, request_user_input
 ---
 
@@ -24,7 +24,6 @@ Core philosophy:
 $ARGUMENTS — requirement description and optional flags.
 
 **Flags:**
-- `--scope <path>`: Restrict implementation scope
 - `--max-iterations N`: Max verify→fix cycles (default: 3)
 - `--auto`: CLI delegates without confirmation
 - `-y`: Auto-confirm — decisions as `deferred`
@@ -113,7 +112,7 @@ id,title,description,task_type,criterion_refs,deps,wave,status,findings,evidence
 
 ### Stage 1: Intake (S_INTAKE)
 
-1. Parse requirement, flags, scope
+1. Parse requirement, flags
 2. Create `SESSION_DIR`
 3. **Define acceptance criteria:**
    - Analyze requirement → derive testable criteria
@@ -260,7 +259,6 @@ pending → done | skipped | failed
 | Code | Severity | Condition | Recovery |
 |------|----------|-----------|----------|
 | E001 | error | No requirement | Provide requirement |
-| E002 | error | --scope not found | Check path |
 | E003 | error | Resume no session | Start new |
 | E004 | error | Delegate failed | Retry or skip |
 | W001 | warning | No criteria derived | Manual definition |
