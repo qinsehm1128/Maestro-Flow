@@ -38,6 +38,24 @@ Core philosophy:
 | `api-endpoint` | 请求/响应契约 + 错误处理 + 权限校验 | API 开发 |
 </boundary>
 
+<execution_discipline>
+**三条铁律（所有阶段适用）:**
+
+1. **Phase commit** — 每个产出变更的阶段完成后立即 `git commit`
+   - 代码变更 + understanding.md → `git add` → `git commit -m "odyssey-planex({slug}): {phase} — {摘要}"`
+   - session.json / evidence.ndjson 为运行时状态，不纳入 commit
+
+2. **有把握才改** — 仅修改自己有把握的内容；不确定的记录决策等人判断
+   - 有把握 → 直接修改代码，commit
+   - 需要决策 → 记录 `evidence.ndjson {"phase":"decision","status":"pending"}` 不改代码
+   - 禁止猜测性修改
+
+3. **多 CLI 辅助** — 利用 `maestro delegate` 调用多个 CLI 工具交叉验证
+   - 计划阶段: `--role analyze` 获取任务分解建议
+   - 修复前后: `--role review` 确认无回归
+   - verify 阶段: cli-review 类型标准自动 delegate
+</execution_discipline>
+
 <context>
 $ARGUMENTS — requirement description and optional flags.
 

@@ -23,6 +23,13 @@ Core philosophy:
 **模板:** `--template <name>` — feature | bugfix | refactor | migration | api-endpoint
 </boundary>
 
+<execution_discipline>
+**三条铁律（所有阶段适用）:**
+1. **Phase commit** — 阶段完成后 `git commit -m "odyssey-planex({slug}): {phase} — {摘要}"`（session.json/evidence.ndjson 不纳入）
+2. **有把握才改** — 有把握→改代码 commit；不确定→记录 `evidence.ndjson {"phase":"decision","status":"pending"}` 不改代码
+3. **多 CLI 辅助** — plan 用 `--role analyze`，verify 用 cli-review delegate，fix 前后用 `--role review`
+</execution_discipline>
+
 <context>
 $ARGUMENTS — requirement description and optional flags.
 

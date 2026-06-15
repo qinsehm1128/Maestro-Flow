@@ -24,6 +24,13 @@ targeted fixes, codebase-wide generalization, decision journal. `--skip-fix` for
 **探索自由度:** 边界内自由 — 跨维度关联、追溯历史、泛化全项目。修复仅限 critical/high。
 </boundary>
 
+<execution_discipline>
+**三条铁律（所有阶段适用）:**
+1. **Phase commit** — 阶段完成后 `git commit -m "odyssey-review({slug}): {phase} — {摘要}"`（session.json/evidence.ndjson 不纳入）
+2. **有把握才改** — 有把握→改代码 commit；不确定→记录 `evidence.ndjson {"phase":"decision","status":"pending"}` 不改代码
+3. **多 CLI 辅助** — `maestro delegate` 多 `--role`（analyze/review/explore）交叉验证，修复前后各 review 一次
+</execution_discipline>
+
 <context>
 $ARGUMENTS — target and optional flags.
 

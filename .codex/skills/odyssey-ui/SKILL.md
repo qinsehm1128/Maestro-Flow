@@ -25,6 +25,13 @@ Core philosophy:
 **探索自由度:** 边界内最大自由 — S_DIVERGE 鼓励发散思维，不设创意上限。在约束下尽可能完善每个像素。
 </boundary>
 
+<execution_discipline>
+**三条铁律（所有阶段适用）:**
+1. **Phase commit** — 阶段完成后 `git commit -m "odyssey-ui({slug}): {phase} — {摘要}"`（session.json/evidence.ndjson 不纳入）
+2. **有把握才改** — 确定性高（缺 hover state、对比度不足）→改；设计方向不确定（色彩/布局）→记录 decision
+3. **多 CLI 辅助** — survey 用 `--role explore`，audit/diverge 用 `--role analyze`，fix 前后用 `--role review`
+</execution_discipline>
+
 <context>
 $ARGUMENTS — target and optional flags.
 

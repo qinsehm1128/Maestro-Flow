@@ -35,6 +35,24 @@ Entry: `/odyssey-ui "target"` (full cycle) | `-c` (resume) | `--skip-fix` (audit
 **探索自由度:** 边界内最大自由 — S_DIVERGE 阶段鼓励发散思维，不设创意上限。审查 + 发散可发现任何视觉/交互/可访问性细节。在约束下尽可能完善每个像素。
 </boundary>
 
+<execution_discipline>
+**三条铁律（所有阶段适用）:**
+
+1. **Phase commit** — 每个产出变更的阶段完成后立即 `git commit`
+   - 代码变更 + understanding.md → `git add` → `git commit -m "odyssey-ui({slug}): {phase} — {摘要}"`
+   - session.json / evidence.ndjson 为运行时状态，不纳入 commit
+
+2. **有把握才改** — 仅修改自己有把握的内容；不确定的记录决策等人判断
+   - 视觉确定性高（缺少 hover state、对比度不足等）→ 直接修复
+   - 设计方向不确定（色彩选择、布局重构等）→ 记录 decision 等用户判断
+   - 禁止猜测性修改，尤其是品牌/风格层面的改动
+
+3. **多 CLI 辅助** — 利用 `maestro delegate` 调用多个 CLI 工具交叉验证
+   - survey 阶段: `--role explore` 发现设计系统用法
+   - audit/diverge: `--role analyze` 获取多视角创意
+   - fix 前后: `--role review` 确认视觉正确性
+</execution_discipline>
+
 <context>
 $ARGUMENTS — target and optional flags.
 

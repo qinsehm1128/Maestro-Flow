@@ -41,6 +41,25 @@ Entry: `/odyssey-debug "issue"` (full cycle) | `-c` (resume) | `--skip-fix` (ana
 | `crash` | stack trace → null chain → error propagation | 崩溃/异常 |
 </boundary>
 
+<execution_discipline>
+**三条铁律（所有阶段适用）:**
+
+1. **Phase commit** — 每个产出变更的阶段完成后立即 `git commit`
+   - 代码变更 + understanding.md → `git add` → `git commit -m "odyssey-debug({slug}): {phase} — {摘要}"`
+   - session.json / evidence.ndjson 为运行时状态，不纳入 commit
+   - 确保每个阶段的进展可回溯、可恢复
+
+2. **有把握才改** — 仅修改自己有把握的内容；不确定的记录决策等人判断
+   - 有把握 → 直接修改代码，commit
+   - 需要决策 → 记录 `evidence.ndjson {"phase":"decision","status":"pending"}` 不改代码
+   - 禁止猜测性修改，宁可多记录一条 decision 也不冒险改错
+
+3. **多 CLI 辅助** — 利用 `maestro delegate` 调用多个 CLI 工具交叉验证
+   - 关键判断用不同 `--role`（analyze / review / explore）获取多视角
+   - 修复前后各做一次 CLI review 确认
+   - 不同阶段可调用不同工具，综合多方意见再行动
+</execution_discipline>
+
 <context>
 $ARGUMENTS — issue description and optional flags.
 

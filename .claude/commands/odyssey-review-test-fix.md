@@ -31,6 +31,23 @@ automated fix, codebase-wide generalization, decision journal. Use `--skip-fix` 
 **探索自由度:** 边界内自由探索 — 可跨维度关联发现、追溯 git 历史、泛化扫描全项目。修复仅限 critical/high findings。
 </boundary>
 
+<execution_discipline>
+**三条铁律（所有阶段适用）:**
+
+1. **Phase commit** — 每个产出变更的阶段完成后立即 `git commit`
+   - 代码变更 + understanding.md → `git add` → `git commit -m "odyssey-review({slug}): {phase} — {摘要}"`
+   - session.json / evidence.ndjson 为运行时状态，不纳入 commit
+
+2. **有把握才改** — 仅修改自己有把握的内容；不确定的记录决策等人判断
+   - 有把握 → 直接修改代码，commit
+   - 需要决策 → 记录 `evidence.ndjson {"phase":"decision","status":"pending"}` 不改代码
+   - 禁止猜测性修改
+
+3. **多 CLI 辅助** — 利用 `maestro delegate` 调用多个 CLI 工具交叉验证
+   - 关键判断用不同 `--role`（analyze / review / explore）获取多视角
+   - 修复前后各做一次 CLI review 确认
+</execution_discipline>
+
 <context>
 $ARGUMENTS — target and optional flags.
 
