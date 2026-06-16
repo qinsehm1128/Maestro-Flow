@@ -27,7 +27,7 @@ Core philosophy:
 
 <execution_discipline>
 **三条铁律（所有阶段适用）:**
-1. **Phase commit** — 阶段完成后 `git commit -m "odyssey-ui({slug}): {phase} — {摘要}"`（session.json/evidence.ndjson 不纳入）
+1. **Phase auto-commit** — 阶段完成后**自动** `git commit`，无需用户确认（session.json/evidence.ndjson 不纳入）
 2. **有把握才改** — 确定性高（缺 hover state、对比度不足）→改；设计方向不确定（色彩/布局）→记录 decision
 3. **多 CLI 辅助** — survey 用 `--role explore`，audit/diverge 用 `--role analyze`，fix 前后用 `--role review`
 </execution_discipline>
@@ -196,6 +196,8 @@ id,title,description,task_type,dimension,deps,wave,status,findings,evidence,erro
 
 **Resume (`-c`):** Glob latest session -> read `session.json` -> restore `current_state` -> jump.
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-ui({slug}): S_INTAKE — 目标解析"`
+
 ### S_SURVEY
 **spawn_agents_on_csv (Wave 1):**
 
@@ -207,6 +209,8 @@ Write `tasks.csv` with Wave 1 rows:
 `spawn_agents_on_csv({ csv_path:"tasks.csv", max_concurrency:2, max_runtime_seconds:300, output_csv_path:"wave-1-results.csv", output_schema:SHARED_OUTPUT_SCHEMA })`
 
 Merge -> evidence.ndjson (phase: "survey"). Update SS2. Mark G1 done.
+
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-ui({slug}): S_SURVEY — 调查"`
 
 ### S_AUDIT
 **spawn_agents_on_csv (Wave 2)** — 6 agents:
@@ -223,6 +227,8 @@ Append Wave 2 rows to `tasks.csv`:
 `spawn_agents_on_csv({ csv_path:"tasks.csv", max_concurrency:6, max_runtime_seconds:600, output_csv_path:"wave-2-results.csv", output_schema:SHARED_OUTPUT_SCHEMA })`
 
 Merge -> evidence.ndjson (phase: "audit"). Write `audit_result` with dimensions, finding count, severity distribution. Update SS3. Mark G2 done.
+
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-ui({slug}): S_AUDIT — 审查"`
 
 ### S_DIVERGE
 **spawn_agents_on_csv (Wave 3)** — 2 agents:
@@ -247,10 +253,14 @@ Run_in_background, STOP, wait for callback.
 
 Consolidate: audit findings + divergent ideas -> prioritized improvement list (impact/effort matrix). Write `diverge_result`. Update SS4. Mark G3 done.
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-ui({slug}): S_DIVERGE — 发散"`
+
 ### S_FIX
 Skip if `--skip-fix`. Filter audit (severity >= high) + divergent (impact:high, effort:low|medium) -> fix candidates.
 **Normal**: `request_user_input` to confirm. **`-y`**: auto-fix, record `deferred`.
 Implement highest impact first. Record evidence (phase: "fix").
+
+📌 **Auto-commit**: `git add -A && git commit -m "odyssey-ui({slug}): S_FIX — 修复"`
 
 ### S_VERIFY
 Skip if `--skip-fix`.
@@ -259,6 +269,8 @@ Skip if `--skip-fix`.
 2. **CLI visual review**: delegate `--role review --mode analysis` for visual correctness + regression check (run_in_background, STOP)
 3. `needs_rework` -> S_FIX (loop). `confirmed` -> mark G4 done, advance
 4. Update SS5
+
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-ui({slug}): S_VERIFY — 验证"`
 
 ### S_GENERALIZE
 Skip if `--skip-generalize`.
@@ -292,6 +304,8 @@ Append Wave 4 rows to `tasks.csv`:
 
 **Step 6:** Write `generalization_stats`. Update SS6. Mark G5 done.
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-ui({slug}): S_GENERALIZE — 泛化"`
+
 ### S_DISCOVER
 Skip if no generalization hits.
 
@@ -299,6 +313,8 @@ Skip if no generalization hits.
 2. **Route**: see appendix `-y` behavior. Append evidence (phase: "discovery" + "decision")
 3. **Cross-phase loop**: new component to audit → S_AUDIT (loops < max_loops → cross_phase_loops++); fixable sibling → S_FIX (!skip_fix, loops < max_loops); triage complete OR budget exhausted → S_RECORD
 4. Update SS7. Mark G6 done.
+
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-ui({slug}): S_DISCOVER — 发现"`
 
 ### S_RECORD
 1. Finalize SS8: structured by Knowledge Persistence table (temporary)
@@ -317,6 +333,8 @@ Goals: {done}/{total} ({skipped} skipped)
 ---
 ```
 **Next steps:** `$odyssey-review-test-fix`, `$manage-issue list --source ui-odyssey`, `$maestro-impeccable`, `$maestro-plan --gaps`
+
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-ui({slug}): S_RECORD — 总结"`
 </execution>
 
 <appendix>

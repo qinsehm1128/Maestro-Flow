@@ -44,7 +44,7 @@ Entry: `/odyssey-debug "issue"` (full cycle) | `-c` (resume) | `--skip-fix` (ana
 <execution_discipline>
 **三条铁律（所有阶段适用）:**
 
-1. **Phase commit** — 每个产出变更的阶段完成后立即 `git commit`
+1. **Phase auto-commit** — 每个阶段完成后**自动** `git commit`，无需用户确认
    - 代码变更 + understanding.md → `git add` → `git commit -m "odyssey-debug({slug}): {phase} — {摘要}"`
    - session.json / evidence.ndjson 为运行时状态，不纳入 commit
    - 确保每个阶段的进展可回溯、可恢复
@@ -224,6 +224,8 @@ S_RECORD   → END            : A_RECORD complete
 5. Write `session.json` + `understanding.md` §1
 6. Emit Goal Prompt (see Appendix)
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-debug({slug}): INTAKE — 目标解析与上下文加载"`
+
 ### A_RESUME_SESSION
 Find latest session via Glob → read `session.json` → display summary → jump to `current_state`.
 
@@ -251,6 +253,8 @@ Run_in_background, STOP, wait for callback. Append results to evidence.
 
 Update `understanding.md` §2.
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-debug({slug}): ARCHAEOLOGY — git 考古分析"`
+
 ### A_EXPLORE
 Skip if no enabled CLI tools (W006).
 
@@ -268,11 +272,15 @@ Run_in_background, STOP, wait for callback.
 
 Parse → write `explore.json` + append `evidence.ndjson` (phase: "explore"). Update §3. Mark G2 done.
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-debug({slug}): EXPLORE — 代码探索完成"`
+
 ### A_DIAGNOSE
 1. **Form hypotheses** from evidence (archaeology + explore), ranked [HIGH]/[MEDIUM]/[LOW] → §4
 2. **Test each** (rank order): design test → execute → append evidence (phase: "diagnosis")
 3. **Decision journal**: ambiguity → evidence (phase: "decision"); Normal: AskUserQuestion | `-y`: defer
 4. **Root cause**: confirmed → `session.json.root_cause` + §5. Mark G1 done.
+
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-debug({slug}): DIAGNOSE — 根因确认"`
 
 ### A_ESCALATE_DIAGNOSIS
 Increment `diagnosis_retries`. If < 3: broaden scope via `maestro delegate --role analyze` (same delegate format), form new hypotheses, return to S_DIAGNOSE. If >= 3: Normal → AskUserQuestion (broaden/new/INCONCLUSIVE) | `-y` → auto INCONCLUSIVE, proceed to S_RECORD. See Appendix: `-y` behavior.
@@ -281,6 +289,8 @@ Increment `diagnosis_retries`. If < 3: broaden scope via `maestro delegate --rol
 1. Present root cause + proposed fix. Normal: AskUserQuestion | `-y`: auto proceed (see Appendix)
 2. Implement fix
 3. Record in evidence (phase: "decision")
+
+📌 **Auto-commit**: `git add -A && git commit -m "odyssey-debug({slug}): FIX — {修复摘要}"`
 
 ### A_CONFIRM
 1. **Tests**: auto-detect framework, run covering tests
@@ -298,6 +308,8 @@ Run_in_background, STOP, wait for callback.
 
 3. Write `session.json.confirmation`: `{test_result, cli_review, overall: "confirmed|needs_rework", timestamp}`
 4. Update §6. `needs_rework` → S_FIX. `confirmed` → mark G3 done, advance.
+
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-debug({slug}): CONFIRM — 修复验证"`
 
 ### A_GENERALIZE
 举一反三: multi-layer pattern extraction → 4-agent scan → cross-layer dedup → iterative deepening.
@@ -331,10 +343,14 @@ Returns: `[{pattern_id, file, line, context, risk_level, layer, confidence}]`
 
 Write §7 + `session.json.generalization_stats`: `{patterns_extracted, total_hits, cross_layer_confirmed, regression_risks, by_layer, deepening_triggered}`. Mark G4 done.
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-debug({slug}): GENERALIZE — 泛化扫描完成"`
+
 ### A_DISCOVER
 1. **Triage** each hit: read ±10 lines context → classify `safe`/`risk`/`bug`
 2. **Route**: see Appendix `-y` behavior table. Append evidence (phase: "discovery" + "decision")
 3. Update §8. Mark G5 done.
+
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-debug({slug}): DISCOVER — 发现分类完成"`
 
 ### A_RECORD
 1. Finalize `understanding.md` §9
@@ -356,6 +372,8 @@ Self-iter:  {N} quality gate rounds across {M} stages
 Goals:      {done}/{total} confirmed ({skipped} skipped)
 ---
 ```
+
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-debug({slug}): RECORD — 会话总结与知识沉淀"`
 
 </actions>
 

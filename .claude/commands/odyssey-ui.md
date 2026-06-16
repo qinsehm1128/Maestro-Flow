@@ -38,7 +38,7 @@ Entry: `/odyssey-ui "target"` (full cycle) | `-c` (resume) | `--skip-fix` (audit
 <execution_discipline>
 **三条铁律（所有阶段适用）:**
 
-1. **Phase commit** — 每个产出变更的阶段完成后立即 `git commit`
+1. **Phase auto-commit** — 每个阶段完成后**自动** `git commit`，无需用户确认
    - 代码变更 + understanding.md → `git add` → `git commit -m "odyssey-ui({slug}): {phase} — {摘要}"`
    - session.json / evidence.ndjson 为运行时状态，不纳入 commit
 
@@ -216,6 +216,8 @@ S_RECORD   → END            DO A_RECORD
 5. Write `session.json` + `understanding.md` §1 (Target & Design Context)
 6. Emit Goal Prompt (see Appendix)
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-ui({slug}): INTAKE — 目标解析"`
+
 ### A_RESUME
 Find latest session via Glob → read `session.json` → display summary → jump to `current_state`.
 
@@ -237,6 +239,8 @@ Run_in_background, STOP, wait for callback.
 
 4. Append evidence.ndjson (phase: "survey"). Update `understanding.md` §2. Mark G1 done.
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-ui({slug}): SURVEY — 视觉调查"`
+
 ### A_AUDIT
 Spawn 6 parallel Agents (one per dimension, or `--dimensions` subset):
 
@@ -252,6 +256,8 @@ Spawn 6 parallel Agents (one per dimension, or `--dimensions` subset):
 Each returns `[{title, severity, file, line, description, suggestion, dimension}]`.
 Merge → evidence.ndjson (phase: "audit"). Write `session.json.audit_result`.
 Update `understanding.md` §3 (findings by dimension + severity matrix). Mark G2 done.
+
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-ui({slug}): AUDIT — 多维审查"`
 
 ### A_DIVERGE
 **The unique phase** — divergent creative exploration. Goes beyond defect fixing to ask "what would make this delightful?"
@@ -279,12 +285,16 @@ Run_in_background, STOP, wait for callback.
 **Step 3 — Consolidate**: Merge audit findings + divergent ideas → prioritized improvement list (severity x impact x effort matrix).
 Append evidence.ndjson (phase: "diverge"). Update `understanding.md` §4. Mark G3 done.
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-ui({slug}): DIVERGE — 发散探索"`
+
 ### A_FIX
 Skip if `--skip-fix`. Implement improvements prioritized by impact.
 
 1. Group by dimension, fix highest-impact first
 2. For each fix: implement → append evidence.ndjson (phase: "fix")
 3. **Normal**: AskUserQuestion per-fix confirmation. **`-y`**: auto-proceed, record `deferred`.
+
+📌 **Auto-commit**: `git add -A && git commit -m "odyssey-ui({slug}): FIX — 优化实现"`
 
 ### A_VERIFY
 Visual verification — confirm improvements work in practice.
@@ -303,6 +313,8 @@ Run_in_background, STOP, wait for callback.
 
 3. `needs_rework` → S_FIX. `verified` → mark G4 done, advance.
 4. Update `understanding.md` §5. Write `session.json.confirmation`.
+
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-ui({slug}): VERIFY — 验证"`
 
 ### A_GENERALIZE
 Multi-layer pattern extraction from findings + improvements → 4-agent scan → cross-layer dedup.
@@ -332,10 +344,14 @@ Write `session.json.patterns[]`.
 
 Update `understanding.md` §6 (per-pattern summary, cross-layer matrix). Write `session.json.generalization_stats`. Mark G5 done.
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-ui({slug}): GENERALIZE — 泛化扫描"`
+
 ### A_DISCOVER
 Classify each hit: `needs_treatment` / `low_risk` / `already_handled`.
 **Normal**: AskUserQuestion for routing. **`-y`**: auto create issue, `deferred`.
 Append evidence (phase: "discovery" + "decision"). Update `understanding.md` §7. Mark G6 done.
+
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-ui({slug}): DISCOVER — 发现分类"`
 
 ### A_RECORD
 1. Finalize `understanding.md` §8: design learnings
@@ -359,6 +375,9 @@ Self-iter:  {N} quality gate rounds across {M} stages
 Goals:      {done}/{total} ({skipped} skipped)
 ---
 ```
+
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-ui({slug}): RECORD — 会话总结"`
+
 </actions>
 
 <appendix>

@@ -26,7 +26,7 @@ targeted fixes, codebase-wide generalization, decision journal. `--skip-fix` for
 
 <execution_discipline>
 **三条铁律（所有阶段适用）:**
-1. **Phase commit** — 阶段完成后 `git commit -m "odyssey-review({slug}): {phase} — {摘要}"`（session.json/evidence.ndjson 不纳入）
+1. **Phase auto-commit** — 阶段完成后**自动** `git commit`，无需用户确认（session.json/evidence.ndjson 不纳入）
 2. **有把握才改** — 有把握→改代码 commit；不确定→记录 `evidence.ndjson {"phase":"decision","status":"pending"}` 不改代码
 3. **多 CLI 辅助** — `maestro delegate` 多 `--role`（analyze/review/explore）交叉验证，修复前后各 review 一次
 </execution_discipline>
@@ -185,6 +185,8 @@ Parse target + flags → file list. Create `SESSION_DIR`, derive `phase_goals[]`
 Search prior knowledge: `maestro search`, prior sessions, ARCHITECTURE.md.
 Write `session.json` + `understanding.md` §1. Display Goal Prompt (appendix).
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-review({slug}): S_INTAKE — 目标解析"`
+
 ### S_ARCHAEOLOGY
 **spawn_agents_on_csv (Wave 1):**
 ```csv
@@ -201,9 +203,13 @@ Merge → evidence.ndjson (phase: "archaeology").
 CLI delegate `--role analyze --mode analysis` for change review (run_in_background, STOP).
 Update `understanding.md` §2.
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-review({slug}): S_ARCHAEOLOGY — 考古"`
+
 ### S_EXPLORE
 CLI delegate `--role explore --mode analysis` → `explore.json` + evidence.ndjson (phase: "explore").
 Update `understanding.md` §3. Mark G2 done.
+
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-review({slug}): S_EXPLORE — 探索"`
 
 ### S_REVIEW
 **spawn_agents_on_csv (Wave 2)** — append rows:
@@ -223,17 +229,23 @@ Merge → evidence.ndjson (phase: "review"). Write `session.json.review_result`.
 Update `understanding.md` §4. Mark G1 done.
 Transition: critical/high exist AND !skip_fix → S_FIX. Else → S_GENERALIZE or S_RECORD.
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-review({slug}): S_REVIEW — 审查"`
+
 ### S_FIX
 Skip if `--skip-fix` or no critical/high findings.
 Filter findings for severity >= high → fix candidates.
 **Normal**: `request_user_input` to confirm. **`-y`**: auto-fix all, record `deferred`.
 Implement targeted fixes. Record evidence (phase: "fix"). Quality Gate check.
 
+📌 **Auto-commit**: `git add -A && git commit -m "odyssey-review({slug}): S_FIX — 修复"`
+
 ### S_CONFIRM
 Skip if `--skip-fix`.
 Run tests on modified files. CLI delegate `--role review --mode analysis` for fix review (run_in_background, STOP).
 Write `session.json.confirmation`. Update `understanding.md` §5.
 `needs_rework` → S_FIX. `confirmed` → mark G3 done.
+
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-review({slug}): S_CONFIRM — 确认"`
 
 ### S_GENERALIZE
 Skip if `--skip-generalize`.
@@ -267,11 +279,15 @@ spawn_agents_on_csv({ csv_path: "tasks.csv", id_column: "id",
 
 Update `understanding.md` §6. Write `session.json.generalization_stats`. Mark G4 done.
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-review({slug}): S_GENERALIZE — 泛化"`
+
 ### S_DISCOVER
 Classify hits: `bug` / `risk` / `safe`.
 **Normal**: `request_user_input` for bug routing. **`-y`**: auto create issue, `deferred`.
 **Cross-phase loop**: fixable sibling → S_FIX (!skip_fix, loops < max_loops → cross_phase_loops++); new review target → S_REVIEW (loops < max_loops); triage complete OR budget exhausted → S_RECORD.
 Append evidence (phase: discovery + decision). Update `understanding.md` §7. Mark G5 done.
+
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-review({slug}): S_DISCOVER — 发现"`
 
 ### S_RECORD
 Finalize `understanding.md` §8: per-dimension summary, top findings, generalization results, open decisions.
@@ -297,6 +313,8 @@ Goals:      {done}/{total} ({skipped} skipped)
 
 **Next steps:** `$odyssey-debug "<finding>"`, `$manage-issue list --source review-odyssey`,
 `$learn-decompose <module>`, `$maestro-plan --gaps`
+
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-review({slug}): S_RECORD — 总结"`
 </execution>
 
 <appendix>

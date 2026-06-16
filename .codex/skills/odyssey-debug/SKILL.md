@@ -26,7 +26,7 @@ Core philosophy:
 
 <execution_discipline>
 **三条铁律（所有阶段适用）:**
-1. **Phase commit** — 阶段完成后 `git commit -m "odyssey-debug({slug}): {phase} — {摘要}"`（session.json/evidence.ndjson 不纳入）
+1. **Phase auto-commit** — 阶段完成后**自动** `git commit`，无需用户确认（session.json/evidence.ndjson 不纳入）
 2. **有把握才改** — 有把握→改代码 commit；不确定→记录 `evidence.ndjson {"phase":"decision","status":"pending"}` 不改代码
 3. **多 CLI 辅助** — `maestro delegate` 多 `--role`（analyze/review/explore）交叉验证关键判断
 </execution_discipline>
@@ -197,6 +197,8 @@ id,title,description,task_type,deps,wave,status,findings,evidence,error
 
 **Resume (`-c`):** Glob latest session → read `session.json` → restore `current_state` → jump.
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-debug({slug}): S_INTAKE — 目标解析"`
+
 ### Stage 2: Archaeology (S_ARCHAEOLOGY)
 **Step 1 — Git archaeology (spawn_agents_on_csv, Wave 1):**
 
@@ -230,6 +232,8 @@ Run_in_background, STOP, wait for callback. Append results.
 
 **Step 3:** Update `understanding.md` §2.
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-debug({slug}): S_ARCHAEOLOGY — 考古"`
+
 ### Stage 3: Exploration (S_EXPLORE)
 Skip if no enabled CLI tools (W006).
 
@@ -247,6 +251,8 @@ Run_in_background, STOP, wait for callback.
 
 Parse → write `explore.json` + evidence (phase: "explore"). Update §3. Mark G2 done.
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-debug({slug}): S_EXPLORE — 探索"`
+
 ### Stage 4: Diagnosis (S_DIAGNOSE)
 1. **Form hypotheses** from evidence (archaeology + explore), ranked [HIGH]/[MEDIUM]/[LOW] → §4
 2. **Test each** (rank order): design test → execute → evidence (phase: "diagnosis")
@@ -258,12 +264,16 @@ All hypotheses fail → increment `diagnosis_retries`.
 - < 3: broaden scope via `maestro delegate --role analyze`, form new hypotheses.
 - >= 3: Normal → request_user_input (broaden/new/INCONCLUSIVE) | `-y` → auto INCONCLUSIVE, proceed to S_RECORD.
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-debug({slug}): S_DIAGNOSE — 诊断"`
+
 ### Stage 5: Fix (S_FIX)
 Skip if `--skip-fix`.
 
 1. Present root cause + proposed fix. Normal: request_user_input | `-y`: auto proceed
 2. Implement fix
 3. Record in evidence (phase: "decision")
+
+📌 **Auto-commit**: `git add -A && git commit -m "odyssey-debug({slug}): S_FIX — 修复"`
 
 ### Stage 6: Confirmation (S_CONFIRM)
 Skip if `--skip-fix`.
@@ -283,6 +293,8 @@ Run_in_background, STOP, wait for callback.
 
 3. Write `session.json.confirmation`: `{test_result, cli_review, overall, timestamp}`
 4. Update §6. `needs_rework` → Stage 5. `confirmed` → mark G3 done, advance.
+
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-debug({slug}): S_CONFIRM — 确认"`
 
 ### Stage 7: Generalization (S_GENERALIZE)
 Skip if `--skip-generalize`. 举一反三: extract pattern, scan for siblings.
@@ -322,6 +334,8 @@ spawn_agents_on_csv({ csv_path:"tasks.csv", id_column:"id",
 
 **Step 6:** Write §7 + `session.json.generalization_stats`: `{patterns_extracted, total_hits, cross_layer_confirmed, regression_risks, by_layer, deepening_triggered}`. Mark G4 done.
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-debug({slug}): S_GENERALIZE — 泛化"`
+
 ### Stage 8: Discovery (S_DISCOVER)
 Skip if no generalization hits.
 
@@ -329,6 +343,8 @@ Skip if no generalization hits.
 2. **Route**: see Appendix `-y` behavior. Append evidence (phase: "discovery" + "decision")
 3. **Cross-phase loop**: discovery finds new bug → S_DIAGNOSE (loops < max_loops → cross_phase_loops++); same-pattern bug + fix template → S_FIX; triage complete OR loops >= max_loops → S_RECORD (剩余 → issue)
 4. Update §8. Mark G5 done.
+
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-debug({slug}): S_DISCOVER — 发现"`
 
 ### Stage 9: Record (S_RECORD)
 1. Finalize `understanding.md` §9
@@ -353,6 +369,8 @@ Goals:      {done}/{total} confirmed ({skipped} skipped)
 
 Next steps: `$manage-issue list --source debug-odyssey`, `$learn-decompose <module>`,
 `$quality-review`, `$learn-second-opinion <understanding.md>`, `$learn-investigate "<question>"`
+
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-debug({slug}): S_RECORD — 总结"`
 </execution>
 
 <appendix>

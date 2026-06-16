@@ -41,7 +41,7 @@ Core philosophy:
 <execution_discipline>
 **三条铁律（所有阶段适用）:**
 
-1. **Phase commit** — 每个产出变更的阶段完成后立即 `git commit`
+1. **Phase auto-commit** — 每个阶段完成后**自动** `git commit`，无需用户确认
    - 代码变更 + understanding.md → `git add` → `git commit -m "odyssey-planex({slug}): {phase} — {摘要}"`
    - session.json / evidence.ndjson 为运行时状态，不纳入 commit
 
@@ -211,6 +211,8 @@ S_RECORD → END
 3. Search prior knowledge: `maestro search`, related sessions
 4. Write session.json + understanding.md §1. Mark G1 done. Display Goal Prompt (see Appendix)
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-planex({slug}): INTAKE — 目标解析"`
+
 ### A_PLAN
 
 1. Decompose requirement into ordered tasks mapped to acceptance criteria
@@ -226,11 +228,15 @@ S_RECORD → END
    Run_in_background, STOP, wait for callback.
 3. Write session.json.plan, append evidence (planning), update understanding.md §2. Mark G2 done.
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-planex({slug}): PLAN — 计划制定"`
+
 ### A_EXECUTE
 
 1. Execute tasks sequentially — implement code changes
 2. Per task: record evidence (execution) `{"phase":"execution","type":"task-completed","task_id":"T1","files_modified":[],"summary":""}`, update task status
 3. Update understanding.md §3. Mark G3 done.
+
+📌 **Auto-commit**: `git add -A && git commit -m "odyssey-planex({slug}): EXECUTE — 实现执行"`
 
 ### A_VERIFY
 
@@ -250,6 +256,8 @@ Update understanding.md §4 with pass/fail table.
 
 **Route:** all passed → mark G4 done → next state. Some failed + iteration < max → S_FIX. Some failed + iteration >= max → **Normal**: AskUserQuestion (continue/lower bar/accept) / **`-y`**: `deferred`, proceed S_RECORD.
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-planex({slug}): VERIFY — 验收验证"`
+
 ### A_FIX
 
 1. Increment current_iteration
@@ -264,6 +272,8 @@ Update understanding.md §4 with pass/fail table.
    " --role review --mode analysis
    ```
 4. Append evidence (fix), update understanding.md §5 → S_VERIFY
+
+📌 **Auto-commit**: `git add -A && git commit -m "odyssey-planex({slug}): FIX — 修复"`
 
 ### A_GENERALIZE
 
@@ -292,6 +302,8 @@ Each returns: `[{pattern_id, file, line, context, risk_level, layer, confidence}
 
 Write understanding.md §6, generalization_stats. Mark G5 done.
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-planex({slug}): GENERALIZE — 泛化扫描"`
+
 ### A_DISCOVER
 
 1. **Triage:** per hit, read context (+-10 lines), classify as `already_handled` | `needs_treatment` | `low_risk`
@@ -302,6 +314,8 @@ Write understanding.md §6, generalization_stats. Mark G5 done.
    | low_risk | Record only | Record only |
    | already_handled | Skip | Skip |
 3. Append evidence (discovery + decision), update understanding.md §7. Mark G6 done.
+
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-planex({slug}): DISCOVER — 发现分类"`
 
 ### A_RECORD
 
@@ -324,6 +338,8 @@ Write understanding.md §6, generalization_stats. Mark G5 done.
    Status:      {ALL_PASSED|PARTIAL|ESCALATED}
    ---
    ```
+
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-planex({slug}): RECORD — 会话总结"`
 
 </actions>
 

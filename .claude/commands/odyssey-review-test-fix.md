@@ -34,7 +34,7 @@ automated fix, codebase-wide generalization, decision journal. Use `--skip-fix` 
 <execution_discipline>
 **三条铁律（所有阶段适用）:**
 
-1. **Phase commit** — 每个产出变更的阶段完成后立即 `git commit`
+1. **Phase auto-commit** — 每个阶段完成后**自动** `git commit`，无需用户确认
    - 代码变更 + understanding.md → `git add` → `git commit -m "odyssey-review({slug}): {phase} — {摘要}"`
    - session.json / evidence.ndjson 为运行时状态，不纳入 commit
 
@@ -205,15 +205,21 @@ Parse target + flags → file list. Create `SESSION_DIR`, derive `phase_goals[]`
 Search prior knowledge: `maestro search`, prior sessions, ARCHITECTURE.md.
 Write `session.json` + `understanding.md` §1. Display Goal Prompt (appendix).
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-review({slug}): INTAKE — 目标解析与上下文加载"`
+
 ### A_ARCHAEOLOGY
 `git log --oneline -20 -- {target_files}` + `git blame` on key regions.
 CLI delegate `--role analyze --mode analysis` to review past changes.
 Append evidence.ndjson (phase: "archaeology"). Update `understanding.md` §2.
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-review({slug}): ARCHAEOLOGY — git 考古分析"`
+
 ### A_EXPLORE
 CLI delegate `--role explore --mode analysis` — call chains, error gaps, similar patterns.
 Write `explore.json`, append evidence.ndjson (phase: "explore").
 Update `understanding.md` §3. Mark G2 done.
+
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-review({slug}): EXPLORE — 代码探索完成"`
 
 ### A_REVIEW
 Spawn N parallel Agents (one per dimension, default 4):
@@ -229,11 +235,15 @@ Each returns `[{title, severity, file, line, description, suggestion, cwe}]`.
 Merge → evidence.ndjson (phase: "review"). Write `session.json.review_result`.
 Update `understanding.md` §4 (findings by dimension + severity matrix). Mark G1 done.
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-review({slug}): REVIEW — 多维度审查完成"`
+
 ### A_FIX
 Filter evidence for `phase=="review" AND severity ∈ [critical, high]` → fix candidates.
 **Normal**: AskUserQuestion to confirm which to fix. **`-y`**: auto-fix all, record `deferred`.
 For each: read context (file:line ±20), implement fix, append evidence (phase: "fix").
 Quality Gate check on fixes.
+
+📌 **Auto-commit**: `git add -A && git commit -m "odyssey-review({slug}): FIX — {修复摘要}"`
 
 ### A_CONFIRM
 Run tests covering modified files. CLI delegate fix review:
@@ -248,6 +258,8 @@ CONSTRAINTS: Focus on correctness and regressions
 ```
 Run_in_background, STOP, wait. Write `session.json.confirmation`.
 Update `understanding.md` §5. `needs_rework` → S_FIX. `confirmed` → mark G3 done.
+
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-review({slug}): CONFIRM — 修复验证"`
 
 ### A_GENERALIZE
 **Multi-layer pattern extraction** from findings (severity >= medium):
@@ -275,10 +287,14 @@ Write `session.json.patterns[]`.
 Update `understanding.md` §6 (per-pattern summary, cross-layer matrix, risk heatmap).
 Write `session.json.generalization_stats`. Mark G4 done.
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-review({slug}): GENERALIZE — 泛化扫描完成"`
+
 ### A_DISCOVER
 Classify each hit: `bug` / `risk` / `safe`.
 **Normal**: AskUserQuestion for bug routing. **`-y`**: auto create issue, `deferred`.
 Append evidence (phase: discovery + decision). Update `understanding.md` §7. Mark G5 done.
+
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-review({slug}): DISCOVER — 发现分类完成"`
 
 ### A_RECORD
 Finalize `understanding.md` §8: per-dimension summary, top findings with file:line, generalization results, open decisions.
@@ -302,6 +318,9 @@ Self-iter:  {N} rounds across {M} stages
 Goals:      {done}/{total} ({skipped} skipped)
 ---
 ```
+
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-review({slug}): RECORD — 会话总结与知识沉淀"`
+
 </actions>
 
 <appendix>

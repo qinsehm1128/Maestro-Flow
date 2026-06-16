@@ -25,7 +25,7 @@ Core philosophy:
 
 <execution_discipline>
 **三条铁律（所有阶段适用）:**
-1. **Phase commit** — 阶段完成后 `git commit -m "odyssey-planex({slug}): {phase} — {摘要}"`（session.json/evidence.ndjson 不纳入）
+1. **Phase auto-commit** — 阶段完成后**自动** `git commit`，无需用户确认（session.json/evidence.ndjson 不纳入）
 2. **有把握才改** — 有把握→改代码 commit；不确定→记录 `evidence.ndjson {"phase":"decision","status":"pending"}` 不改代码
 3. **多 CLI 辅助** — plan 用 `--role analyze`，verify 用 cli-review delegate，fix 前后用 `--role review`
 </execution_discipline>
@@ -191,6 +191,8 @@ id,title,description,task_type,criterion_refs,deps,wave,status,findings,evidence
 3. Search prior knowledge: `maestro search`, related sessions
 4. Write session.json + understanding.md §1. Mark G1 done. Display Goal Prompt (see Appendix).
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-planex({slug}): S_INTAKE — 目标解析"`
+
 ### S_PLAN
 
 1. Decompose requirement into ordered tasks mapped to acceptance criteria
@@ -206,11 +208,15 @@ id,title,description,task_type,criterion_refs,deps,wave,status,findings,evidence
    Run_in_background, STOP, wait for callback.
 3. Write session.json.plan, append evidence (planning), update understanding.md §2. Mark G2 done.
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-planex({slug}): S_PLAN — 计划"`
+
 ### S_EXECUTE
 
 1. Execute tasks sequentially — implement code changes
 2. Per task: record evidence (execution), update task status
 3. Update understanding.md §3. Mark G3 done.
+
+📌 **Auto-commit**: `git add -A && git commit -m "odyssey-planex({slug}): S_EXECUTE — 执行"`
 
 ### S_VERIFY
 
@@ -239,12 +245,16 @@ Record per criterion to evidence (verification). Update acceptance_criteria[].st
 
 **Route:** all passed → mark G4 done → next state. Some failed + iteration < max → S_FIX. Fundamental plan flaw → S_PLAN (loops < max_loops → cross_phase_loops++, 重规划). Some failed + iteration >= max → **Normal**: `request_user_input` (continue/lower/accept) / **`-y`**: `deferred`, proceed S_RECORD.
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-planex({slug}): S_VERIFY — 验证"`
+
 ### S_FIX
 
 1. Increment current_iteration
 2. For each failed criterion: diagnose gap → targeted code fix
 3. CLI fix review (optional): `maestro delegate --role review --mode analysis` for regression check
 4. Append evidence (fix), update understanding.md §5 → S_VERIFY (loop)
+
+📌 **Auto-commit**: `git add -A && git commit -m "odyssey-planex({slug}): S_FIX — 修复"`
 
 ### S_GENERALIZE
 
@@ -273,6 +283,8 @@ Each returns: `[{pattern_id, file, line, context, risk_level, layer, confidence}
 
 Write understanding.md §6, generalization_stats. Mark G5 done.
 
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-planex({slug}): S_GENERALIZE — 泛化"`
+
 ### S_DISCOVER
 
 1. **Triage:** per hit, read context (+-10 lines), classify as `already_handled` | `needs_treatment` | `low_risk`
@@ -284,6 +296,8 @@ Write understanding.md §6, generalization_stats. Mark G5 done.
    | already_handled | Skip | Skip |
 3. **Cross-phase loop**: needs_treatment area → S_EXECUTE (loops < max_loops → cross_phase_loops++); triage complete OR budget exhausted → S_RECORD
 4. Append evidence (discovery + decision), update understanding.md §7. Mark G6 done.
+
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-planex({slug}): S_DISCOVER — 发现"`
 
 ### S_RECORD
 
@@ -308,6 +322,8 @@ Write understanding.md §6, generalization_stats. Mark G5 done.
    ```
 
 **Next steps:** `$odyssey-review-test-fix <changed-files>`, `$odyssey-debug "<failing>"`, `$quality-review`, `$manage-issue list --source odyssey-planex`
+
+📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-planex({slug}): S_RECORD — 总结"`
 </execution>
 
 <appendix>
