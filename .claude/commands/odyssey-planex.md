@@ -1,7 +1,7 @@
 ---
 name: odyssey-planex
 description: Requirement-driven iterative cycle — plan, execute, strict verify, fix loop until acceptance criteria met
-argument-hint: "<requirement> [--max-iterations N] [--skip-generalize] [--auto] [-y] [-c]"
+argument-hint: "<requirement> [--max-iterations N] [--skip-generalize] [--auto] [--method agent|cli|auto] [--executor <tool>] [--skip-verify] [-y] [-c]"
 allowed-tools:
   - Read
   - Write
@@ -66,6 +66,9 @@ $ARGUMENTS — requirement description and optional flags.
 | `--max-iterations N` | Max verify→fix cycles before escalation | 3 |
 | `--skip-generalize` | Skip S_GENERALIZE + S_DISCOVER | false |
 | `--auto` | CLI delegate calls without confirmation | false |
+| `--method agent\|cli\|auto` | Execution method: Agent tool, CLI delegate, or auto-select | `auto` |
+| `--executor <tool>` | Explicit executor tool for CLI delegate mode | First enabled in config |
+| `--skip-verify` | Skip execution post-validation gate | false |
 | `-y` | Auto-confirm — decisions recorded as `deferred` | false |
 | `-c` | Resume most recent session | — |
 
@@ -89,7 +92,15 @@ SESSION_DIR/
   "acceptance_criteria": [
     {"id":"AC1","criterion":"","verify_method":"test|grep|cli-review|manual","status":"pending","evidence":"","passed_at":null}
   ],
-  "plan": { "tasks": [{"id":"T1","title":"","description":"","criteria_refs":["AC1"],"status":"pending","files_modified":[]}], "created_at":"" },
+  "plan": { "tasks": [{"id":"T1","title":"","description":"","criteria_refs":["AC1"],"status":"pending","files_modified":[],"domain":"general","executor":"agent"}], "created_at":"" },
+  "execution_config": {
+    "method": "auto",
+    "default_executor": "",
+    "domain_routing": { "frontend": "", "backend": "", "default": "agent" },
+    "code_review_tool": "Skip",
+    "verification_tool": "Auto",
+    "confirmed": false
+  },
   "iterations": [
     {"iteration":1,"started_at":"","completed_at":"","criteria_before":{"passed":0,"total":0},"criteria_after":{"passed":0,"total":0},"gaps_fixed":[],"files_modified":[]}
   ],
@@ -232,9 +243,158 @@ S_RECORD → END
 
 ### A_EXECUTE
 
-1. Execute tasks sequentially — implement code changes
-2. Per task: record evidence (execution) `{"phase":"execution","type":"task-completed","task_id":"T1","files_modified":[],"summary":""}`, update task status
-3. Update understanding.md §3. Mark G3 done.
+#### Step 1: Execution Options Confirmation
+
+**Skip if** `-y` flag OR `--method` explicitly set OR `execution_config.confirmed == true` (resume).
+
+Load available tools: `maestro delegate-config show --json` → extract enabled tools and domain tags.
+
+```
+AskUserQuestion({
+  questions: [
+    {
+      question: "任务如何执行？选择一种方式，或 Other 指定域路由规则（如 '前端gemini 后端codex 其余agent'）",
+      header: "Executor",
+      options: [
+        { label: "Auto (Recommended)", description: "域路由: frontend→{frontendTool}, backend→{backendTool}, general→agent" },
+        { label: "Agent", description: "Claude Code Agent 执行所有任务（最快）" },
+        // 每个 enabled CLI tool 一个选项
+        ...availableTools.map(t => ({ label: t, description: `${t} CLI 执行所有任务` }))
+      ]
+    },
+    {
+      question: "执行后运行代码审查？",
+      header: "Review",
+      options: [
+        { label: "Skip", description: "不审查" },
+        ...availableTools.map(t => ({ label: `${t} Review`, description: `${t} CLI: git diff 质量审查` }))
+      ]
+    },
+    {
+      question: "验证门控？（外部模型检查收敛 + 结构 + 反模式）",
+      header: "Verify",
+      options: [
+        { label: "Auto (Recommended)", description: `Delegate 到 ${availableTools[0]} 做收敛+结构+反模式检查` },
+        ...availableTools.map(t => ({ label: t, description: `${t}: 验证门控` })),
+        { label: "Skip", description: "不验证" }
+      ]
+    }
+  ]
+})
+```
+
+Parse response → write `execution_config` to session.json, set `confirmed: true`.
+
+`--skip-verify` flag overrides verification to `"Skip"`.
+
+#### Step 2: Executor Resolution
+
+Per-task domain routing (when method == "auto"):
+
+| Domain | Keywords / Patterns | File Extensions |
+|--------|-------------------|-----------------|
+| frontend | UI, component, page, style, layout, CSS, view | .tsx/.jsx/.vue/.css/.html/.svelte |
+| backend | API, server, database, service, algorithm, worker | .go/.rs/.java/.py/.sql/.proto |
+| general | mixed, config, tests, unclear | .ts/.js/other |
+
+Resolution: `execution_config.domain_routing[domain]` → fallback `domain_routing.default` ("agent").
+
+Log routing per task:
+```
+T1 [frontend] → gemini
+T2 [backend]  → codex
+T3 [general]  → agent
+```
+
+#### Step 3: Task Execution
+
+Execute tasks per plan order. Independent tasks (no cross-dependency) may run in parallel.
+
+**Agent path:**
+```
+Spawn Agent with:
+  task definition, acceptance criteria refs, prior task summaries, specs_content
+Agent implements → verifies convergence criteria → auto-fix (max 3) → returns result
+```
+
+**CLI path (via maestro delegate):**
+```bash
+maestro delegate "PURPOSE: Implement task ${task_id}: ${title}; success = criteria ${criteria_refs} satisfied
+TASK: ${description} | Read existing code first | Verify convergence criteria after changes
+MODE: write
+CONTEXT: @${scope}/**/* | Criteria: ${criteria_summary}
+EXPECTED: Working code changes, convergence evidence, summary of what was done
+CONSTRAINTS: Scope limited to task files | Follow project specs
+
+## Acceptance Criteria (must satisfy)
+${criteria_refs.map(ref => criteria[ref].criterion).join('\n')}
+
+## Implementation Steps
+${task.description}
+
+## Project Specs
+${specs_content}
+
+## Prior Task Summaries
+${prior_summaries}
+" --to ${resolved_executor} --mode write --id planex-${slug}-${task_id}
+```
+
+Run CLI delegate with `run_in_background: true`, STOP, wait for callback.
+
+**Deviation Rule** — max 3 auto-fix attempts per task:
+1. First attempt: normal dispatch
+2. Retry: `--resume planex-${slug}-${task_id}` with simplified prompt
+3. Final: fallback to Agent path
+4. All 3 fail → mark task `blocked`, record checkpoint, continue remaining tasks
+
+#### Step 4: Per-Task Evidence
+
+Per completed task:
+- Record evidence: `{"phase":"execution","type":"task-completed","task_id":"T1","executor":"agent|gemini|...","files_modified":[],"summary":"","attempt":1}`
+- Update task status in session.json plan
+
+#### Step 5: Post-Execution Validation
+
+**Skip if** `execution_config.verification_tool == "Skip"` OR `--skip-verify` OR no completed tasks.
+
+**Check 1: Summary Consistency** — cross-check task status vs actual file changes (git diff).
+
+**Check 2: CLI Verification Gate** — delegate to external model:
+```bash
+maestro delegate "PURPOSE: Verify execution output meets acceptance criteria; success = all criteria verified with file:line evidence
+TASK:
+1. CONVERGENCE: For each criterion, read actual code, verify behavior exists, report status with evidence
+2. EXISTENCE: Verify all expected files exist on disk
+3. SUBSTANCE: Verify real implementation — flag stubs, placeholders, TODO-only
+4. ANTI-PATTERNS: Scan for TODO/FIXME/HACK, console.log debug, disabled tests
+MODE: analysis
+CONTEXT: @${modified_files}
+EXPECTED: JSON { convergence: [{criterion, status, evidence}], issues: [{type, file, line, severity}], overall: passed|gaps_found }
+CONSTRAINTS: Read-only | Check ALL criteria exhaustively | Evidence must be file:line
+
+## Acceptance Criteria (verify each)
+${acceptance_criteria.map(c => c.criterion).join('\n')}
+
+## Modified Files
+${modified_files.join('\n')}
+" --to ${execution_config.verification_tool} --mode analysis
+```
+
+Run_in_background, STOP, wait for callback.
+
+On result:
+- `overall == "passed"` → proceed to S_VERIFY (criteria gate) with boosted confidence
+- `overall == "gaps_found"` → log findings, proceed to S_VERIFY (criteria will catch failures)
+
+**Check 3: Code Review** (if `execution_config.code_review_tool != "Skip"`):
+```bash
+maestro delegate "Review git diff for correctness, style, bugs" --to ${code_review_tool} --mode analysis --rule analysis-review-code-quality
+```
+
+#### Step 6: Completion
+
+Update understanding.md §3. Mark G3 done.
 
 📌 **Auto-commit**: `git add -A && git commit -m "odyssey-planex({slug}): EXECUTE — 实现执行"`
 
@@ -365,6 +525,8 @@ verify 失败时自动进入 fix 循环，不超过 max_iterations 次。
 | Decision Point | Normal | `-y` |
 |----------------|--------|------|
 | S_INTAKE criteria confirmation | AskUserQuestion | auto-derive, `deferred` |
+| S_EXECUTE execution options | AskUserQuestion (executor/review/verify) | use defaults (auto/Skip/Auto), `confirmed: true` |
+| S_EXECUTE task blocked (3 retries) | AskUserQuestion: continue or stop | auto continue, log blocked |
 | S_VERIFY manual criterion | AskUserQuestion | `deferred` |
 | S_VERIFY max iteration reached | AskUserQuestion | auto accept, `deferred` |
 | S_DISCOVER classification routing | AskUserQuestion | auto create issue, `deferred` |
@@ -403,7 +565,11 @@ Max iterations (default 3) prevents infinite loops. Each iteration records crite
 <success_criteria>
 - [ ] Requirement parsed and ≥1 acceptance criterion defined with verify_method
 - [ ] Plan created with tasks mapped to criteria
-- [ ] Tasks executed with evidence logged
+- [ ] Execution options confirmed (executor/review/verify) before task dispatch
+- [ ] Tasks dispatched via resolved executor (agent/cli/auto domain routing)
+- [ ] Per-task deviation rule enforced (max 3 retries, fallback chain)
+- [ ] Post-execution validation gate run (unless --skip-verify)
+- [ ] Tasks executed with evidence logged (executor, attempt count, files_modified)
 - [ ] Every criterion verified by its method after each iteration
 - [ ] Failing criteria trigger targeted fix (not full re-implementation)
 - [ ] Iteration count tracked, max respected
