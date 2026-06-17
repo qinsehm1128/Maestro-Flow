@@ -1,7 +1,5 @@
 # KnowHow Workflow
 
-Reusable knowledge capture, retrieval, and management for cross-session recovery and knowledge reuse.
-
 ## Dual Store Architecture
 
 | Store | Path | Format | Index |
@@ -151,13 +149,6 @@ When and how to use this template.
 Additional context.
 ```
 
-**Field guide:**
-- `lang` — Programming language or config format (required)
-- `Usage` — 1-2 sentences describing when to apply
-- `Parameters` — Placeholder table (optional)
-- `Code` — The actual template, ready to copy
-- `Dependencies` — What's needed before using
-
 #### recipe (RCP-{YYYYMMDD}-{slug}.md)
 
 Step-by-step operational guide. Sections:
@@ -196,13 +187,6 @@ What success looks like.
 - [[template-xxx]] — Templates used
 ```
 
-**Field guide:**
-- `Goal` — One sentence, actionable
-- `Prerequisites` — Everything needed before starting
-- `Steps` — Numbered, each step verifiable independently
-- `Expected Outcome` — Measurable result
-- `Common Pitfalls` — Known gotchas from experience
-
 #### reference (REF-{YYYYMMDD}-{slug}.md)
 
 External documentation digest. Sections:
@@ -238,13 +222,6 @@ last_verified: {ISO date}
 ## Notes
 Additional context.
 ```
-
-**Field guide:**
-- `source` — Original URL or document ID (required)
-- `Key Points` — Distilled essentials, not raw dump
-- `Applicable Scenarios` — "Use this when..."
-- `Quick Examples` — Most-used snippets first
-- `last_verified` — When the source was last checked
 
 #### decision (DCS-{YYYYMMDD}-{slug}.md)
 
@@ -288,13 +265,6 @@ Why this choice over alternatives.
 - [[spec-xxx]] — Affected spec
 - [[recipe-xxx]] — Implementation recipe
 ```
-
-**Field guide:**
-- `status` — proposed → accepted → superseded lifecycle
-- `Context` — Enough background for future reader (no assumed knowledge)
-- `Alternatives` — Must list at least 2 rejected options with reasons
-- `Rationale` — The "why" matters more than the "what"
-- `Consequences` — Both positive and negative; be honest about trade-offs
 
 #### tip (TIP-{YYYYMMDD}-{slug}.md)
 
@@ -391,8 +361,6 @@ store_knowhow { operation: "add", type: "template", title: "...", description: "
 ---
 
 ## Part D: Learning Insights Container (specs/learnings.md)
-
-A special container file at `.workflow/specs/learnings.md` holds multiple `<spec-entry>` sub-entries for atomic learning insights. This replaces the former `lessons.jsonl` approach.
 
 ### Container Format
 

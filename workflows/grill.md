@@ -1,6 +1,6 @@
 # Workflow: Grill
 
-Socratic stress-testing of a plan, idea, or requirement against codebase reality. Walks every branch of the decision tree one question at a time, challenges vague terminology against existing code, probes edge cases with concrete scenarios, and produces a verified context package for downstream brainstorm/analyze/roadmap consumption.
+Socratic stress-testing of a plan/idea/requirement against codebase reality. Produces a verified context package for downstream consumption.
 
 ## Architecture
 
@@ -76,8 +76,6 @@ output_dir = .workflow/scratch/{YYYYMMDD}-grill-{slug}/
 
 ## Step 2: Discovery
 
-Scan project documentation and codebase to build a grilling context. This grounds all subsequent questions in code reality.
-
 ### 2.1: Load Project State
 
 ```
@@ -118,9 +116,7 @@ Agent(
 )
 ```
 
-Store as `codebase_context`.
-
-If scan fails (W001): `codebase_context = null`, continue without code grounding.
+Store as `codebase_context`. W001 on failure: continue without code grounding.
 
 ### 2.4: Initialize Report
 
@@ -159,14 +155,9 @@ Write `{output_dir}/grill-report.md` with header:
 
 ## Step 3: Terminology Alignment
 
-Extract terminology from the proposal/topic and cross-reference with codebase naming.
-
 ### 3.1: Extract Candidate Terms
 
-From topic text + upstream material, identify 5-15 candidate domain terms:
-- Nouns that appear as entities, concepts, or roles
-- Verbs that describe key operations
-- Adjectives that qualify system properties
+From topic + upstream, identify 5-15 domain terms (entity nouns, operation verbs, property adjectives).
 
 ### 3.2: Code Name Collision Check
 
@@ -218,11 +209,9 @@ Write `{output_dir}/terminology.md`:
 
 ## Step 4: Branch Walking (Core Grilling Loop)
 
-The heart of the grill. Walk the decision tree one branch at a time, one question per turn. Each branch is fully explored before moving to the next.
+One branch at a time, one question per turn. Each branch fully explored before next.
 
 ### Branch Categories
-
-Select branches based on `--depth`:
 
 | Priority | Branch | Shallow | Standard | Deep |
 |----------|--------|---------|----------|------|
@@ -237,11 +226,7 @@ Select branches based on `--depth`:
 
 ### Branch Walking Protocol
 
-For EACH selected branch:
-
 **4.1: Open the Branch**
-
-Append to `grill-report.md`:
 ```markdown
 ## Branch {N}: {branch_name}
 
@@ -252,13 +237,9 @@ Append to `grill-report.md`:
 
 **4.2: Generate Probing Questions**
 
-Based on the topic + codebase_context + terminology + prior branch decisions, generate 3-5 probing questions for this branch. Questions MUST:
-- Reference specific code findings from Step 2.3 when available
-- Use concrete scenarios, not abstract hypotheticals
-- Challenge assumptions ("You said X, but the code shows Y — how do you reconcile?")
-- Escalate from basic to adversarial
+Generate 3-5 probing questions per branch. MUST: reference code findings, use concrete scenarios, challenge assumptions, escalate from basic to adversarial.
 
-Question generation pattern per branch:
+Question patterns per branch:
 
 **Scope & Boundaries**:
 - "What is the smallest version of this that delivers value?"
@@ -331,15 +312,10 @@ CONSTRAINTS: Answer based on code evidence only, flag uncertainty" --role analyz
 
 **4.4: Validate Answer Against Code**
 
-After each answer, verify against codebase when possible:
-- If user says "We'll use X pattern" → Grep for existing X usage, confirm consistency
-- If user says "This won't affect Y" → Explore call chains to verify isolation
-- If contradiction found → immediately challenge:
-
-```
-"You said {answer}, but I found {code_evidence} at {file:line}. 
-This suggests {contradiction}. How do you reconcile?"
-```
+After each answer, verify against codebase:
+- "We'll use X pattern" → Grep for existing X usage, confirm consistency
+- "This won't affect Y" → Explore call chains to verify isolation
+- Contradiction found → immediately challenge with code evidence
 
 **4.5: Record Decision**
 
@@ -354,24 +330,17 @@ After each question is settled, immediately append to `grill-report.md`:
 **Constraint**: {if locked, the RFC 2119 statement — e.g., "MUST use event sourcing for audit trail"}
 ```
 
-Update the branch header: increment questions/decisions counts.
-
 **4.6: Branch Completion**
 
-When all questions in a branch are asked (or user signals "enough"):
-- Update branch status to ✅ Completed
-- Update Branch Log table in report header
-- Move to next branch
+All questions asked (or user signals "enough") → update branch status, update Branch Log table, move to next.
 
 ---
 
 ## Step 5: Synthesis
 
-After all branches are walked (or max rounds reached):
-
 ### 5.1: Decision Summary
 
-Read all branch decisions from `grill-report.md`. Classify:
+Classify all branch decisions:
 
 | Classification | Criteria | Downstream Use |
 |----------------|----------|----------------|
@@ -380,8 +349,6 @@ Read all branch decisions from `grill-report.md`. Classify:
 | **Deferred** | Explicitly postponed or "not applicable" | → `non_goals[]` or future work |
 
 ### 5.2: Risk Register
-
-Extract unresolved tensions, contradictions found during grilling, and branches not fully explored:
 
 ```markdown
 ## Risk Register
@@ -500,14 +467,3 @@ Next steps:
   /maestro-roadmap --from grill:{artifact_id}                — Direct to roadmap (if scope is clear)
 ```
 
----
-
-## Quality Criteria
-
-- grill-report.md has at least `{depth_branch_count}` completed branches
-- Each branch has ≥ 2 question-answer pairs with evidence
-- terminology.md has ≥ 5 terms with code references where applicable
-- context-package.json passes schema validation (all required fields present)
-- No locked decision lacks evidence (code reference or explicit user confirmation)
-- Risk register captures all unresolved contradictions found during grilling
-- Branch Log table in report header is fully populated with final status

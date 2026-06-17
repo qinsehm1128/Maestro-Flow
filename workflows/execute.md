@@ -1,42 +1,15 @@
 # Execute Workflow
 
-Wave-based parallel execution with atomic commits, breakpoint resume, built-in verification gate, and optional sync/reflection.
-
-Core principle: **Execute per-plan, not per-phase.** Each plan's wave DAG runs independently. Multiple plans execute sequentially. Verification is an integral post-gate — not a separate command.
+Wave-based parallel execution with atomic commits, breakpoint resume, built-in verification gate, and optional sync/reflection. Execute per-plan, not per-phase.
 
 ---
 
 ## Iron Law
 
-**VERIFY EACH TASK OUTPUT BEFORE MARKING COMPLETE.**
-
-Every task completion requires:
-1. Run convergence criteria checks (not just code review)
-2. Confirm output matches task definition expectations
+NEVER mark a task "completed" without running convergence criteria checks. Every completion requires:
+1. Run convergence criteria checks
+2. Confirm output matches task definition
 3. Evidence of verification in the task summary
-
-No task may be marked "completed" based on agent self-report alone.
-
----
-
-## Red Flags — These Thoughts Mean STOP
-
-If you catch yourself thinking any of these, STOP and verify:
-
-- "The agent said it's done, so it must be done"
-- "I'll batch-verify all tasks at the end instead of per-task"
-- "This task is too simple to need verification"
-- "The warning isn't relevant, I'll ignore it"
-- "Let me mark it complete and fix the issue later"
-
-All of these mean: **run convergence criteria check NOW before marking the task complete**.
-
----
-
-## Prerequisites
-
-- Plan exists in scratch directory: `plan.json` + `.task/TASK-*.json`
-- OR: executionContext handoff received from `/workflow:plan`
 
 ---
 
@@ -75,8 +48,6 @@ For each PLAN_DIR in PLAN_DIRS (sequential):
 ---
 
 ## E0.5: Execution Options Confirmation
-
-**Purpose:** Let user choose how tasks execute. Reads available tools from `delegate-config show --json` to build dynamic options. Supports both menu selection and natural language intent. Skipped when `-y` flag or executionContext already confirmed.
 
 ### Skip conditions
 
@@ -172,8 +143,6 @@ Store: `executionMethod`, `domainRouting`, `codeReviewTool`, `verificationTool`
 
 ## E1: Load Plan (per PLAN_DIR)
 
-**Purpose:** Build or receive the execution queue for a single plan.
-
 ### From executionContext handoff (preferred, first plan only)
 
 ```
@@ -232,8 +201,6 @@ Pass specs_content to each executor agent in E2.
 ---
 
 ## E2: Wave Parallel Execution
-
-**Purpose:** Execute tasks wave by wave, parallel within each wave. Supports multi-backend dispatch — tasks route to Agent or CLI tools (via `maestro delegate`) based on executor resolution.
 
 ### Executor Resolution
 
@@ -360,8 +327,6 @@ Continue wave (other tasks unaffected)
 
 ## E2.5: Post-Wave Validation
 
-**Purpose:** Validate execution integrity after all waves complete, before sync and reflection. Catches missing summaries, status inconsistencies, and tech stack constraint violations early.
-
 ### Check 1: Summary Existence
 
 ```
@@ -387,8 +352,6 @@ If constraints exist:
 ```
 
 ### Check 4: CLI Supplementary Validation (optional)
-
-**Purpose:** Use external CLI tool for semantic validation that structural checks miss — dead code, unused exports, circular dependencies introduced by execution.
 
 ```
 IF no CLI tools enabled OR completed_tasks.length == 0: skip
@@ -421,8 +384,6 @@ If none critical: log "passed" and continue to E2.6
 
 ## E2.6: Code Review (Optional)
 
-**Purpose:** Run code review on execution output if selected in E0.5.
-
 ```
 If codeReviewTool == "Skip": continue to E3
 
@@ -438,8 +399,6 @@ Wait for completion, log findings summary
 ---
 
 ## E2.7: Verification Gate
-
-**Purpose:** External model verifies execution output actually achieves convergence criteria and structural integrity. Replaces the standalone `maestro-verify` — verification is now an integral post-gate within execution. The executing agent does NOT verify itself; a separate model performs the cross-check.
 
 **Skip if** `verificationTool == "Skip"` OR `--skip-verify` flag OR no completed tasks.
 
@@ -561,8 +520,6 @@ IF verification ran (not skipped):
 
 ## E3: Auto Sync
 
-**Purpose:** Update codebase documentation after execution.
-
 ```
 If config.json.codebase.auto_sync_after_execute == true:
   Trigger /workflow:sync logic:
@@ -577,8 +534,6 @@ Else:
 ---
 
 ## E4: Reflection (Optional)
-
-**Purpose:** Record strategy observations for future iterations.
 
 ```
 If config.json.workflow.reflection == true:
@@ -619,8 +574,6 @@ If NOT SCRATCH_MODE: sync state.json (status, clear current_task_id)
 
 ## E5: Register Artifact & Extract Learnings (per PLAN_DIR)
 
-**Purpose:** Register execution completion and extract incremental learnings.
-
 ```
 // Register EXC artifact
 Find matching plan artifact in state.json; create EXC artifact:
@@ -655,8 +608,6 @@ Mark artifact.harvested = true; write state.json (atomic)
 ---
 
 ## Breakpoint Resume
-
-The execute workflow is fully resumable:
 
 ```
 State tracked in index.json.execution:

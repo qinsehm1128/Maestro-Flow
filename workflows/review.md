@@ -185,8 +185,6 @@ Same as standard, with deep-mode enhancements:
   - Top 30 findings (vs 20 for standard)
 ```
 
-Collect results same as standard.
-
 ---
 
 ## Step 6: Aggregate Findings
@@ -225,8 +223,6 @@ verdict:
 ## Step 6.5: CLI Supplementary Analysis (standard + deep only)
 
 **Skip for quick level or if no enabled CLI tools.**
-
-**Purpose:** Use external CLI tool as a second opinion on critical findings before deep-dive. The CLI analysis supplements (not replaces) the agent review — its results are merged into findings.
 
 ```
 IF level == "quick" OR no CLI tools enabled: skip to Step 7
@@ -270,13 +266,12 @@ Recalculate severity_dist after merge
 
 ## Step 7: Deep-Dive (Conditional)
 
-**Skip entirely for quick level.**
+**Skip for quick level.**
 
-**Trigger conditions:**
-- **Standard**: `severity_dist.critical > 0` (auto-trigger)
-- **Deep**: Always triggered (forced)
-
-**Skip if level == "standard" AND severity_dist.critical == 0.**
+| Level | Trigger |
+|-------|---------|
+| Standard | `severity_dist.critical > 0` |
+| Deep | Always |
 
 ### 7a: Select deep-dive targets
 
@@ -315,16 +310,14 @@ Iterate up to max_iterations (deep=3, standard=1) over unresolved targets:
 
 ## Step 8: Auto-Create Issues
 
-**Issue creation thresholds by level:**
-
-| Level | Severities that create issues |
-|-------|-------------------------------|
+| Level | Create issues for |
+|-------|-------------------|
 | Quick | Critical only |
 | Standard | Critical + High |
 | Deep | Critical + High + Medium |
 
 ```
-Filter findings by level threshold (quick=critical, standard=critical+high, deep=+medium)
+Filter findings by level threshold
 
 For each qualifying finding → append issue to .workflow/issues/issues.jsonl:
   id: "ISS-{YYYYMMDD}-{NNN}" (auto-increment from existing today's entries)
@@ -340,16 +333,11 @@ For each qualifying finding → append issue to .workflow/issues/issues.jsonl:
 Link finding.issue_id back to created issue
 ```
 
-**severity_to_priority mapping**: critical → 1, high → 2, medium → 3
-
 ---
 
 ## Step 9: Write review.json
 
-**Archive previous review artifacts** before writing:
-```
-Archive existing review.json → ${PHASE_DIR}/.history/review-{YYYY-MM-DDTHH-mm-ss}.json
-```
+Archive existing `review.json` → `${PHASE_DIR}/.history/review-{YYYY-MM-DDTHH-mm-ss}.json`
 
 ```
 Write ${PHASE_DIR}/review.json:
