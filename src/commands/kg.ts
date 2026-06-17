@@ -122,6 +122,7 @@ async function requireCodeGraph(): Promise<{ adapter: any }> {
   const mg = await MaestroGraph.open(resolve('.'));
   const adapter = {
     searchNodes: (q: string, opts?: { limit?: number }) => mg.searchCode(q, opts),
+    resolveNode: (id: string) => mg.getNode(id),
     getCallers: (id: string, d?: number) => mg.getCallers(id, d),
     getCallees: (id: string, d?: number) => mg.getCallees(id, d),
     getNodesInFile: (fp: string) => mg.getQueryBuilder().getNodesByFile(fp),
