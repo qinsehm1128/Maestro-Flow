@@ -76,6 +76,7 @@
     "experiment": "Experiment",
     "ui_design": "UI Design",
     "session": "Session",
+    "odyssey": "Odyssey",
     "learn": "Learning",
     "wiki": "Wiki"
   },
@@ -84,6 +85,7 @@
     "spec": "Project specifications, conventions, and codebase knowledge management",
     "quality": "Testing, debugging, code review, refactoring, and quality assurance",
     "manage": "Project status, memory management, codebase documentation, and issue tracking",
+    "odyssey": "Long-running deep-cycle commands — exhaustive iteration with archaeology, fix, generalization, and knowledge persistence",
     "team": "Multi-agent team collaboration skills for orchestrated parallel workflows",
     "learn": "Pattern extraction, guided reading, investigation, retrospectives, and multi-perspective analysis",
     "wiki": "Knowledge graph management, connection discovery, and digest generation"

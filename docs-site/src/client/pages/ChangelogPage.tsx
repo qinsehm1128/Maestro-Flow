@@ -22,6 +22,7 @@ const changelog: ChangelogEntry[] = [
     changes: [
       { type: 'feat', text_en: 'MaestroGraph: self-built KG engine with 9-language extractors, 24 framework resolvers, BM25F search — fully replacing CodeGraph', text_zh: 'MaestroGraph 自研知识图谱引擎——9 语言提取器、24 框架 resolver、BM25F 搜索，完全替换 CodeGraph' },
       { type: 'feat', text_en: 'Odyssey command family: 5 new long-running deep-cycle commands (debug/improve/planex/ui/review-test-fix)', text_zh: '新增 Odyssey 长时命令族——5 个深度循环命令（debug/improve/planex/ui/review-test-fix）' },
+      { type: 'feat', text_en: 'Odyssey exhaustive iteration: 3-sentence philosophy constraints (zero-residual / exhaustive iteration / improvement-is-standard) + Goal reinforcement across all 5 commands', text_zh: 'Odyssey 穷尽迭代优化——三句哲学约束（零遗留 / 穷尽迭代 / 改进即标准）+ Goal 强化，覆盖全部 5 个命令' },
       { type: 'feat', text_en: 'Domain knowledge system: glossary CRUD, code discovery, Hook injection, WikiIndexer search integration', text_zh: 'Domain 领域知识系统——glossary CRUD、代码发现、Hook 注入、WikiIndexer 搜索集成' },
       { type: 'feat', text_en: 'Install TUI redesign: grouped Hub, granular Hooks config, Config Profile export/import', text_zh: 'Install TUI 重设计——分组 Hub、Hooks 颗粒度配置、Config Profile 导出导入' },
       { type: 'feat', text_en: 'Cross-workspace knowledge sharing: workspace link/unlink/list/status + WikiIndexer multi-source aggregation', text_zh: '跨工作空间知识共享——workspace link/unlink/list/status + WikiIndexer 多源聚合' },

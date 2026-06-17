@@ -737,6 +737,61 @@
       "prev_commands": [],
       "next_commands": [],
       "flags": ["<intent> (意图描述)", "--name <slug> (脚本名称)", "--depth shallow|standard|deep (对抗深度)", "--dry-run (演练)", "--from <script> (从脚本导入)", "--resume <runId> (恢复运行)"]
+    },
+    "odyssey-debug": {
+      "name": "odyssey-debug",
+      "name_zh": "深度调试",
+      "description": "Long-running debug cycle — archaeology, diagnosis, fix, confirmation, generalization, discovery, and knowledge persistence",
+      "description_zh": "长周期闭环调试：考古（git 变更溯源）→ 探索 → 假设驱动诊断 → 修复确认 → 泛化（举一反三）→ 发现同类 → 沉淀学习。三句哲学约束：零遗留 / 穷尽迭代 / 改进即标准",
+      "workflow": "Independent deep debugging — treats every bug as a learning signal",
+      "workflow_zh": "独立深度调试，将每个 bug 视为学习信号。与 quality-debug（快速修复）不同，本命令深入 git 历史、扫描同类问题",
+      "prev_commands": [],
+      "next_commands": ["odyssey-improve", "odyssey-review-test-fix"],
+      "flags": ["\"<issue>\" (问题描述)", "--skip-fix (仅分析)", "--skip-generalize (跳过泛化)", "--auto (自动模式)", "--template <name> (调查策略模板)", "-y (跳过确认)", "-c (恢复会话)"]
+    },
+    "odyssey-improve": {
+      "name": "odyssey-improve",
+      "name_zh": "深度改进",
+      "description": "Long-running codebase improvement cycle — multi-dimensional audit, deep diagnosis, targeted fix, verify, generalize, and engineering knowledge persistence",
+      "description_zh": "代码质量深度提升：基线测量 → 6 维审计 → 根因诊断 → 逐轮修复（按 severity 递降）→ 验证 → 泛化 → 沉淀。穷尽修复至 0 remaining actionable findings",
+      "workflow": "Independent deep improvement — combines static analysis with runtime-aware reasoning",
+      "workflow_zh": "独立深度改进，结合静态分析与运行时感知。与 quality-review（通过/失败门控）不同，本命令逐个根因诊断并穷尽修复",
+      "prev_commands": [],
+      "next_commands": ["odyssey-review-test-fix"],
+      "flags": ["\"<target>\" (目标路径/模块)", "--dimensions <list> (审计维度)", "--skip-fix (仅审计)", "--skip-generalize (跳过泛化)", "--auto (自动模式)", "-y (跳过确认)", "-c (恢复会话)"]
+    },
+    "odyssey-planex": {
+      "name": "odyssey-planex",
+      "name_zh": "需求交付闭环",
+      "description": "Requirement-driven iterative cycle — plan, execute, strict verify, fix loop until acceptance criteria met",
+      "description_zh": "需求到交付闭环：解析需求 → 严格验收标准 → 分解任务 → 执行 → 验证 → 修复差距 → 迭代直到 ALL 标准通过。不允许「接近通过」",
+      "workflow": "Independent requirement-to-delivery loop — acceptance criteria are sacred",
+      "workflow_zh": "独立需求交付循环，验收标准神圣不可侵犯。与 maestro-execute（按计划执行）不同，本命令自带 verify→fix 闭环迭代",
+      "prev_commands": [],
+      "next_commands": ["odyssey-review-test-fix"],
+      "flags": ["\"<requirement>\" (需求描述)", "--max-iterations N (最大迭代)", "--skip-generalize (跳过泛化)", "--auto (自动模式)", "--method agent|cli|auto (执行方式)", "--executor <tool> (执行工具)", "--skip-verify (跳过验证)", "--template <name> (需求模板)", "-y (跳过确认)", "-c (恢复会话)"]
+    },
+    "odyssey-review-test-fix": {
+      "name": "odyssey-review-test-fix",
+      "name_zh": "深度审查修复",
+      "description": "Deep review + fix cycle — archaeology, exploration, multi-dimensional review, targeted fix, generalization, discovery, and knowledge persistence",
+      "description_zh": "多维度深度审查 + 穷尽修复：考古 → 探索 → 多维审查 → 全 severity 逐轮修复 + re-review gate → 泛化到全项目。每次修复后重审同区域",
+      "workflow": "Independent deep code review with exhaustive fix — find one, fix one, find all",
+      "workflow_zh": "独立深度审查修复，发现一个修复一个再扫描全部。与 quality-review（门控裁决）不同，本命令自动修复并泛化",
+      "prev_commands": [],
+      "next_commands": [],
+      "flags": ["\"<target>\" (目标路径/模块)", "--dimensions <list> (审查维度)", "--fix-threshold critical|high|medium|low|all (修复阈值)", "--skip-fix (仅审查)", "--skip-generalize (跳过泛化)", "--auto (自动模式)", "-y (跳过确认)", "-c (恢复会话)"]
+    },
+    "odyssey-ui": {
+      "name": "odyssey-ui",
+      "name_zh": "UI 深度优化",
+      "description": "Long-running UI optimization cycle — visual survey, multi-dimensional audit, divergent exploration, fix, verify, generalize, and design knowledge persistence",
+      "description_zh": "UI 深度打磨循环：视觉普查 → 6 维审计 → 发散探索 → 修复 → 浏览器验证 → 泛化到兄弟组件 → 沉淀设计知识。按 impact×severity 递降穷尽修复",
+      "workflow": "Independent deep UI polish — every pixel tells a story",
+      "workflow_zh": "独立深度 UI 打磨，每个像素都有故事。与 maestro-impeccable（单次执行）不同，本命令是持久化会话，带证据链和迭代改进",
+      "prev_commands": [],
+      "next_commands": [],
+      "flags": ["\"<target>\" (目标组件/页面)", "--dimensions <list> (审计维度)", "--skip-fix (仅审计)", "--skip-generalize (跳过泛化)", "--auto (自动模式)", "-y (跳过确认)", "-c (恢复会话)"]
     }
   },
   "skills": {
