@@ -370,3 +370,23 @@ registerNotice({
     },
   ],
 });
+
+registerNotice({
+  version: '0.5.3',
+  title: 'MaestroGraph 知识图谱引擎 + Odyssey 长时命令族',
+  highlights: [
+    'MaestroGraph 自研 KG 引擎：9 语言提取器 + 24 框架 resolver + BM25F 搜索',
+    '新增 Odyssey 5 命令：debug / improve / planex / ui / review-test-fix',
+    'Domain 领域知识系统：glossary CRUD + 代码发现 + Hook 注入',
+    'Install TUI 重设计：分组 Hub + Hooks 颗粒度 + Config Profile 导出导入',
+    '跨工作空间知识共享：workspace link/unlink/list/status',
+  ],
+  actions: [
+    {
+      id: 'reinstall-commands-global',
+      description: '重新安装全局 commands + skills + agents（含 Odyssey 全族 + Domain 系统）',
+      defaultYes: true,
+      run: () => runShell('maestro install --force --global --components agy-context,agy-skills,agy-agents,agy-md-chinese'),
+    },
+  ],
+});
