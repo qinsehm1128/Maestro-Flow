@@ -14,16 +14,8 @@ allowed-tools:
   - TodoWrite
 ---
 <purpose>
-Orchestrate all maestro commands based on user intent and project state.
-Classify intent → select chain → create session → dispatch to `maestro-ralph-execute`.
-
-Entry points:
-- **`/maestro "intent"`** — Intent-based: classify → chain → execute
-- **`/maestro -c`** — Resume previous session
-- **`/maestro --dry-run "intent"`** — Show chain, no execution
-- **`/maestro --super "intent"`** — Production-ready mode (read maestro-super.md)
-
-**Session**: `.workflow/.maestro/{session_id}/status.json` — 工作流唯一真源。session_id 格式 `maestro-{YYYYMMDD-HHmmss}`（本 command 创建，静态链）或 `ralph-{YYYYMMDD-HHmmss}`（`/maestro-ralph` 创建，自适应链）。两类都由 `/maestro-ralph-execute` 推进；schema 与 ralph 共用（含 `ralph_protocol_version: "1"` + `active_step_index`）。
+Orchestrate all maestro commands: classify intent → select chain → create session → dispatch to `maestro-ralph-execute`.
+Session: `.workflow/.maestro/{session_id}/status.json`.
 </purpose>
 
 <deferred_reading>

@@ -13,19 +13,8 @@ allowed-tools:
   - AskUserQuestion
 ---
 <purpose>
-Closed-loop runner for the maestro workflow lifecycle.
-Single skill — every invocation routes by session state, executes one tick, and self-invokes `Skill("maestro-ralph-beta")` until all `completion_confirmed` or paused.
-
-Entry points:
-- **`/maestro-ralph-beta "intent"`** — New session: infer → decompose → build → tick
-- **`/maestro-ralph-beta continue`** — Resume: locate session → tick
-- **`/maestro-ralph-beta status`** — Display session progress
-
-Tick kinds:
-- **执行 step** (`step.decision == null`): `maestro ralph next` → inline → `maestro ralph complete` → self-invoke
-- **decision step** (`step.decision != null`): inline evaluate → apply verdict → self-invoke
-
-Session: `.workflow/.maestro/ralph-{YYYYMMDD-HHmmss}/status.json`
+Self-running closed-loop: routes by session state, executes one tick, self-invokes until done or paused.
+Single skill handles build + execute + decision evaluation. Session: `.workflow/.maestro/ralph-{YYYYMMDD-HHmmss}/status.json`.
 </purpose>
 
 <context>

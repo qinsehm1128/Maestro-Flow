@@ -1,71 +1,97 @@
 # Instruction File Authoring Guide
 
-Maestro instruction files (`*-instructions.md`, `delegate-usage.md` etc.) are injected into LLM context. Every line costs tokens and competes for attention. This guide defines optimization principles.
-
 ## Core Principle
 
 **Only write what changes the model's behavior.** If removing a line doesn't change what the model does, delete it.
 
-## Anti-Patterns
+## Protected Content — NEVER Remove
+
+### P1. Structural Tags
+
+**ALWAYS preserve ALL XML-style tags** (open AND close) in command files. These serve overlay targeting, system parsing, or state machine definition. Never remove tags — only trim content inside them.
+
+Common tags: `<purpose>`, `<context>`, `<execution>`, `<required_reading>`, `<deferred_reading>`, `<success_criteria>`, `<completion>`, `<error_codes>`, `<interview_protocol>`, `<on_complete>`.
+
+Odyssey-specific: `<boundary>`, `<execution_discipline>`, `<self_iteration>`, `<state_machine>`, `<states>`, `<transitions>`, `<actions>`, `<appendix>`, `<next_step_routing>`.
+
+Rule: if it has `<` and `>` wrapping a section — keep it.
+
+### P2. Data Structure Schemas
+
+JSON/NDJSON templates that define write formats:
+- `state.json.artifacts[]` registration blocks — keep all field names and value patterns
+- `evidence.ndjson` / `decisions.ndjson` schema definitions
+- Any `Append to ...` with field structure
+
+Allowed: JSON code block → bullet-point field list. NOT allowed: compress to one narrative sentence.
+
+### P3. Completion Status Blocks
+
+`--- COMPLETION STATUS ---` blocks enable downstream command chaining. NEVER remove.
+
+### P4. Routing Tables
+
+`success_criteria` → next command mapping tables enable workflow transitions. NEVER remove.
+
+### P5. Cross-File Reference Integrity
+
+When removing content from command file because "workflow file has it":
+- VERIFY the workflow file actually contains the referenced content
+- If command says "X is defined in Y.md", Y.md MUST have X with matching identifiers
+- Missing target = broken reference = FAIL
+
+## Anti-Patterns — Fix These
 
 ### 1. Passive Dependency Assumptions
 
-Bad: "KG stays fresh via hooks — manual search only needed on initial setup"
-Problem: Model assumes context is pre-loaded, skips active search.
-
-Fix: Frame all actions as explicit. "ALWAYS search before acting. Never assume context is pre-loaded."
+"hooks handle it" / "auto-loaded" → "ALWAYS search before acting."
 
 ### 2. Flat Tables With Equal Weight
 
-Bad: 7 trigger conditions in one table — model treats all as optional.
-
-Fix: Progressive layering (L0/L1/L2). L0 = unconditional, always execute. L1/L2 = conditional, trigger-based. Model can quickly decide "at least do L0".
+7 equal triggers → L0 (unconditional) / L1 (conditional) / L2 (deep analysis).
 
 ### 3. Implementation Details
 
-Bad: "BM25 full-text across all knowledge types", "broker-managed lifecycle", "auto-assembles previous conversation context"
-
-Fix: Delete. Model doesn't need to know HOW a command works internally — only WHEN and WHY to call it.
+"BM25 full-text", "broker-managed lifecycle" → Delete. Model needs WHEN, not HOW.
 
 ### 4. Teaching-Style Explanations
 
-Bad: "Not 'Analyze code' but 'Identify auth vulnerabilities; success = OWASP Top 10 covered'"
-
-Fix: Show the template, drop the pedagogy. One good example beats three explanations.
+"Not X but Y" pedagogy → Show template, drop explanation.
 
 ### 5. Duplicate Sections
 
-Bad: "Tool Resolution Priority" in Section 1 AND "Tool Selection" in Section 2 saying the same thing.
+Same info in summary + steps → Single source. Schemas are reference, NOT duplication of steps.
 
-Fix: Single source of truth. If info exists in config files, don't repeat it in instructions.
+### 6. Soft Language for Hard Rules
 
-### 6. Structural Tags as Wrappers
+"should" / "recommended" → `ALWAYS` / `NEVER`.
 
-Bad: `<context>...</context>`, `<execution>...</execution>`, `<purpose>...</purpose>` wrapping entire sections.
+### 7. Verbose Descriptions
 
-Fix: Delete. Use markdown headers for structure. Tags that don't trigger specific model behavior are noise.
+Purpose in ≤10 words. Trim `<purpose>` content but keep the tag.
 
-### 7. Soft Language for Hard Rules
+### 8. Phase Gates Without BLOCKED
 
-Bad: "Search is **not optional**. Execute these commands before acting in the corresponding scenarios:"
+Every Phase Gate MUST have both `REQUIRED` conditions AND `BLOCKED if missing` consequence. A Gate with only REQUIRED is unenforceable.
 
-Fix: Use `ALWAYS` / `NEVER` directly. "**ALWAYS search before acting.**"
+### 9. Missing Structural Sections
 
-### 8. Verbose Command Descriptions
-
-Bad: `maestro search — BM25 full-text search across all knowledge types including specs, knowhow, and issues`
-
-Fix: `maestro search — all knowledge types`. Purpose in ≤5 words.
+Commands with `<execution>` logic MUST also have:
+- `<completion>` — standalone report + ralph completion + next-step routing table
+- `<error_codes>` — error/warning code table with recovery actions
+Do NOT embed completion/routing logic inside `<execution>`. Keep them in their own tags.
 
 ## Checklist
 
-Before committing an instruction file, verify:
-
+- [ ] ALL structural tags preserved (P1)
+- [ ] ALL data schemas preserved with field-level detail (P2)
+- [ ] ALL completion status blocks preserved (P3)
+- [ ] ALL routing tables preserved (P4)
 - [ ] No line explains HOW a tool works internally
-- [ ] No duplicate info across sections or with external config files
-- [ ] Strong constraints use ALWAYS/NEVER, not "should"/"recommended"
-- [ ] High-frequency actions are visually prominent (L0 / top of list)
-- [ ] Each command description is ≤10 words
-- [ ] No wrapper tags without behavioral function
-- [ ] No "fallback" framing that implies a primary automatic path
-- [ ] Removed all examples that repeat what a template already shows
+- [ ] No duplicate info across sections
+- [ ] Strong constraints use ALWAYS/NEVER
+- [ ] High-frequency actions visually prominent (L0 / top of list)
+- [ ] Command descriptions ≤10 words
+- [ ] No "fallback" framing implying automatic primary path
+- [ ] Phase Gates have REQUIRED + BLOCKED pairs
+- [ ] Commands with `<execution>` have matching `<completion>` and `<error_codes>`

@@ -114,12 +114,17 @@ function hasSqliteDb(): boolean {
 
 async function requireCodeGraph(): Promise<{ adapter: any }> {
   const { MaestroGraph } = await import('../graph/kg/engine.js');
-  if (!MaestroGraph.isInitialized(resolve('.'))) {
-    console.error('MaestroGraph not initialized for this project.');
-    console.error('  Run: maestro kg sync');
-    process.exit(1);
+  const projectRoot = resolve('.');
+  let mg: InstanceType<typeof MaestroGraph>;
+  if (!MaestroGraph.isInitialized(projectRoot)) {
+    console.log('MaestroGraph not initialized — auto-indexing...');
+    mg = await MaestroGraph.init(projectRoot);
+    const results = await mg.sync();
+    const total = results.reduce((s, r) => s + r.nodesAdded, 0);
+    console.log(`Auto-index complete: ${total} nodes indexed.`);
+  } else {
+    mg = await MaestroGraph.open(projectRoot);
   }
-  const mg = await MaestroGraph.open(resolve('.'));
   const adapter = {
     searchNodes: (q: string, opts?: { limit?: number; kinds?: string[] }) => mg.searchCode(q, opts),
     resolveNode: (id: string) => mg.getNode(id),

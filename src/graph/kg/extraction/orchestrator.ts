@@ -156,11 +156,13 @@ export async function syncKnowledgeGraph(
     if (shouldSync('codegraph')) {
       const startMs = Date.now();
       const removedCode = queries.deleteNodesBySourceType('codegraph');
-      const candidateDirs = ['src', 'lib', 'app', 'packages', 'apps', 'dashboard/src'];
-      const srcDirs = candidateDirs
+      const preferredDirs = ['src', 'lib', 'app', 'packages', 'apps', 'dashboard/src'];
+      const srcDirs = preferredDirs
         .map(d => resolve(projectPath, d))
         .filter(d => existsSync(d));
-      if (srcDirs.length === 0) srcDirs.push(resolve(projectPath, 'src'));
+      if (srcDirs.length === 0) {
+        srcDirs.push(projectPath);
+      }
 
       let totalNodes = 0;
       let totalEdges = 0;
@@ -175,7 +177,15 @@ export async function syncKnowledgeGraph(
 
         for (const result of codeResult.results) {
           if (result.nodes.length > 0) {
-            mg.insertExtractionResults(result);
+            try {
+              mg.insertExtractionResults(result);
+            } catch {
+              // FK or unique constraint — insert nodes only, skip edges
+              try {
+                mg.getQueryBuilder().insertNodes(result.nodes);
+                mg.getQueryBuilder().upsertFile(result.fileRecord);
+              } catch { /* skip this file entirely */ }
+            }
           }
         }
 

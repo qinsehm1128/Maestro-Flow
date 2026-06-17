@@ -13,25 +13,8 @@ allowed-tools:
   - AskUserQuestion
 ---
 <purpose>
-Deep UI polish cycle: survey (capture current state) → audit (6 dimensions) → diverge (creative
-exploration beyond bugs) → fix → verify → generalize (举一反三) → discover → persist.
-
-Unlike `maestro-impeccable` (single command/chain execution), this is a persistent session with
-evidence trails, decision journal, and iterative improvement. Every visual detail is an opportunity
-to learn and replicate.
-
-Core philosophy:
-- **Every pixel tells a story** — subtle details create the experience
-- **Diverge before converge** — explore creatively, then implement methodically
-- **Find one, polish all** — a single improvement reveals a class of opportunities
-- **Browser is truth** — verify in real rendering, not just in code
-
-**三句哲学约束（穷尽迭代）:**
-1. **零遗留** — 每个 finding/idea 必须是 action item（修复 / issue / 决策），不允许只报告不处理
-2. **穷尽迭代** — 按 impact×severity 递降逐轮修复，直到 0 remaining actionable findings 才退出 fix loop
-3. **改进即标准** — 每次修复后重审同区域，发现新视觉问题继续修，直到该区域无可改善
-
-Entry: `/odyssey-ui "target"` (full cycle) | `-c` (resume) | `--skip-fix` (audit-only)
+Deep UI polish cycle: survey → 6-dimension audit → divergent creative exploration →
+fix → verify → generalize → discover → persist. Every pixel is a learning opportunity.
 </purpose>
 
 <boundary>

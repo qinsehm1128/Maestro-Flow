@@ -13,22 +13,8 @@ allowed-tools:
   - AskUserQuestion
 ---
 <purpose>
-Closed-loop deep debugging: archaeology (what changed) → explore (call chains, error gaps) → diagnose (hypothesis-driven) → fix & confirm → generalize (举一反三) → discover siblings → persist learnings.
-
-Unlike `quality-debug` (fast fix), this treats every bug as a learning signal — digs into git history before hypotheses, confirms fixes with CLI review, scans for siblings of the root cause.
-
-Core philosophy:
-- **Archaeology before hypothesis** — look at what changed before guessing why
-- **Fix one, find many** — a single bug reveals a class of bugs
-- **Decision journal** — human-judgment items recorded, not lost
-- **CLI-assisted review** — delegate for second-opinion analysis
-
-**三句哲学约束（穷尽迭代）:**
-1. **零遗留** — 根因必须确认到底，修复必须验证通过，泛化必须扫描穷尽
-2. **穷尽迭代** — 假设失败不放弃：扩范围 → 换视角 → 升级工具，直到根因确认或明确 INCONCLUSIVE
-3. **改进即标准** — 修复后重新确认同区域无新问题，泛化发现的同类 bug 全部处理
-
-Entry: `/odyssey-debug "issue"` (full cycle) | `-c` (resume) | `--skip-fix` (analysis-only)
+Closed-loop deep debugging: archaeology → explore → diagnose → fix & confirm → generalize → discover siblings → persist.
+Treats every bug as a learning signal with exhaustive iteration until root cause confirmed or INCONCLUSIVE.
 </purpose>
 
 <boundary>

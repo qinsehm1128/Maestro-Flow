@@ -13,42 +13,8 @@ allowed-tools:
   - AskUserQuestion
 ---
 <purpose>
-Closed-loop decision engine for the maestro workflow lifecycle.
-Reads project state → infers position → builds adaptive chain → delegates execution.
-
-Entry points:
-- **`/maestro-ralph "intent"`** — New session: infer → decompose → build → emit /goal prompt（如有 decomposition）→ dispatch ralph-execute
-- **`/maestro-ralph continue`** — Wrapper; dispatches to ralph-execute（首选直接 `/maestro-ralph-execute` 推进 step）
-- **`/maestro-ralph status`** — Display session progress
-
-> 推进规则：**step 推进由 `/maestro-ralph-execute` 负责**；ralph 仅在 build / decision 评估时介入。decision 节点由 ralph-execute 自动 `Skill("maestro-ralph")` handoff，无需用户手动切换。
-
-Initial decomposition (S_DECOMPOSE): boundary-clarified via ≤3 questions for broad intents (重构/全面/迁移/重写). 写入 status.json 的 `boundary_contract` / `execution_criteria` / `task_decomposition`，附 `/goal` prompt。
-
-Step kinds:
-- **执行 step**: ralph-execute 调 `Bash("maestro ralph next")` 加载 command .md + required_reading 全文，按 stdout 内联执行
-- **decision step**: `step.decision` 字段非空；回 ralph 评估（CLI 只读分析）
-
-Key difference from maestro coordinator:
-- maestro: static chain → one-time selection → runs all steps
-- ralph: living chain → decision nodes re-evaluate → chain grows/shrinks dynamically
-
-Session: `.workflow/.maestro/ralph-{YYYYMMDD-HHmmss}/status.json`
-Mutual invocation with `/maestro-ralph-execute` forms a self-perpetuating work loop.
-
-### Execution Flow
-
-```
- /maestro-ralph "intent" ─▶ ralph        infer → decompose → build chain
-                              │           resolves command_path per step
-                              │           writes status.json
-                              │           emits /goal prompt
-                              ▼
-                       ralph-execute  ◀─┐ 执行 step → `maestro ralph next` + inline + `ralph complete`
-                              │         │ decision step → Skill("maestro-ralph")
-                              └─────────┘ CLI writes step.completion_confirmed
-                       loop until all completion_confirmed | paused
-```
+Closed-loop decision engine: read project state → infer position → build adaptive chain → delegate execution.
+Ralph builds/evaluates; ralph-execute runs steps. Session: `.workflow/.maestro/ralph-{YYYYMMDD-HHmmss}/status.json`.
 </purpose>
 
 <context>

@@ -105,6 +105,30 @@ Create OUTPUT_DIR.
 
 ---
 
+## Phase Gates (Standard Mode, when `-q` and `--gaps` are BOTH absent)
+
+MANDATORY and BLOCKING. Do NOT advance past a gate until ALL conditions are met.
+
+**GATE 1: Step 4 → Step 5** (Exploration → Discussion)
+- REQUIRED: cli-explore-agent completed (Step 4.1), `exploration-codebase.json` written with ≥1 code anchor
+- REQUIRED: ≥1 maestro delegate CLI call completed (Step 4.2), output in `explorations.json` or `perspectives.json`
+- REQUIRED: Baseline confidence scoring recorded in discussion.md (Step 4.6)
+
+**GATE 2: Step 5 → Step 6** (Discussion → Scoring)
+- REQUIRED: discussion.md contains ≥1 interactive round with user feedback (Step 5.3)
+- REQUIRED: Confidence re-scored ≥1 time with delta shown (Step 5.8)
+- REQUIRED: Pressure pass completed ≥1 time (Step 5.9)
+
+**GATE 3: Step 6 → Step 7** (Scoring → Synthesis)
+- REQUIRED: analysis.md written with all 6 dimensions scored
+- REQUIRED: Each dimension score cites evidence from exploration-codebase.json or explorations.json — NOT from manual file reading
+
+**GATE 4: Step 7 → Step 8** (Synthesis → Decision Extraction)
+- REQUIRED: conclusions.json written with recommendations and decision trail
+- REQUIRED: Intent Coverage Matrix shows no unresolved ❌ items (or user-confirmed deferrals)
+
+---
+
 ## Process
 
 ### Step 1: Parse Input & Initialize Session
@@ -233,7 +257,7 @@ If `external_research` not selected: `researchContext = null`.
 
 **Step 4.1: Codebase Exploration** (cli-explore-agent) — MANDATORY, NOT SUBSTITUTABLE
 
-MUST spawn cli-explore-agent. Manual Read/Grep by the orchestrator is NOT a substitute — it provides preparation context, not independent evidence. The agent produces exploration-codebase.json which is a prerequisite for Step 5.
+MUST spawn cli-explore-agent; manual Read/Grep is not a substitute. Produces exploration-codebase.json required for Step 5.
 
 Spawn cli-explore-agent with 3-layer exploration:
 
@@ -734,54 +758,6 @@ Each round appends:
 Replaceable blocks (overwritten each round):
 - `## Current Understanding` — latest consolidated understanding
 - `## Table of Contents` — updated with new section links
-
-## Six Dimensions
-
-| Dimension | Focus Areas |
-|-----------|------------|
-| Feasibility | Technical difficulty, team capability, time, tooling |
-| Impact | User value, business value, tech debt reduction, DX |
-| Risk | Failure modes, security, scalability, regression |
-| Complexity | Integration points, dependencies, learning curve, testing |
-| Dependencies | External services, internal modules, data, infrastructure |
-| Alternatives | 2+ other approaches with tradeoffs |
-
-## Key Design Principles
-
-1. **Iterative Deepening**: Multi-round discussion (max 5) with user feedback steering direction
-2. **CLI-Assisted Exploration**: cli-explore-agent for codebase + multi-CLI parallel analysis
-3. **Discussion Timeline**: discussion.md as living document — rounds appended, Current Understanding replaced
-4. **Decision Recording Protocol**: Immediate capture of decisions, findings, assumption changes
-5. **Intent Coverage Tracking**: Original user intent checked every round (✅🔄⚠️❌)
-6. **Six-Dimension Scoring**: Feasibility, Impact, Risk, Complexity, Dependencies, Alternatives
-7. **Multi-Perspective Synthesis**: Up to 4 perspectives with convergent/conflicting/unique extraction
-8. **Decision Extraction**: Gray area identification → interactive discussion → Locked/Free/Deferred classification → context.md
-9. **Dual Depth**: Full mode (explore→score→decide) or Quick mode (-q, decide only)
-
-## Quality Criteria
-
-**Full mode:**
-- All 6 dimensions analyzed with evidence-backed scores
-- Discussion timeline has narrative synthesis per round
-- Decision Recording Protocol applied consistently
-- Intent Coverage verified with no unresolved ❌ items
-- Risk matrix populated with identified risks
-- At least 2 alternatives compared with tradeoffs
-- Go/No-Go/Conditional recommendation with confidence level
-- Code references included where relevant (file paths, line numbers)
-- Confidence tracking initialized and re-scored each round
-- Readiness gate checked before synthesis (Step 5.10)
-- Pressure pass completed ≥ 1 time before Step 6
-- Confidence summary with factor decomposition in analysis.md
-
-**Both modes (full + quick):**
-- context.md written with all decisions classified as Locked/Free/Deferred
-- context-package.json written with constraints, requirements, insights, and open_questions
-- Gray areas identified through phase-specific analysis
-- Scope creep redirected to Deferred section
-- Every decision follows Context/Options/Chosen/Reason protocol
-- Prior context loaded and applied (no re-asking decided questions)
-- Upstream context loaded via `--from` when specified (context-package.json consumed)
 
 ## Error Handling
 

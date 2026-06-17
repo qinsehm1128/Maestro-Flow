@@ -13,19 +13,8 @@ allowed-tools:
   - AskUserQuestion
 ---
 <purpose>
-Requirement-to-delivery closed loop: parse requirement → define strict acceptance criteria →
-plan tasks → execute → verify against criteria → fix gaps → iterate until ALL criteria pass.
-
-Core philosophy:
-- **Acceptance criteria are sacred** — no "close enough", no manual override
-- **Iterate, don't restart** — each fix cycle targets only the failing criteria
-- **CLI-assisted verification** — delegate to external tools for objective quality checks
-- **Evidence-based progress** — every iteration logged with pass/fail per criterion
-
-**三句哲学约束（穷尽迭代）:**
-1. **零遗留** — 验收标准必须 ALL pass，不允许"接近通过"
-2. **穷尽迭代** — verify 失败自动修复重试，直到全部通过或明确升级
-3. **改进即标准** — 修复后重新验证同区域，新发现的标准违反继续修
+Requirement-to-delivery closed loop: parse requirement → define acceptance criteria →
+plan → execute → verify → fix gaps → iterate until ALL criteria pass.
 </purpose>
 
 <boundary>

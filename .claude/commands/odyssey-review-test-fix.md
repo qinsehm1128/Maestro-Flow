@@ -13,21 +13,8 @@ allowed-tools:
   - AskUserQuestion
 ---
 <purpose>
-Deep code review with exhaustive fix and generalization: archaeology → explore → multi-dimensional
-review → fix ALL findings → confirm → generalize (举一反三) → discover → persist.
-
-Unlike `quality-review` (pipeline gate verdict), this goes deeper: exhaustive documentation,
-automated fix, codebase-wide generalization, decision journal. Use `--skip-fix` for review-only.
-
-**三句哲学约束（穷尽迭代）:**
-1. **零遗留** — 每个 finding 必须是 action item（修复 / issue / 决策），不允许只报告不处理
-2. **穷尽迭代** — 按 severity 从高到低逐轮修复，直到 0 remaining actionable findings 才退出 fix loop
-3. **改进即标准** — 每次修复后重审同区域，发现新问题继续修，直到该区域无可改善
-
-Core behaviors:
-- **Find one, fix one, find all** — every finding triggers fix + codebase-wide scan
-- **Record everything** — ambiguous items → decision journal, never silent skip
-- **CLI-assisted** — delegate for multi-angle analysis and verification
+Deep code review with exhaustive fix: archaeology → explore → multi-dimensional review →
+fix ALL findings → confirm → generalize → discover → persist. Zero-residual philosophy.
 </purpose>
 
 <boundary>

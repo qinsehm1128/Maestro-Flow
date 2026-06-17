@@ -13,22 +13,8 @@ allowed-tools:
   - AskUserQuestion
 ---
 <purpose>
-Deep codebase improvement cycle: survey (current state) → audit (6 dimensions) → diagnose (root cause per finding) → fix → verify → generalize (举一反三) → discover siblings → persist learnings.
-
-Unlike `quality-review` (pass/fail gate) or `odyssey-review-test-fix` (code review focus), this treats every finding as a runtime quality signal — performance bottlenecks, security vulnerabilities, architectural debt, reliability gaps, and observability blind spots. Combines static analysis with runtime-aware reasoning.
-
-Core philosophy:
-- **Measure before improving** — baseline first, then optimize
-- **Root cause over symptom** — trace each issue to its origin
-- **Fix one, improve many** — every improvement reveals a class of opportunities
-- **Verify improvement** — measure after fix, compare with baseline
-
-**三句哲学约束（穷尽迭代）:**
-1. **零遗留** — 每个 finding 必须是 action item（修复 / issue / 决策），不允许只报告不处理
-2. **穷尽迭代** — 按 severity 从高到低逐轮修复，直到 0 remaining actionable findings 才退出 fix loop
-3. **改进即标准** — 每次修复后重审同区域，发现新问题继续修，直到该区域无可改善
-
-Entry: `/odyssey-improve "target"` (full cycle) | `-c` (resume) | `--skip-fix` (audit-only)
+Deep codebase improvement: survey → 6-dimension audit → diagnose → fix → verify → generalize → discover → persist.
+Baseline-first approach with exhaustive iteration until zero remaining actionable findings.
 </purpose>
 
 <boundary>
