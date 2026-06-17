@@ -39,6 +39,29 @@ Available CLI endpoints are dynamically defined by the config file
 
 KG stays fresh via hooks (`kg-sync` on UserPromptSubmit, `kg-context-injector` on Agent spawn). Manual `maestro kg index --sqlite` only needed on initial setup.
 
+### Proactive Search — Mandatory Triggers
+
+Search is **not optional**. Execute these commands before acting in the corresponding scenarios:
+
+| Trigger Condition | Command | Purpose |
+|---|---|---|
+| Starting any implementation task | `maestro search "<feature/module keywords>"` | Load relevant specs, knowhow, existing issues |
+| Encountering unknown symbol/module | `maestro kg search "<symbol>"` | Understand code structure and dependencies |
+| Understanding module boundaries | `maestro kg context <file-or-symbol>` | Get callers, callees, related code |
+| Making architecture decisions | `maestro search --type spec --category arch` | Load architecture constraints |
+| Debugging unfamiliar code | `maestro kg callers <function>` / `maestro kg callees <function>` | Trace call chains |
+| Before writing tests | `maestro search --type spec --category test "<module>"` | Load test patterns and requirements |
+| Before refactoring | `maestro kg search "<module>" --code` | Map impact radius before changes |
+
+### Fallback — When Hooks Are Not Firing
+
+If automatic injection seems absent (no `<maestro-context>` blocks appearing):
+
+1. Check hook status: `maestro hooks status`
+2. Sync graph manually: `maestro kg sync`
+3. Search directly: `maestro search "<query>"` or `maestro kg search "<symbol>"`
+4. Reinstall hooks if needed: `maestro hooks install --level standard`
+
 ### Record — Capture Knowledge
 
 When execution surfaces non-obvious knowledge, persist it:
