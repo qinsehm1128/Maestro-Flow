@@ -27,6 +27,7 @@ export class PluginEngine {
   private scriptDir: string;
   private configMtime: number = 0;
   private scriptModules: Map<string, { extract: (ctx: PluginContext) => PluginExtractionResult | Promise<PluginExtractionResult> }> = new Map();
+  private globCache: Map<string, RegExp> = new Map();
 
   constructor(private projectRoot: string) {
     this.configPath = resolve(projectRoot, '.workflow', 'kg', 'extractors.yaml');
@@ -107,7 +108,13 @@ export class PluginEngine {
       // Array item
       if (trimmed.startsWith('- ')) {
         const value = trimmed.slice(2).trim();
-        if (currentArray && indent >= currentArrayIndent) {
+        if (indent >= currentArrayIndent && currentArrayKey) {
+          if (!currentArray) {
+            const parent = stack[stack.length - 1].obj;
+            const arr: unknown[] = [];
+            parent[currentArrayKey] = arr;
+            currentArray = arr;
+          }
           if (value.includes(':')) {
             const item: Record<string, unknown> = {};
             this.parseInlineKeyValues(value, item);
@@ -146,13 +153,10 @@ export class PluginEngine {
           currentArray = null;
         }
 
-        // Check if next lines are array items for this key
-        if (val === '') {
+        if (val === '' || val === '|') {
           currentArrayKey = key;
           currentArrayIndent = indent + 2;
-          const arr: unknown[] = [];
-          parent[key] = arr;
-          currentArray = arr;
+          currentArray = null;
         }
       }
     }
@@ -343,12 +347,20 @@ export class PluginEngine {
     language: Language,
   ): PluginExtractedSymbol[] {
     const symbols: PluginExtractedSymbol[] = [];
-    const regex = new RegExp(rule.match.pattern, 'gm');
-    const nameRegex = rule.match.nameRegex ? new RegExp(rule.match.nameRegex) : null;
+    let regex: RegExp;
+    let nameRegex: RegExp | null = null;
+    try {
+      regex = new RegExp(rule.match.pattern, 'gm');
+      nameRegex = rule.match.nameRegex ? new RegExp(rule.match.nameRegex) : null;
+    } catch {
+      return symbols;
+    }
     const lines = sourceCode.split('\n');
+    const MAX_MATCHES = 10_000;
 
     let match;
-    while ((match = regex.exec(sourceCode)) !== null) {
+    let count = 0;
+    while ((match = regex.exec(sourceCode)) !== null && count++ < MAX_MATCHES) {
       const name = this.resolveTemplate(rule.extract.name ?? '$1', match);
       if (!name) continue;
       if (nameRegex && !nameRegex.test(name)) continue;
@@ -381,11 +393,16 @@ export class PluginEngine {
     // Build regex to find function calls
     const escapedFunc = funcName.replace(/\./g, '\\.');
     const callRegex = new RegExp(`${escapedFunc}\\s*\\(`, 'g');
-    const nameRegex = rule.match.nameRegex ? new RegExp(rule.match.nameRegex) : null;
+    let nameRegex: RegExp | null = null;
+    try {
+      nameRegex = rule.match.nameRegex ? new RegExp(rule.match.nameRegex) : null;
+    } catch { /* invalid regex */ }
     const lines = sourceCode.split('\n');
+    const MAX_MATCHES = 10_000;
 
     let m;
-    while ((m = callRegex.exec(sourceCode)) !== null) {
+    let count = 0;
+    while ((m = callRegex.exec(sourceCode)) !== null && count++ < MAX_MATCHES) {
       const startIdx = m.index + m[0].length;
       const argValues = this.extractCallArgs(sourceCode, startIdx);
       if (nameArgIdx >= 0 && nameArgIdx < argValues.length) {
@@ -409,14 +426,18 @@ export class PluginEngine {
     language: Language,
   ): PluginExtractedSymbol[] {
     const symbols: PluginExtractedSymbol[] = [];
-    const nameRegex = rule.match.nameRegex ? new RegExp(rule.match.nameRegex) : null;
+    let nameRegex: RegExp | null = null;
+    try {
+      nameRegex = rule.match.nameRegex ? new RegExp(rule.match.nameRegex) : null;
+    } catch { /* invalid regex */ }
     const scope = rule.match.scope ?? 'any';
     const lines = sourceCode.split('\n');
 
-    // Match assignments: NAME = ... / const NAME = ... / export const NAME = ... / NAME: type = ...
     const assignRegex = /^(\s*)(?:export\s+)?(?:(?:const|let|var|final|static\s+final)\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*(?::\s*[^\n=]+)?\s*=\s*/gm;
     let m;
-    while ((m = assignRegex.exec(sourceCode)) !== null) {
+    let count = 0;
+    const MAX_MATCHES = 10_000;
+    while ((m = assignRegex.exec(sourceCode)) !== null && count++ < MAX_MATCHES) {
       const indent = m[1].length;
       const name = m[2];
 
@@ -443,7 +464,11 @@ export class PluginEngine {
       const ch = source[i];
       if (inString) {
         current += ch;
-        if (ch === inString && source[i - 1] !== '\\') inString = null;
+        if (ch === inString) {
+          let bs = 0;
+          for (let j = i - 1; j >= startIdx && source[j] === '\\'; j--) bs++;
+          if (bs % 2 === 0) inString = null;
+        }
         continue;
       }
       if (ch === '"' || ch === "'" || ch === '`') {
@@ -623,12 +648,22 @@ export class PluginEngine {
   }
 
   private globMatch(path: string, pattern: string): boolean {
-    const regex = pattern
-      .replace(/\*\*/g, '§§')
-      .replace(/\*/g, '[^/]*')
-      .replace(/§§/g, '.*')
-      .replace(/\?/g, '.');
-    return new RegExp(`^${regex}$`).test(path);
+    let re = this.globCache.get(pattern);
+    if (!re) {
+      const escaped = pattern
+        .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+        .replace(/\\\*\\\*/g, '§§')
+        .replace(/\\\*/g, '[^/]*')
+        .replace(/§§/g, '.*')
+        .replace(/\\\?/g, '.');
+      try {
+        re = new RegExp(`^${escaped}$`);
+      } catch {
+        return false;
+      }
+      this.globCache.set(pattern, re);
+    }
+    return re.test(path);
   }
 
   private getOnError(): 'warn' | 'fail' {

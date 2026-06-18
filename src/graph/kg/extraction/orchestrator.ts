@@ -164,7 +164,6 @@ export async function syncKnowledgeGraph(
 
     if (shouldSync('codegraph')) {
       const startMs = Date.now();
-      const removedCode = queries.deleteNodesBySourceType('codegraph');
       const hasExplicitSrcDirs = Boolean(options?.codegraph?.srcDirs?.length);
       const candidateDirs = options?.codegraph?.srcDirs?.length
         ? options.codegraph.srcDirs
@@ -178,19 +177,13 @@ export async function syncKnowledgeGraph(
 
       let totalNodes = 0;
       let totalEdges = 0;
+      const pendingResults: import('../db/types.js').ExtractionResult[] = [];
+      const BATCH_SIZE = 50;
 
-      for (const srcDir of srcDirs) {
-        if (!existsSync(srcDir)) continue;
-        const stats = await forEachCodeExtractionResult({
-          projectRoot: projectPath,
-          srcDir,
-          includeTests: options?.codegraph?.includeTests ?? false,
-          maxFileSize: options?.codegraph?.maxFileSize ?? 500 * 1024,
-          excludeDirs: options?.codegraph?.excludeDirs,
-          excludeFiles: options?.codegraph?.excludeFiles,
-          createMaestroIgnore: options?.codegraph?.createMaestroIgnore,
-        }, async (result) => {
-          if (result.nodes.length > 0) {
+      const flushBatch = (): void => {
+        if (pendingResults.length === 0) return;
+        mg.getConnection().transaction(() => {
+          for (const result of pendingResults) {
             try {
               mg.insertExtractionResults(result);
             } catch (err) {
@@ -206,16 +199,51 @@ export async function syncKnowledgeGraph(
             }
           }
         });
+        pendingResults.length = 0;
+      };
+
+      for (const srcDir of srcDirs) {
+        if (!existsSync(srcDir)) continue;
+        const stats = await forEachCodeExtractionResult({
+          projectRoot: projectPath,
+          srcDir,
+          includeTests: options?.codegraph?.includeTests ?? false,
+          maxFileSize: options?.codegraph?.maxFileSize ?? 500 * 1024,
+          excludeDirs: options?.codegraph?.excludeDirs,
+          excludeFiles: options?.codegraph?.excludeFiles,
+          createMaestroIgnore: options?.codegraph?.createMaestroIgnore,
+        }, async (result) => {
+          if (result.nodes.length > 0) {
+            pendingResults.push(result);
+            if (pendingResults.length >= BATCH_SIZE) flushBatch();
+          }
+        });
 
         totalNodes += stats.nodesCreated;
         totalEdges += stats.edgesCreated;
       }
 
+      // Atomic swap: delete old + flush remaining in one transaction
+      mg.getConnection().transaction(() => {
+        queries.deleteNodesBySourceType('codegraph');
+        for (const result of pendingResults) {
+          try {
+            mg.insertExtractionResults(result);
+          } catch {
+            try {
+              mg.getQueryBuilder().insertNodes(result.nodes);
+              mg.getQueryBuilder().upsertFile(result.fileRecord);
+            } catch { /* skip */ }
+          }
+        }
+      });
+      pendingResults.length = 0;
+
       results.push({
         source: 'codegraph',
         nodesAdded: totalNodes,
         nodesUpdated: 0,
-        nodesRemoved: removedCode,
+        nodesRemoved: 0,
         edgesAdded: totalEdges,
         edgesRemoved: 0,
         durationMs: Date.now() - startMs,
@@ -245,9 +273,11 @@ export async function syncKnowledgeGraph(
         `SELECT id, body FROM nodes WHERE source_type IN (${knowledgeSources.map(() => '?').join(',')}) AND body IS NOT NULL AND body != ''`
       ).all(...knowledgeSources) as Array<{ id: string; body: string }>;
       const nowMs = Date.now();
-      for (const node of knowledgeNodes) {
-        store.upsert(node.id, contentHash(node.body), nowMs);
-      }
+      mg.getConnection().transaction(() => {
+        for (const node of knowledgeNodes) {
+          store.upsert(node.id, contentHash(node.body), nowMs);
+        }
+      });
     } catch (err) {
       if (process.env.DEBUG) {
         process.stderr.write(`[MaestroGraph] Credibility sync skipped: ${err instanceof Error ? err.message : String(err)}\n`);
