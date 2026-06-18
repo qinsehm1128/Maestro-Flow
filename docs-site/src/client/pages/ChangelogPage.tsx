@@ -17,6 +17,17 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '0.5.33',
+    date: '2026-06',
+    changes: [
+      { type: 'fix', text_en: 'Install component selection changed to group bundles — 53→25 items, individual control via `install toggle`', text_zh: 'Install 组件选择改为分组打包——53→25 项，个别控制用 `install toggle`' },
+      { type: 'fix', text_en: 'Fix ComponentGrid cursor index mismatch — navigation and rendering now share unified ordered array', text_zh: '修复 ComponentGrid 光标索引错位——导航和渲染统一使用 ordered 数组' },
+      { type: 'fix', text_en: 'Add viewport scrolling to ComponentGrid — 20-row window prevents terminal overflow', text_zh: 'ComponentGrid 添加 viewport 滚动——20 行窗口防止终端溢出' },
+      { type: 'fix', text_en: 'Improve group label visibility in GroupedHub and ComponentGrid — primary color instead of dimColor', text_zh: '改善 GroupedHub 和 ComponentGrid 分组标签可见度——主色替代暗色' },
+      { type: 'fix', text_en: 'Add manifest migration for legacy individual skill IDs to new group bundle IDs', text_zh: '新增 manifest 迁移——旧个别 skill ID 自动映射到新 group bundle ID' },
+    ],
+  },
+  {
     version: '0.5.32',
     date: '2026-06',
     changes: [
