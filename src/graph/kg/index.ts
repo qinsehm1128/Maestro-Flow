@@ -25,6 +25,8 @@ export { extractIssues } from './extraction/knowledge/issue-extractor.js';
 export { TreeSitterEngine, isTreeSitterAvailable, getTreeSitterEngine } from './extraction/code/tree-sitter.js';
 export { isGeneratedFile, isTestFile, shouldDegradeInSearch } from './extraction/code/generated-detection.js';
 export { ensureWasmStability, cleanupWasmStability } from './extraction/code/wasm-stability.js';
+export { WASM_RUNTIME_FLAGS, processHasWasmRuntimeFlags, getWasmRuntimeHint } from './extraction/code/wasm-runtime-flags.js';
+export { buildScanScope, MAESTRO_IGNORE_FILE } from './extraction/code/scan-scope.js';
 export { getExtractor, getSupportedLanguages, detectLanguageFromPath } from './extraction/code/languages/index.js';
 
 // Resolution

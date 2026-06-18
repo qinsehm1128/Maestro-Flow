@@ -8,7 +8,7 @@ import { MaestroGraph } from '../engine.js';
 import { searchUnified, parseQuery } from '../query/search.js';
 import { bfs, findShortestPath, getCallers, getCallees, getImpactRadius } from '../query/traversal.js';
 import { buildContext } from '../query/context-builder.js';
-import { syncKnowledgeGraph } from '../extraction/orchestrator.js';
+import { syncKnowledgeGraph, type CodegraphSyncOptions } from '../extraction/orchestrator.js';
 import { getKgDatabasePath } from '../db/connection.js';
 import type { UnifiedNode, SourceType } from '../db/types.js';
 
@@ -20,6 +20,37 @@ function parseCsv(value: string | undefined): string[] | undefined {
 
 function normalizeSources(value: string | undefined): SourceType[] | undefined {
   return parseCsv(value) as SourceType[] | undefined;
+}
+
+function parseInteger(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function normalizeCodegraphOptions(opts: {
+  src?: string;
+  includeTests?: boolean;
+  maxFileSize?: string;
+  excludeDir?: string;
+  excludeFile?: string;
+  noCreateMaestroIgnore?: boolean;
+}): CodegraphSyncOptions | undefined {
+  const srcDirs = parseCsv(opts.src);
+  const excludeDirs = parseCsv(opts.excludeDir);
+  const excludeFiles = parseCsv(opts.excludeFile);
+  const maxFileSize = parseInteger(opts.maxFileSize);
+  if (!srcDirs && !excludeDirs && !excludeFiles && !maxFileSize && !opts.includeTests && !opts.noCreateMaestroIgnore) {
+    return undefined;
+  }
+  return {
+    srcDirs,
+    excludeDirs,
+    excludeFiles,
+    maxFileSize,
+    includeTests: opts.includeTests,
+    createMaestroIgnore: opts.noCreateMaestroIgnore ? false : undefined,
+  };
 }
 
 function printSyncResults(results: Awaited<ReturnType<typeof syncKnowledgeGraph>>): void {
@@ -34,16 +65,28 @@ function printSyncResults(results: Awaited<ReturnType<typeof syncKnowledgeGraph>
 }
 
 async function syncProject(
-  opts: { full?: boolean; source?: string; json?: boolean },
+  opts: {
+    full?: boolean;
+    source?: string;
+    json?: boolean;
+    src?: string;
+    includeTests?: boolean;
+    maxFileSize?: string;
+    excludeDir?: string;
+    excludeFile?: string;
+    noCreateMaestroIgnore?: boolean;
+  },
   label = 'Syncing MaestroGraph...',
 ): Promise<void> {
   const projectRoot = resolve('.');
   const sources = normalizeSources(opts.source);
+  const codegraph = normalizeCodegraphOptions(opts);
 
   if (!opts.json) console.log(label);
   const results = await syncKnowledgeGraph(projectRoot, {
     full: opts.full,
     sources,
+    codegraph,
   });
 
   if (opts.json) {
@@ -114,6 +157,12 @@ export function registerKgCommands(program: Command): void {
     .description('Sync knowledge graph — extract from all sources')
     .option('--full', 'Full rebuild (ignore file hashes)')
     .option('--source <sources>', 'Comma-separated sources: domain,spec,knowhow,codebase,issue,codegraph')
+    .option('--src <paths>', 'Comma-separated code source roots for codegraph source')
+    .option('--max-file-size <bytes>', 'Maximum code file size to index')
+    .option('--include-tests', 'Include test files in code index')
+    .option('--exclude-dir <patterns>', 'Comma-separated directory ignore patterns')
+    .option('--exclude-file <patterns>', 'Comma-separated file ignore patterns')
+    .option('--no-create-maestro-ignore', 'Do not create .maestroignore when missing')
     .option('--json', 'Output as JSON')
     .action(async (opts) => syncProject(opts));
 
@@ -122,15 +171,26 @@ export function registerKgCommands(program: Command): void {
     .description('Compatibility alias for sync — sync all MaestroGraph sources')
     .option('--full', 'Full rebuild (ignore file hashes)')
     .option('--source <sources>', 'Comma-separated sources: domain,spec,knowhow,codebase,issue,codegraph')
+    .option('--src <paths>', 'Comma-separated code source roots for codegraph source')
+    .option('--max-file-size <bytes>', 'Maximum code file size to index')
+    .option('--include-tests', 'Include test files in code index')
+    .option('--exclude-dir <patterns>', 'Comma-separated directory ignore patterns')
+    .option('--exclude-file <patterns>', 'Comma-separated file ignore patterns')
+    .option('--no-create-maestro-ignore', 'Do not create .maestroignore when missing')
     .option('--json', 'Output as JSON')
     .action(async (opts) => syncProject(opts, 'Syncing MaestroGraph (all knowledge sources)...'));
 
   kg
     .command('index')
     .description('Compatibility alias for sync --source codegraph')
-    .option('--src <path>', 'Accepted for compatibility; MaestroGraph auto-detects source roots')
+    .option('--src <paths>', 'Comma-separated code source roots to index')
+    .option('--max-file-size <bytes>', 'Maximum code file size to index')
+    .option('--include-tests', 'Include test files in code index')
+    .option('--exclude-dir <patterns>', 'Comma-separated directory ignore patterns')
+    .option('--exclude-file <patterns>', 'Comma-separated file ignore patterns')
+    .option('--no-create-maestro-ignore', 'Do not create .maestroignore when missing')
     .option('--json', 'Output as JSON')
-    .action(async (opts) => syncProject({ source: 'codegraph', json: opts.json }, 'Indexing code with MaestroGraph...'));
+    .action(async (opts) => syncProject({ ...opts, source: 'codegraph' }, 'Indexing code with MaestroGraph...'));
 
   // ── query ─────────────────────────────────────────────────────────
   kg

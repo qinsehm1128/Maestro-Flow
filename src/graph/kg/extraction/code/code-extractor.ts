@@ -2,8 +2,9 @@
 // 代码提取编排器 — 扫描源文件 → 语言检测 → tree-sitter 解析 → 生成 nodes + edges
 // 参考: codegraph extraction pipeline
 
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { resolve, extname, join, relative } from 'node:path';
+import { execFileSync } from 'node:child_process';
 import type { UnifiedNode, UnifiedEdge, FileRecord, ExtractionResult, SourceType, Language } from '../../db/types.js';
 import { getTreeSitterEngine, isTreeSitterAvailable } from './tree-sitter.js';
 import { getExtractor, detectLanguageFromPath, isFileLevelOnlyLanguage, getSupportedLanguages } from './languages/index.js';
@@ -16,6 +17,8 @@ import { extractLiquid } from './liquid-extractor.js';
 import { extractMybatisXml } from './mybatis-extractor.js';
 import { extractDfm } from './dfm-extractor.js';
 import { createHash } from 'node:crypto';
+import { buildScanScope } from './scan-scope.js';
+import { CodeParseRunner } from './worker-parser.js';
 
 // ---------------------------------------------------------------------------
 // 扫描配置
@@ -24,10 +27,14 @@ import { createHash } from 'node:crypto';
 interface ScanOptions {
   /** 源码根目录 */
   srcDir: string;
+  /** 项目根目录，用于解析 .gitignore/.maestroignore */
+  projectRoot?: string;
   /** 排除的目录模式 */
   excludeDirs?: string[];
   /** 排除的文件模式 (glob) */
   excludeFiles?: string[];
+  /** 是否在缺失时创建 .maestroignore */
+  createMaestroIgnore?: boolean;
   /** 是否包含测试文件 */
   includeTests?: boolean;
   /** 最大文件大小 (bytes) */
@@ -35,11 +42,6 @@ interface ScanOptions {
   /** 进度回调 */
   onProgress?: (file: string, count: number, total: number) => void;
 }
-
-const DEFAULT_EXCLUDE_DIRS = new Set([
-  'node_modules', '.git', 'dist', 'build', '.next', '__pycache__',
-  '.workflow', '.codegraph', 'coverage', '.cache',
-]);
 
 const BINARY_EXTENSIONS = new Set([
   '.wasm', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico',
@@ -63,10 +65,74 @@ interface ScannedFile {
 
 function scanFiles(options: ScanOptions): ScannedFile[] {
   const files: ScannedFile[] = [];
-  const excludeDirs = options.excludeDirs
-    ? new Set([...DEFAULT_EXCLUDE_DIRS, ...options.excludeDirs])
-    : DEFAULT_EXCLUDE_DIRS;
   const maxFileSize = options.maxFileSize ?? DEFAULT_MAX_FILE_SIZE;
+  const srcDir = resolve(options.srcDir);
+  const scope = buildScanScope({
+    projectRoot: options.projectRoot ?? srcDir,
+    srcDir,
+    excludeDirs: options.excludeDirs,
+    excludeFiles: options.excludeFiles,
+    createMaestroIgnore: options.createMaestroIgnore,
+  });
+
+  if (!existsSync(srcDir)) return files;
+
+  function collectFile(fullPath: string): void {
+    let stat;
+    try {
+      stat = statSync(fullPath);
+    } catch {
+      return;
+    }
+
+    if (!stat.isFile()) return;
+    if (scope.ignores(fullPath)) return;
+    if (stat.size > maxFileSize) return;
+
+    const ext = extname(fullPath).toLowerCase();
+    if (BINARY_EXTENSIONS.has(ext)) return;
+
+    const language = detectLanguageFromPath(fullPath);
+    if (language === 'unknown') return;
+
+    if (!options.includeTests && isTestFile(fullPath)) return;
+
+    const content = readFileSync(fullPath);
+    const contentHash = createHash('sha256').update(content).digest('hex').substring(0, 16);
+
+    files.push({
+      path: fullPath,
+      language,
+      size: stat.size,
+      modifiedAt: Math.floor(stat.mtimeMs),
+      contentHash,
+    });
+  }
+
+  function collectGitVisibleFiles(): boolean {
+    const srcRel = relative(scope.projectRoot, srcDir).replace(/\\/g, '/') || '.';
+    if (srcRel.startsWith('..')) return false;
+    try {
+      const output = execFileSync(
+        'git',
+        ['ls-files', '-z', '-c', '-o', '--exclude-standard', '--', srcRel],
+        {
+          cwd: scope.projectRoot,
+          encoding: 'utf-8',
+          maxBuffer: 50 * 1024 * 1024,
+          stdio: ['pipe', 'pipe', 'ignore'],
+          timeout: 30_000,
+          windowsHide: true,
+        },
+      );
+      for (const relPath of output.split('\0').filter(Boolean)) {
+        collectFile(resolve(scope.projectRoot, relPath));
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   function walkDir(dir: string): void {
     let entries: string[];
@@ -86,38 +152,17 @@ function scanFiles(options: ScanOptions): ScannedFile[] {
       }
 
       if (stat.isDirectory()) {
-        if (!excludeDirs.has(entry)) {
-          walkDir(fullPath);
-        }
+        if (!scope.ignores(fullPath, true)) walkDir(fullPath);
         continue;
       }
 
-      if (!stat.isFile()) continue;
-      if (stat.size > maxFileSize) continue;
-
-      const ext = extname(entry).toLowerCase();
-      if (BINARY_EXTENSIONS.has(ext)) continue;
-
-      const language = detectLanguageFromPath(fullPath);
-      if (language === 'unknown') continue;
-
-      // 测试文件过滤
-      if (!options.includeTests && isTestFile(fullPath)) continue;
-
-      const content = readFileSync(fullPath);
-      const contentHash = createHash('sha256').update(content).digest('hex').substring(0, 16);
-
-      files.push({
-        path: fullPath,
-        language,
-        size: stat.size,
-        modifiedAt: Math.floor(stat.mtimeMs),
-        contentHash,
-      });
+      collectFile(fullPath);
     }
   }
 
-  walkDir(options.srcDir);
+  if (!collectGitVisibleFiles()) {
+    walkDir(srcDir);
+  }
   return files;
 }
 
@@ -148,6 +193,7 @@ export async function extractCode(
   const startMs = Date.now();
   const engine = getTreeSitterEngine();
   const hasTreeSitter = engine.isAvailable();
+  const parser = new CodeParseRunner();
 
   // 扫描文件
   const scannedFiles = scanFiles(options);
@@ -159,108 +205,110 @@ export async function extractCode(
   let extractedCount = 0;
   let skippedCount = 0;
 
-  for (let i = 0; i < scannedFiles.length; i++) {
-    const file = scannedFiles[i];
-    options.onProgress?.(file.path, i + 1, scannedFiles.length);
+  try {
+    for (let i = 0; i < scannedFiles.length; i++) {
+      const file = scannedFiles[i];
+      options.onProgress?.(file.path, i + 1, scannedFiles.length);
 
-    try {
-      const sourceCode = readFileSync(file.path, 'utf-8');
-      const relPath = relative(options.srcDir, file.path).replace(/\\/g, '/');
+      try {
+        const sourceCode = readFileSync(file.path, 'utf-8');
+        const relPath = relative(options.srcDir, file.path).replace(/\\/g, '/');
 
-      // 自定义提取器优先 (vue/svelte/liquid/mybatis/dfm)
-      const customResult = await extractWithCustomExtractor(sourceCode, file.path);
-      if (customResult) {
-        const { nodes, edges } = buildResultFromCustomExtractor(
-          customResult.symbols, customResult.references, customResult.edges,
-          file, relPath,
-        );
+        // 自定义提取器优先 (vue/svelte/liquid/mybatis/dfm)
+        const customResult = await extractWithCustomExtractor(sourceCode, file.path);
+        if (customResult) {
+          const { nodes, edges } = buildResultFromCustomExtractor(
+            customResult.symbols, customResult.references, customResult.edges,
+            file, relPath,
+          );
+          results.push({
+            nodes,
+            edges,
+            fileRecord: createFileRecord(file, nodes.length),
+          });
+          totalNodes += nodes.length;
+          totalEdges += edges.length;
+          totalRefs += customResult.references.length;
+          extractedCount++;
+          continue;
+        }
+
+        // file-level-only 语言 (yaml/twig/properties)
+        if (isFileLevelOnlyLanguage(file.language)) {
+          const fileNode = createFileLevelNode(file, relPath);
+          results.push({
+            nodes: [fileNode],
+            edges: [],
+            fileRecord: createFileRecord(file, 1),
+          });
+          totalNodes++;
+          extractedCount++;
+          continue;
+        }
+
+        // tree-sitter 通用提取
+        if (!hasTreeSitter) {
+          skippedCount++;
+          continue;
+        }
+
+        const extractor = getExtractor(file.language);
+        if (!extractor) {
+          skippedCount++;
+          continue;
+        }
+
+        const extracted = await parser.extract(sourceCode, file.language, file.path);
+        if (!extracted) {
+          errors.push({ filePath: file.path, message: 'tree-sitter parse failed' });
+          skippedCount++;
+          continue;
+        }
+
+        // 将 ExtractedSymbol 转换为 UnifiedNode
+        const now = Date.now();
+        const nodes: UnifiedNode[] = extracted.symbols.map(s => symbolToNode(s, now));
+
+        // 引用 → unresolved_refs (由 resolution 阶段解析)
+        // 此处只计数, 实际写入在 resolution 阶段
+        const edges: UnifiedEdge[] = extracted.edges.map(e => ({
+          source: e.source,
+          target: e.target,
+          kind: e.kind as UnifiedEdge['kind'],
+          line: e.line,
+          column: e.col,
+          provenance: 'tree-sitter' as UnifiedEdge['provenance'],
+        }));
+
+        // generated file 标记
+        const isGenerated = isGeneratedFile(file.path);
+        if (isGenerated) {
+          for (const node of nodes) {
+            node.metadata = { ...node.metadata, generated: true };
+          }
+        }
+
         results.push({
           nodes,
           edges,
           fileRecord: createFileRecord(file, nodes.length),
         });
+
         totalNodes += nodes.length;
         totalEdges += edges.length;
-        totalRefs += customResult.references.length;
+        totalRefs += extracted.references.length;
         extractedCount++;
-        continue;
-      }
 
-      // file-level-only 语言 (yaml/twig/properties)
-      if (isFileLevelOnlyLanguage(file.language)) {
-        const fileNode = createFileLevelNode(file, relPath);
-        results.push({
-          nodes: [fileNode],
-          edges: [],
-          fileRecord: createFileRecord(file, 1),
+      } catch (err) {
+        errors.push({
+          filePath: file.path,
+          message: err instanceof Error ? err.message : String(err),
         });
-        totalNodes++;
-        extractedCount++;
-        continue;
-      }
-
-      // tree-sitter 通用提取
-      if (!hasTreeSitter) {
         skippedCount++;
-        continue;
       }
-
-      const extractor = getExtractor(file.language);
-      if (!extractor) {
-        skippedCount++;
-        continue;
-      }
-
-      const tree = await engine.parse(sourceCode, file.language);
-      if (!tree) {
-        errors.push({ filePath: file.path, message: 'tree-sitter parse failed' });
-        skippedCount++;
-        continue;
-      }
-
-      const extracted = extractor.extract(tree, sourceCode, file.path);
-
-      // 将 ExtractedSymbol 转换为 UnifiedNode
-      const now = Date.now();
-      const nodes: UnifiedNode[] = extracted.symbols.map(s => symbolToNode(s, now));
-
-      // 引用 → unresolved_refs (由 resolution 阶段解析)
-      // 此处只计数, 实际写入在 resolution 阶段
-      const edges: UnifiedEdge[] = extracted.edges.map(e => ({
-        source: e.source,
-        target: e.target,
-        kind: e.kind as UnifiedEdge['kind'],
-        line: e.line,
-        column: e.col,
-        provenance: 'tree-sitter' as UnifiedEdge['provenance'],
-      }));
-
-      // generated file 标记
-      const isGenerated = isGeneratedFile(file.path);
-      if (isGenerated) {
-        for (const node of nodes) {
-          node.metadata = { ...node.metadata, generated: true };
-        }
-      }
-
-      results.push({
-        nodes,
-        edges,
-        fileRecord: createFileRecord(file, nodes.length),
-      });
-
-      totalNodes += nodes.length;
-      totalEdges += edges.length;
-      totalRefs += extracted.references.length;
-      extractedCount++;
-
-    } catch (err) {
-      errors.push({
-        filePath: file.path,
-        message: err instanceof Error ? err.message : String(err),
-      });
-      skippedCount++;
     }
+  } finally {
+    parser.dispose();
   }
 
   return {

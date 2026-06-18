@@ -13,9 +13,18 @@ import { extractCode } from './code/code-extractor.js';
 import { resolveKnowledgeEdges } from '../resolution/knowledge-resolver.js';
 import type { SyncResult, SourceType } from '../db/types.js';
 
+export interface CodegraphSyncOptions {
+  srcDirs?: string[];
+  includeTests?: boolean;
+  maxFileSize?: number;
+  excludeDirs?: string[];
+  excludeFiles?: string[];
+  createMaestroIgnore?: boolean;
+}
+
 export async function syncKnowledgeGraph(
   projectPath: string,
-  options?: { full?: boolean; sources?: SourceType[] },
+  options?: { full?: boolean; sources?: SourceType[]; codegraph?: CodegraphSyncOptions },
 ): Promise<SyncResult[]> {
   const workflowRoot = resolve(projectPath, '.workflow');
   const results: SyncResult[] = [];
@@ -156,7 +165,9 @@ export async function syncKnowledgeGraph(
     if (shouldSync('codegraph')) {
       const startMs = Date.now();
       const removedCode = queries.deleteNodesBySourceType('codegraph');
-      const candidateDirs = ['src', 'lib', 'app', 'packages', 'apps', 'dashboard/src'];
+      const candidateDirs = options?.codegraph?.srcDirs?.length
+        ? options.codegraph.srcDirs
+        : ['src', 'lib', 'app', 'packages', 'apps', 'dashboard/src'];
       const srcDirs = candidateDirs
         .map(d => resolve(projectPath, d))
         .filter(d => existsSync(d));
@@ -168,9 +179,13 @@ export async function syncKnowledgeGraph(
       for (const srcDir of srcDirs) {
         if (!existsSync(srcDir)) continue;
         const codeResult = await extractCode({
+          projectRoot: projectPath,
           srcDir,
-          includeTests: false,
-          maxFileSize: 500 * 1024,
+          includeTests: options?.codegraph?.includeTests ?? false,
+          maxFileSize: options?.codegraph?.maxFileSize ?? 500 * 1024,
+          excludeDirs: options?.codegraph?.excludeDirs,
+          excludeFiles: options?.codegraph?.excludeFiles,
+          createMaestroIgnore: options?.codegraph?.createMaestroIgnore,
         });
 
         for (const result of codeResult.results) {
