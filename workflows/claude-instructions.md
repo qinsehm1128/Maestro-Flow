@@ -34,7 +34,7 @@ Do not use deprecated commands: `spec search`, `knowhow search`, `wiki search`.
 
 **L2 — Architecture / debugging / refactoring / tests:**
 - `maestro search --type spec --category arch`
-- `maestro kg callers <fn>` / `maestro kg callees <fn>`
+- `maestro kg callers <fn>` / `maestro kg callees <fn>` (注意: `--json` 返回 `{node, callers/callees: [...]}` 对象，非数组)
 - `maestro search --type spec --category test "<module>"`
 - `maestro kg search "<module>" --code`
 
