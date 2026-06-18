@@ -64,6 +64,7 @@
     "commander": "^13.1.0",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.7.0",
+    "ignore": "^7.0.5",
     "ink": "^6.0.0",
     "ink-big-text": "^2.0.0",
     "ink-gradient": "^4.0.0",

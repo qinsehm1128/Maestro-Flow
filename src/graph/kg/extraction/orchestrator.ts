@@ -9,13 +9,22 @@ import { extractSpec } from './knowledge/spec-extractor.js';
 import { extractWiki } from './knowledge/wiki-extractor.js';
 import { extractCodebase } from './knowledge/codebase-extractor.js';
 import { extractIssues } from './knowledge/issue-extractor.js';
-import { extractCode } from './code/code-extractor.js';
+import { forEachCodeExtractionResult } from './code/code-extractor.js';
 import { resolveKnowledgeEdges } from '../resolution/knowledge-resolver.js';
 import type { SyncResult, SourceType } from '../db/types.js';
 
+export interface CodegraphSyncOptions {
+  srcDirs?: string[];
+  includeTests?: boolean;
+  maxFileSize?: number;
+  excludeDirs?: string[];
+  excludeFiles?: string[];
+  createMaestroIgnore?: boolean;
+}
+
 export async function syncKnowledgeGraph(
   projectPath: string,
-  options?: { full?: boolean; sources?: SourceType[] },
+  options?: { full?: boolean; sources?: SourceType[]; codegraph?: CodegraphSyncOptions },
 ): Promise<SyncResult[]> {
   const workflowRoot = resolve(projectPath, '.workflow');
   const results: SyncResult[] = [];
@@ -156,11 +165,14 @@ export async function syncKnowledgeGraph(
     if (shouldSync('codegraph')) {
       const startMs = Date.now();
       const removedCode = queries.deleteNodesBySourceType('codegraph');
-      const preferredDirs = ['src', 'lib', 'app', 'packages', 'apps', 'dashboard/src'];
-      const srcDirs = preferredDirs
+      const hasExplicitSrcDirs = Boolean(options?.codegraph?.srcDirs?.length);
+      const candidateDirs = options?.codegraph?.srcDirs?.length
+        ? options.codegraph.srcDirs
+        : ['src', 'lib', 'app', 'packages', 'apps', 'dashboard/src'];
+      const srcDirs = candidateDirs
         .map(d => resolve(projectPath, d))
         .filter(d => existsSync(d));
-      if (srcDirs.length === 0) {
+      if (srcDirs.length === 0 && !hasExplicitSrcDirs) {
         srcDirs.push(projectPath);
       }
 
@@ -169,14 +181,15 @@ export async function syncKnowledgeGraph(
 
       for (const srcDir of srcDirs) {
         if (!existsSync(srcDir)) continue;
-        const codeResult = await extractCode({
-          srcDir,
+        const stats = await forEachCodeExtractionResult({
           projectRoot: projectPath,
-          includeTests: false,
-          maxFileSize: 500 * 1024,
-        });
-
-        for (const result of codeResult.results) {
+          srcDir,
+          includeTests: options?.codegraph?.includeTests ?? false,
+          maxFileSize: options?.codegraph?.maxFileSize ?? 500 * 1024,
+          excludeDirs: options?.codegraph?.excludeDirs,
+          excludeFiles: options?.codegraph?.excludeFiles,
+          createMaestroIgnore: options?.codegraph?.createMaestroIgnore,
+        }, async (result) => {
           if (result.nodes.length > 0) {
             try {
               mg.insertExtractionResults(result);
@@ -188,10 +201,10 @@ export async function syncKnowledgeGraph(
               } catch { /* skip this file entirely */ }
             }
           }
-        }
+        });
 
-        totalNodes += codeResult.stats.nodesCreated;
-        totalEdges += codeResult.stats.edgesCreated;
+        totalNodes += stats.nodesCreated;
+        totalEdges += stats.edgesCreated;
       }
 
       results.push({
