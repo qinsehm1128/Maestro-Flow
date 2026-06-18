@@ -13,7 +13,7 @@ export type {
 } from './db/types.js';
 
 // Extraction
-export { extractCode } from './extraction/code/code-extractor.js';
+export { extractCode, forEachCodeExtractionResult } from './extraction/code/code-extractor.js';
 export { syncKnowledgeGraph } from './extraction/orchestrator.js';
 export { extractDomain } from './extraction/knowledge/domain-extractor.js';
 export { extractSpec } from './extraction/knowledge/spec-extractor.js';

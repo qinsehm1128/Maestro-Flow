@@ -26,7 +26,7 @@ import { CodeParseRunner } from './worker-parser.js';
 // 扫描配置
 // ---------------------------------------------------------------------------
 
-interface ScanOptions {
+export interface ScanOptions {
   /** 源码根目录 */
   srcDir: string;
   /** 项目根目录，用于插件加载和解析 .gitignore/.maestroignore */
@@ -183,14 +183,35 @@ export interface CodeExtractionStats {
   durationMs: number;
 }
 
+export type CodeExtractionResultHandler = (result: ExtractionResult) => void | Promise<void>;
+
 /**
  * 批量代码提取 — 扫描目录 → tree-sitter 解析 → nodes + edges
  *
- * 设计: 逐文件提取, 汇总后一次性写入 DB
+ * 设计: 逐文件提取, 汇总后返回结果；大仓库写库请使用 forEachCodeExtractionResult()
  * 支持: 自定义提取器 (vue/svelte/liquid/mybatis/dfm) 优先于通用 tree-sitter
  */
 export async function extractCode(
   options: ScanOptions,
+): Promise<{ results: ExtractionResult[]; stats: CodeExtractionStats }> {
+  return runCodeExtraction(options, undefined, true);
+}
+
+/**
+ * 流式代码提取 — 每个文件提取完成后立即回调，避免在内存中累积全量结果。
+ */
+export async function forEachCodeExtractionResult(
+  options: ScanOptions,
+  onResult: CodeExtractionResultHandler,
+): Promise<CodeExtractionStats> {
+  const { stats } = await runCodeExtraction(options, onResult, false);
+  return stats;
+}
+
+async function runCodeExtraction(
+  options: ScanOptions,
+  onResult: CodeExtractionResultHandler | undefined,
+  collectResults: boolean,
 ): Promise<{ results: ExtractionResult[]; stats: CodeExtractionStats }> {
   const startMs = Date.now();
   const engine = getTreeSitterEngine();
@@ -213,6 +234,17 @@ export async function extractCode(
   let extractedCount = 0;
   let skippedCount = 0;
 
+  const emitResult = async (result: ExtractionResult, referencesCount: number): Promise<void> => {
+    if (collectResults) {
+      results.push(result);
+    }
+    await onResult?.(result);
+    totalNodes += result.nodes.length;
+    totalEdges += result.edges.length;
+    totalRefs += referencesCount;
+    extractedCount++;
+  };
+
   try {
     for (let i = 0; i < scannedFiles.length; i++) {
       const file = scannedFiles[i];
@@ -229,28 +261,22 @@ export async function extractCode(
             customResult.symbols, customResult.references, customResult.edges,
             file, relPath,
           );
-          results.push({
+          await emitResult({
             nodes,
             edges,
             fileRecord: createFileRecord(file, nodes.length),
-          });
-          totalNodes += nodes.length;
-          totalEdges += edges.length;
-          totalRefs += customResult.references.length;
-          extractedCount++;
+          }, customResult.references.length);
           continue;
         }
 
         // file-level-only 语言 (yaml/twig/properties)
         if (isFileLevelOnlyLanguage(file.language)) {
           const fileNode = createFileLevelNode(file, relPath);
-          results.push({
+          await emitResult({
             nodes: [fileNode],
             edges: [],
             fileRecord: createFileRecord(file, 1),
-          });
-          totalNodes++;
-          extractedCount++;
+          }, 0);
           continue;
         }
 
@@ -270,14 +296,18 @@ export async function extractCode(
         if (hasPlugins) {
           const tree = await engine.parse(sourceCode, file.language);
           if (tree) {
-            extracted = extractor.extract(tree, sourceCode, file.path);
             try {
-              const pluginResult = await pluginEngine.run(file.path, sourceCode, file.language, tree, extracted);
-              if (pluginResult.symbols.length > 0 || (pluginResult.references?.length ?? 0) > 0 || (pluginResult.edges?.length ?? 0) > 0) {
-                extracted = pluginEngine.mergeResults(extracted, pluginResult);
+              extracted = extractor.extract(tree, sourceCode, file.path);
+              try {
+                const pluginResult = await pluginEngine.run(file.path, sourceCode, file.language, tree, extracted);
+                if (pluginResult.symbols.length > 0 || (pluginResult.references?.length ?? 0) > 0 || (pluginResult.edges?.length ?? 0) > 0) {
+                  extracted = pluginEngine.mergeResults(extracted, pluginResult);
+                }
+              } catch {
+                // Plugin extraction is best-effort and must not block core indexing.
               }
-            } catch {
-              // Plugin extraction is best-effort and must not block core indexing.
+            } finally {
+              tree.delete();
             }
           }
         } else {
@@ -292,16 +322,11 @@ export async function extractCode(
 
         const { nodes, edges } = buildResultFromTreeSitter(extracted, file.path);
 
-        results.push({
+        await emitResult({
           nodes,
           edges,
           fileRecord: createFileRecord(file, nodes.length),
-        });
-
-        totalNodes += nodes.length;
-        totalEdges += edges.length;
-        totalRefs += extracted.references.length;
-        extractedCount++;
+        }, extracted.references.length);
 
       } catch (err) {
         errors.push({

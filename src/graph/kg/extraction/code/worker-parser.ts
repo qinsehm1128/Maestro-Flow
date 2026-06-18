@@ -49,7 +49,12 @@ export class CodeParseRunner {
       const extractor = getExtractor(language);
       if (!extractor) return null;
       const tree = await getTreeSitterEngine().parse(sourceCode, language);
-      return tree ? extractor.extract(tree, sourceCode, filePath) : null;
+      if (!tree) return null;
+      try {
+        return extractor.extract(tree, sourceCode, filePath);
+      } finally {
+        tree.delete();
+      }
     }
 
     if (this.workerParseCount >= WORKER_RECYCLE_INTERVAL) {

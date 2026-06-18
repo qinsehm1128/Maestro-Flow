@@ -43,8 +43,12 @@ parentPort?.on('message', async (message: ExtractRequest | { type: 'shutdown' })
       return;
     }
 
-    const result = extractor.extract(tree, message.sourceCode, message.filePath);
-    parentPort?.postMessage({ type: 'extract-result', id: message.id, ok: true, result });
+    try {
+      const result = extractor.extract(tree, message.sourceCode, message.filePath);
+      parentPort?.postMessage({ type: 'extract-result', id: message.id, ok: true, result });
+    } finally {
+      tree.delete();
+    }
   } catch (err) {
     const text = err instanceof Error ? err.message : String(err);
     if (text.includes('memory access out of bounds') || text.toLowerCase().includes('out of memory')) {

@@ -65,20 +65,24 @@ export async function extractSvelte(
         try {
           const tree = await engine.parse(block.content, lang);
           if (tree) {
-            const { typescriptExtractor } = await import('./languages/typescript.js');
-            const result = typescriptExtractor.extract(tree, block.content, filePath);
+            try {
+              const { typescriptExtractor } = await import('./languages/typescript.js');
+              const result = typescriptExtractor.extract(tree, block.content, filePath);
 
-            for (const sym of result.symbols) {
-              // 过滤 Svelte 5 runes
-              if (SVELTE_RUNES.has(sym.name)) continue;
+              for (const sym of result.symbols) {
+                // 过滤 Svelte 5 runes
+                if (SVELTE_RUNES.has(sym.name)) continue;
 
-              sym.startLine += block.startLine - 1;
-              sym.endLine += block.startLine - 1;
-              symbols.push(sym);
-            }
-            for (const ref of result.references) {
-              ref.line += block.startLine - 1;
-              references.push(ref);
+                sym.startLine += block.startLine - 1;
+                sym.endLine += block.startLine - 1;
+                symbols.push(sym);
+              }
+              for (const ref of result.references) {
+                ref.line += block.startLine - 1;
+                references.push(ref);
+              }
+            } finally {
+              tree.delete();
             }
           }
         } catch (err) {

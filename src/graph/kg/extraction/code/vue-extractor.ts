@@ -83,18 +83,22 @@ export async function extractVueSFC(
         try {
           const tree = await engine.parse(block.content, lang);
           if (tree) {
-            const { typescriptExtractor } = await import('./languages/typescript.js');
-            const result = typescriptExtractor.extract(tree, block.content, filePath);
+            try {
+              const { typescriptExtractor } = await import('./languages/typescript.js');
+              const result = typescriptExtractor.extract(tree, block.content, filePath);
 
-            // 行号偏移校正: script 块在 SFC 中的起始行
-            for (const sym of result.symbols) {
-              sym.startLine += block.startLine - 1;
-              sym.endLine += block.startLine - 1;
-              allSymbols.push(sym);
-            }
-            for (const ref of result.references) {
-              ref.line += block.startLine - 1;
-              references.push(ref);
+              // 行号偏移校正: script 块在 SFC 中的起始行
+              for (const sym of result.symbols) {
+                sym.startLine += block.startLine - 1;
+                sym.endLine += block.startLine - 1;
+                allSymbols.push(sym);
+              }
+              for (const ref of result.references) {
+                ref.line += block.startLine - 1;
+                references.push(ref);
+              }
+            } finally {
+              tree.delete();
             }
           }
         } catch (err) {

@@ -9,7 +9,7 @@ import { extractSpec } from './knowledge/spec-extractor.js';
 import { extractWiki } from './knowledge/wiki-extractor.js';
 import { extractCodebase } from './knowledge/codebase-extractor.js';
 import { extractIssues } from './knowledge/issue-extractor.js';
-import { extractCode } from './code/code-extractor.js';
+import { forEachCodeExtractionResult } from './code/code-extractor.js';
 import { resolveKnowledgeEdges } from '../resolution/knowledge-resolver.js';
 import type { SyncResult, SourceType } from '../db/types.js';
 
@@ -181,7 +181,7 @@ export async function syncKnowledgeGraph(
 
       for (const srcDir of srcDirs) {
         if (!existsSync(srcDir)) continue;
-        const codeResult = await extractCode({
+        const stats = await forEachCodeExtractionResult({
           projectRoot: projectPath,
           srcDir,
           includeTests: options?.codegraph?.includeTests ?? false,
@@ -189,9 +189,7 @@ export async function syncKnowledgeGraph(
           excludeDirs: options?.codegraph?.excludeDirs,
           excludeFiles: options?.codegraph?.excludeFiles,
           createMaestroIgnore: options?.codegraph?.createMaestroIgnore,
-        });
-
-        for (const result of codeResult.results) {
+        }, async (result) => {
           if (result.nodes.length > 0) {
             try {
               mg.insertExtractionResults(result);
@@ -203,10 +201,10 @@ export async function syncKnowledgeGraph(
               } catch { /* skip this file entirely */ }
             }
           }
-        }
+        });
 
-        totalNodes += codeResult.stats.nodesCreated;
-        totalEdges += codeResult.stats.edgesCreated;
+        totalNodes += stats.nodesCreated;
+        totalEdges += stats.edgesCreated;
       }
 
       results.push({
