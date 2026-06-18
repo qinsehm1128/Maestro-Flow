@@ -41,9 +41,14 @@ export class CodeParseRunner {
   private nextId = 0;
   private pending = new Map<number, PendingExtract>();
   private readonly workerPath = join(__dirname, 'parse-worker.js');
+  private readonly _usesWorker: boolean;
+
+  constructor() {
+    this._usesWorker = existsSync(this.workerPath);
+  }
 
   get usesWorker(): boolean {
-    return existsSync(this.workerPath);
+    return this._usesWorker;
   }
 
   async extract(sourceCode: string, language: Language, filePath: string): Promise<LanguageExtractionResult | null> {
@@ -110,7 +115,9 @@ export class CodeParseRunner {
     });
     this.worker.on('exit', code => {
       if (this.workerGeneration !== gen) return;
-      if (code !== 0) this.rejectAllPending(`Parse worker exited with code ${code}`);
+      if (this.pending.size > 0) {
+        this.rejectAllPending(`Parse worker exited with code ${code}`);
+      }
       this.worker = null;
       this.workerParseCount = 0;
     });

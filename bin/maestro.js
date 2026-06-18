@@ -26,8 +26,10 @@ function hasWasmFlags() {
   return WASM_RUNTIME_FLAGS.every(flag => process.execArgv.includes(flag));
 }
 
+const needsWasmFlags = shouldApplyWasmFlags(process.argv.slice(2));
+
 if (
-  shouldApplyWasmFlags(process.argv.slice(2)) &&
+  needsWasmFlags &&
   !hasWasmFlags() &&
   !process.env[WASM_RELAUNCH_GUARD] &&
   !process.env.MAESTRO_NO_WASM_RELAUNCH
@@ -44,6 +46,7 @@ if (
   });
 
   if (result.error) {
+    process.env[WASM_RELAUNCH_GUARD] = '1';
     process.stderr.write(
       `[MaestroGraph] Warning: Failed to relaunch with WASM flags (${result.error.message}). ` +
       'Continuing without --liftoff-only; large repositories may trigger V8 WASM OOM.\n',
@@ -54,7 +57,7 @@ if (
   }
 }
 
-if (shouldApplyWasmFlags(process.argv.slice(2)) && Number.parseInt(process.versions.node.split('.')[0] ?? '0', 10) >= 25 && !process.env.MAESTRO_ALLOW_UNSAFE_NODE) {
+if (needsWasmFlags && Number.parseInt(process.versions.node.split('.')[0] ?? '0', 10) >= 25 && !process.env.MAESTRO_ALLOW_UNSAFE_NODE) {
   process.stderr.write(
     '[MaestroGraph] Warning: Node 25.x is sensitive to V8 WASM Zone OOM during tree-sitter indexing. ' +
     'Node 22 LTS is recommended for large repositories.\n',

@@ -201,7 +201,6 @@ export class PluginEngine {
         return true;
       }
     }
-    if (this.scriptModules.size > 0) return true;
     return false;
   }
 

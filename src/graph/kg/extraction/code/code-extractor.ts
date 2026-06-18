@@ -99,15 +99,12 @@ function scanFiles(options: ScanOptions): ScannedFile[] {
 
     if (!options.includeTests && isTestFile(fullPath)) return;
 
-    const content = readFileSync(fullPath);
-    const contentHash = createHash('sha256').update(content).digest('hex').substring(0, 16);
-
     files.push({
       path: fullPath,
       language,
       size: stat.size,
       modifiedAt: Math.floor(stat.mtimeMs),
-      contentHash,
+      contentHash: '',
     });
   }
 
@@ -253,6 +250,7 @@ async function runCodeExtraction(
 
       try {
         const sourceCode = readFileSync(file.path, 'utf-8');
+        file.contentHash = createHash('sha256').update(sourceCode).digest('hex').substring(0, 16);
         const relPath = relative(resolvedSrcDir, file.path).replace(/\\/g, '/');
 
         // 自定义提取器优先 (vue/svelte/liquid/mybatis/dfm)
