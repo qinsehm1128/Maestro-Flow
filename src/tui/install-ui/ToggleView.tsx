@@ -155,28 +155,46 @@ export function ToggleView({ pkgRoot, targetBase, scope, targetPath, filter }: T
         })}
       </Box>
 
-      {/* Items */}
+      {/* Items — viewport window around cursor */}
       <Box flexDirection="column" marginTop={1}>
         {count === 0 ? (
           <Text dimColor>  No items in this category.</Text>
         ) : (
-          tabItems.map((item, i) => {
-            const hl = i === safeIdx;
-            const d = STATE_DISPLAY[item.state];
+          (() => {
+            const VIEWPORT = 20;
+            let start = 0;
+            let end = count;
+            if (count > VIEWPORT) {
+              start = Math.max(0, safeIdx - Math.floor(VIEWPORT / 2));
+              end = Math.min(count, start + VIEWPORT);
+              if (end - start < VIEWPORT) start = Math.max(0, end - VIEWPORT);
+            }
+            const visible = tabItems.slice(start, end);
             return (
-              <Box key={item.name}>
-                <Text color={hl ? C.primary : C.neutral}>{hl ? SYM.cursor : ' '} </Text>
-                <Text color={hl ? (item.state === 'on' ? C.successBright : d.color) : d.color}>
-                  {d.sym}
-                </Text>
-                <Text> </Text>
-                <Text color={hl ? C.primary : undefined} bold={hl}>
-                  {item.name.padEnd(32)}
-                </Text>
-                {d.label && <Text dimColor>{d.label}</Text>}
-              </Box>
+              <>
+                {start > 0 && <Text dimColor>  ↑ {start} more</Text>}
+                {visible.map((item, vi) => {
+                  const i = start + vi;
+                  const hl = i === safeIdx;
+                  const d = STATE_DISPLAY[item.state];
+                  return (
+                    <Box key={item.name}>
+                      <Text color={hl ? C.primary : C.neutral}>{hl ? SYM.cursor : ' '} </Text>
+                      <Text color={hl ? (item.state === 'on' ? C.successBright : d.color) : d.color}>
+                        {d.sym}
+                      </Text>
+                      <Text> </Text>
+                      <Text color={hl ? C.primary : undefined} bold={hl}>
+                        {item.name.padEnd(32)}
+                      </Text>
+                      {d.label && <Text dimColor>{d.label}</Text>}
+                    </Box>
+                  );
+                })}
+                {end < count && <Text dimColor>  ↓ {count - end} more</Text>}
+              </>
             );
-          })
+          })()
         )}
       </Box>
 
