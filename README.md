@@ -132,11 +132,12 @@ Wiki knowledge graph with BM25 search, backlink traversal, and health scoring. L
 | Category | Count | Prefix | Purpose |
 |----------|-------|--------|---------|
 | **Core Workflow** | 19 | `maestro-*` | Full lifecycle — ralph, init, brainstorm, blueprint, analyze, roadmap, plan, execute, verify, milestones, overlays |
-| **Management** | 12 | `manage-*` | Issue lifecycle, codebase docs, knowledge capture, memory, status |
+| **Management** | 13 | `manage-*` | Issue lifecycle, codebase docs, knowledge capture, memory, status |
 | **Quality** | 9 | `quality-*` | Review, test, debug, test-gen, integration-test, business-test, refactor, sync |
 | **Learning** | 5 | `learn-*` | Retro, follow-along, pattern decompose, investigate, second opinion |
 | **Specification** | 3 | `spec-*` | Setup, add, load |
-| **Wiki** | 2 | `wiki-*` | Connection discovery, knowledge digest |
+| **Wiki** | 2 | `wiki-*` | Knowledge graph health, search, cleanup, connection discovery, digest |
+| **Team** | 1 | `team-*` | ACO swarm intelligence, colony optimization |
 
 21 specialized agent definitions in `.claude/agents/` — each a focused Markdown file that Claude Code loads on demand.
 
