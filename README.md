@@ -97,7 +97,7 @@ At each `◆` decision node, Ralph evaluates outcomes and decides: pass through,
 
 ### 2. Layered Command Topology
 
-Commands are organized in four layers: **upstream origin** (brainstorm, blueprint), **understanding** (analyze with dual-mode: macro for scope exploration, micro for phase-level depth), **orchestration** (roadmap — optional, pure Milestone > Phase decomposition), and **execution** (plan → execute → verify). Six canonical paths (A–F) cover everything from full greenfield projects to small fixes. 50 slash commands across 7 categories power every stage, with all artifacts in `.workflow/scratch/` tracked by `state.json`.
+Commands are organized in four layers: **upstream origin** (brainstorm, blueprint), **understanding** (analyze with dual-mode: macro for scope exploration, micro for phase-level depth), **orchestration** (roadmap — optional, pure Milestone > Phase decomposition), and **execution** (plan → execute → verify). Six canonical paths (A–F) cover everything from full greenfield projects to small fixes. 64 slash commands across 7 categories power every stage, with all artifacts in `.workflow/scratch/` tracked by `state.json`.
 
 ### 3. Issue Closed-Loop
 
@@ -123,7 +123,7 @@ Wiki knowledge graph with BM25 search, backlink traversal, and health scoring. L
 
 ### 7. Hook & Overlay System
 
-11 context-aware hooks inject project specs into agent prompts, monitor context usage, and track delegate execution. The overlay system enables non-invasive patches for `.claude/commands/*.md` that survive upgrades.
+17 context-aware hooks inject project specs into agent prompts, monitor context usage, and track delegate execution. The overlay system enables non-invasive patches for `.claude/commands/*.md` that survive upgrades.
 
 ---
 
@@ -131,15 +131,15 @@ Wiki knowledge graph with BM25 search, backlink traversal, and health scoring. L
 
 | Category | Count | Prefix | Purpose |
 |----------|-------|--------|---------|
-| **Core Workflow** | 19 | `maestro-*` | Full lifecycle — ralph, init, brainstorm, blueprint, analyze, roadmap, plan, execute, verify, milestones, overlays |
-| **Management** | 13 | `manage-*` | Issue lifecycle, codebase docs, knowledge capture, memory, status |
-| **Quality** | 9 | `quality-*` | Review, test, debug, test-gen, integration-test, business-test, refactor, sync |
-| **Learning** | 5 | `learn-*` | Retro, follow-along, pattern decompose, investigate, second opinion |
-| **Specification** | 3 | `spec-*` | Setup, add, load |
-| **Wiki** | 2 | `wiki-*` | Knowledge graph health, search, cleanup, connection discovery, digest |
-| **Team** | 1 | `team-*` | ACO swarm intelligence, colony optimization |
+| **Core Workflow** | 32 | `maestro-*` | Full lifecycle — ralph, init, brainstorm, blueprint, analyze, roadmap, plan, execute, verify, milestones, overlays, swarm, companion |
+| **Management** | 10 | `manage-*` | Issue lifecycle, codebase docs, knowledge capture, memory, status |
+| **Quality** | 7 | `quality-*` | Review, test, debug, test-gen, business-test, refactor, sync |
+| **Learning** | 4 | `learn-*` | Retro, follow-along, pattern decompose, investigate |
+| **Specification** | 4 | `spec-*` | Setup, add, load, analytics |
+| **Odyssey** | 5 | `odyssey-*` | Academic research workflows — lit-review, experiment, paper-draft, data-pipeline, thesis-structure |
+| **Security** | 1 | `security-*` | Security audit |
 
-21 specialized agent definitions in `.claude/agents/` — each a focused Markdown file that Claude Code loads on demand.
+23 specialized agent definitions in `.claude/agents/` — each a focused Markdown file that Claude Code loads on demand.
 
 ---
 
@@ -149,7 +149,7 @@ Wiki knowledge graph with BM25 search, backlink traversal, and health scoring. L
 maestro/
 ├── bin/                     # CLI entry points
 ├── src/                     # Core CLI (Commander.js + MCP SDK)
-│   ├── commands/            # 11 CLI commands (serve, run, cli, ext, tool, ...)
+│   ├── commands/            # 32 CLI commands (serve, run, cli, ext, tool, ...)
 │   ├── mcp/                 # MCP server (stdio transport)
 │   └── core/                # Tool registry, extension loader
 ├── dashboard/               # Real-time web dashboard
@@ -158,9 +158,9 @@ maestro/
 │       ├── server/          # Hono API + WebSocket + SSE
 │       └── shared/          # Shared types
 ├── .claude/
-│   ├── commands/            # 50 slash commands (.md)
-│   └── agents/              # 21 agent definitions (.md)
-├── workflows/               # 45 workflow implementations (.md)
+│   ├── commands/            # 64 slash commands (.md)
+│   └── agents/              # 23 agent definitions (.md)
+├── workflows/               # 75 workflow implementations (.md)
 ├── templates/               # JSON templates (task, plan, issue, ...)
 └── extensions/              # Plugin system
 ```
@@ -178,17 +178,17 @@ maestro/
 
 ## Documentation
 
-- **[Maestro Ralph Guide](guide/maestro-ralph-guide.md)** — Adaptive lifecycle engine: position inference, decision nodes, quality modes, retry escalation
-- **[Command Usage Guide](guide/command-usage-guide.md)** — All 53 commands with workflow diagrams, pipeline chaining, Issue closed-loop
+- **[Maestro Ralph Guide](guide/maestro-ralph-guide.en.md)** — Adaptive lifecycle engine: position inference, decision nodes, quality modes, retry escalation
+- **[Command Usage Guide](guide/command-usage-guide.en.md)** — All 64 commands with workflow diagrams, pipeline chaining, Issue closed-loop
 - **[Command Reference (HTML)](guide/command-usage-guide.html)** — Interactive HTML version with search, card grid, and workflow examples (`maestro command-help` to open)
-- **[CLI Commands Reference](guide/cli-commands-guide.en.md)** — All 21 terminal commands: install, delegate, coordinate, wiki, hooks, overlay, collab
-- **[Spec System Guide](guide/spec-system-guide.md)** — Project specs with `<spec-entry>` format, keyword-based loading, validation hooks
-- **[Delegate Async Guide](guide/delegate-async-guide.md)** — Async task delegation: CLI & MCP usage, message injection, chaining
-- **[Overlay Guide](guide/overlay-guide.md)** — Non-invasive command extensions: format, section injection, bundle/import
-- **[Hooks Guide](guide/hooks-guide.md)** — Hook system architecture, 11 hooks, spec injection, context budget
-- **[Worktree Guide](guide/worktree-guide.md)** — Milestone-level parallel development: fork, sync, merge, dashboard integration
-- **[Collab — User Guide](guide/team-lite-guide.md)** — Multi-person collaboration for 2-8 person teams
-- **[Collab — Design](guide/team-lite-design.md)** — Architecture, data model, namespace boundaries
+- **[CLI Commands Reference](guide/cli-commands-guide.en.md)** — All 32 terminal commands: install, delegate, coordinate, wiki, hooks, overlay, collab
+- **[Spec System Guide](guide/spec-system-guide.en.md)** — Project specs with `<spec-entry>` format, keyword-based loading, validation hooks
+- **[Delegate Async Guide](guide/delegate-async-guide.en.md)** — Async task delegation: CLI & MCP usage, message injection, chaining
+- **[Overlay Guide](guide/overlay-guide.en.md)** — Non-invasive command extensions: format, section injection, bundle/import
+- **[Hooks Guide](guide/hooks-guide.en.md)** — Hook system architecture, 17 hooks, spec injection, context budget
+- **[Worktree Guide](guide/worktree-guide.en.md)** — Milestone-level parallel development: fork, sync, merge, dashboard integration
+- **[Collab — User Guide](guide/team-lite-guide.en.md)** — Multi-person collaboration for 2-8 person teams
+- **[Collab — Design](guide/team-lite-design.en.md)** — Architecture, data model, namespace boundaries
 - **[MCP Tools Reference](guide/mcp-tools-guide.en.md)** — All 9 MCP endpoint tools
 
 ---

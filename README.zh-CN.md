@@ -91,7 +91,7 @@ brainstorm → blueprint(可选) → init → analyze(宏观) → roadmap(可选
 
 ### 3. 分层命令拓扑
 
-命令按四层组织：**上游起源层**（brainstorm 发散、blueprint 收敛）、**理解层**（analyze 双层模式：宏观探索影响面 + 微观 Phase 级深入）、**编排层**（roadmap — 可选，纯 Milestone > Phase 分解）、**执行层**（plan → execute → verify）。6 条规范路径（Path A–F）覆盖从全新项目到小修复的所有场景。50 个斜杠命令覆盖 7 大类别，所有产物存放于 `.workflow/scratch/`，由 `state.json` 追踪。
+命令按四层组织：**上游起源层**（brainstorm 发散、blueprint 收敛）、**理解层**（analyze 双层模式：宏观探索影响面 + 微观 Phase 级深入）、**编排层**（roadmap — 可选，纯 Milestone > Phase 分解）、**执行层**（plan → execute → verify）。6 条规范路径（Path A–F）覆盖从全新项目到小修复的所有场景。64 个斜杠命令覆盖 7 大类别，所有产物存放于 `.workflow/scratch/`，由 `state.json` 追踪。
 
 ### 4. Issue 闭环
 
@@ -121,14 +121,15 @@ Wiki 知识图谱支持 BM25 搜索、反向链接遍历、健康评分。学习
 
 | 类别 | 数量 | 前缀 | 用途 |
 |------|------|------|------|
-| **核心工作流** | 19 | `maestro-*` | 全生命周期 — ralph、init、brainstorm、blueprint、analyze、roadmap、plan、execute、verify、milestones、overlays |
-| **管理** | 12 | `manage-*` | Issue 生命周期、代码库文档、知识捕获、记忆管理、状态 |
-| **质量** | 9 | `quality-*` | review、test、debug、test-gen、integration-test、business-test、refactor、sync |
-| **学习** | 5 | `learn-*` | 复盘、跟读、模式拆解、探究、多视角 |
-| **规范** | 3 | `spec-*` | setup、add、load |
-| **知识图谱** | 2 | `wiki-*` | 连接发现、知识摘要 |
+| **核心工作流** | 32 | `maestro-*` | 全生命周期 — ralph、init、brainstorm、blueprint、analyze、roadmap、plan、execute、verify、milestones、overlays、swarm、companion |
+| **管理** | 10 | `manage-*` | Issue 生命周期、代码库文档、知识捕获、记忆管理、状态 |
+| **质量** | 7 | `quality-*` | review、test、debug、test-gen、business-test、refactor、sync |
+| **学习** | 4 | `learn-*` | 复盘、跟读、模式拆解、探究 |
+| **规范** | 4 | `spec-*` | setup、add、load、analytics |
+| **奥德赛** | 5 | `odyssey-*` | 学术研究工作流 — 文献综述、实验、论文草稿、数据管线、论文结构 |
+| **安全** | 1 | `security-*` | 安全审计 |
 
-`.claude/agents/` 下 21 个专业化 Agent 定义，Claude Code 按需加载。
+`.claude/agents/` 下 23 个专业化 Agent 定义，Claude Code 按需加载。
 
 ---
 
@@ -138,7 +139,7 @@ Wiki 知识图谱支持 BM25 搜索、反向链接遍历、健康评分。学习
 maestro/
 ├── bin/                     # CLI 入口
 ├── src/                     # 核心 CLI (Commander.js + MCP SDK)
-│   ├── commands/            # 11 个 CLI 命令 (serve, run, cli, ext, tool, ...)
+│   ├── commands/            # 32 个 CLI 命令 (serve, run, cli, ext, tool, ...)
 │   ├── mcp/                 # MCP 服务器 (stdio 传输)
 │   └── core/                # 工具注册、扩展加载器
 ├── dashboard/               # 实时 Web 仪表盘
@@ -147,9 +148,9 @@ maestro/
 │       ├── server/          # Hono API + WebSocket + SSE
 │       └── shared/          # 共享类型
 ├── .claude/
-│   ├── commands/            # 50 个斜杠命令 (.md)
-│   └── agents/              # 21 个 Agent 定义 (.md)
-├── workflows/               # 45 个工作流实现 (.md)
+│   ├── commands/            # 64 个斜杠命令 (.md)
+│   └── agents/              # 23 个 Agent 定义 (.md)
+├── workflows/               # 75 个工作流实现 (.md)
 ├── templates/               # JSON 模板 (task, plan, issue, ...)
 └── extensions/              # 插件系统
 ```
@@ -168,13 +169,13 @@ maestro/
 ## 文档
 
 - **[Maestro Ralph 指南](guide/maestro-ralph-guide.md)** — 自适应生命周期引擎：位置推断、decision 节点、质量模式、重试升级
-- **[命令使用指南](guide/command-usage-guide.md)** — 全部 53 个命令，含工作流图表、管线衔接、Issue 闭环
+- **[命令使用指南](guide/command-usage-guide.md)** — 全部 64 个命令，含工作流图表、管线衔接、Issue 闭环
 - **[命令参考 (HTML)](guide/command-usage-guide.html)** — 交互式 HTML 版本，支持搜索、卡片网格、工作流示例（`maestro command-help` 打开）
-- **[CLI 命令参考](guide/cli-commands-guide.en.md)** — 全部 21 个终端命令：install、delegate、coordinate、wiki、hooks、overlay、collab
+- **[CLI 命令参考](guide/cli-commands-guide.en.md)** — 全部 32 个终端命令：install、delegate、coordinate、wiki、hooks、overlay、collab
 - **[Spec 系统指南](guide/spec-system-guide.md)** — `<spec-entry>` 格式、keyword 加载、验证 Hook、session dedup 注入
 - **[Delegate 异步执行指南](guide/delegate-async-guide.md)** — 异步任务委派：CLI & MCP 用法、消息注入、链式调用
 - **[Overlay 系统指南](guide/overlay-guide.md)** — 非侵入式命令扩展：格式、section 注入、bundle 打包/导入
-- **[Hook 系统指南](guide/hooks-guide.md)** — Hook 系统架构、11 个 Hook、Spec 注入、上下文预算
+- **[Hook 系统指南](guide/hooks-guide.md)** — Hook 系统架构、17 个 Hook、Spec 注入、上下文预算
 - **[Worktree 并行开发指南](guide/worktree-guide.md)** — 里程碑级 worktree 并行：fork、sync、merge、dashboard 集成
 - **[Collab 协作 — 使用指南](guide/team-lite-guide.md)** — 2-8 人小团队协作
 - **[Collab 协作 — 设计文档](guide/team-lite-design.md)** — 架构、数据模型、命名空间边界

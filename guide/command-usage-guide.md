@@ -2,19 +2,19 @@
 title: "Maestro 命令使用指南"
 ---
 
-Maestro 命令系统包含 52 个 slash 命令，分为 7 大类。本文档提供命令全景图和核心工作流导航。
+Maestro 命令系统包含 64 个 slash 命令，分为 7 大类。本文档提供命令全景图和核心工作流导航。
 
 ## 命令总览
 
 | 类别 | 命令数 | 前缀 | 职责 |
 |------|--------|------|------|
-| **核心工作流** | 19 | `maestro-*` | 项目初始化、规划、执行、验证、coordinate、milestones、overlays、swarm、companion、next |
-| **管理** | 13 | `manage-*` | Issue 生命周期、代码库文档、知识捕获、记忆管理、harvest、status、knowledge-audit |
-| **质量** | 9 | `quality-*` | 代码审查、业务测试、UAT、调试、重构、复盘、同步 |
-| **规范** | 3 | `spec-*` | 项目规范初始化、加载、录入 |
-| **学习** | 5 | `learn-*` | 统一复盘（git+决策）、跟读学习、模式拆解、系统探究、多视角分析 |
-| **知识图谱** | 2 | `wiki-*` | 图谱健康、搜索、清理、连接发现、知识摘要 |
-| **团队智能** | 1 | `team-*` | ACO 蚁群智能、群体优化 |
+| **核心工作流** | 32 | `maestro-*` | 项目初始化、规划、执行、验证、coordinate、milestones、overlays、swarm、companion、next |
+| **管理** | 10 | `manage-*` | Issue 生命周期、代码库文档、知识捕获、记忆管理、harvest、status、knowledge-audit |
+| **质量** | 7 | `quality-*` | 代码审查、业务测试、UAT、调试、重构、复盘、同步 |
+| **规范** | 4 | `spec-*` | 项目规范初始化、加载、录入、分析 |
+| **学习** | 4 | `learn-*` | 统一复盘（git+决策）、跟读学习、模式拆解、系统探究 |
+| **奥德赛** | 5 | `odyssey-*` | 学术研究工作流 — 文献综述、实验、论文草稿、数据管线、论文结构 |
+| **安全** | 1 | `security-*` | 安全审计 |
 
 全局入口 `/maestro` 是智能协调器，根据用户意图和项目状态自动选择最优命令链。
 
@@ -321,7 +321,7 @@ analyze → plan → execute → verify → review → test → milestone-audit 
 /spec-setup                                     # 扫描项目生成规范
 /spec-add coding "所有 API 使用 Hono 框架"       # 录入规范
 /spec-load --role implement                     # 加载规范
-/manage-codebase-refresh                        # 增量刷新代码库文档
+/manage-codebase-rebuild                        # 重建代码库文档
 /manage-knowhow search "认证"                   # 搜索知识复用
 /manage-knowledge-audit --scope all             # 审计三存储，清理过期/矛盾条目
 /manage-status                                  # 项目仪表板

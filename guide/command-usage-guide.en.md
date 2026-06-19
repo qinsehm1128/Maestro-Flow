@@ -2,19 +2,19 @@
 title: "Maestro Command Usage Guide"
 ---
 
-The Maestro command system includes 52 slash commands, organized into 7 major categories. This document provides the command panorama and core workflow navigation.
+The Maestro command system includes 64 slash commands, organized into 7 major categories. This document provides the command panorama and core workflow navigation.
 
 ## Command Overview
 
 | Category | Count | Prefix | Responsibility |
 |----------|-------|--------|----------------|
-| **Core Workflow** | 19 | `maestro-*` | Lifecycle engine (ralph), initialization, planning, execution, verification, coordination, milestones, overlays |
-| **Management** | 13 | `manage-*` | Issue lifecycle, codebase documentation, knowledge capture, memory, harvest, status, knowledge-audit |
-| **Quality** | 9 | `quality-*` | Code review, business testing, UAT, debugging, refactoring, retrospective, sync |
-| **Specification** | 3 | `spec-*` | Project spec initialization, loading, entry |
-| **Learning** | 5 | `learn-*` | Unified retro (git+decision), follow-along, pattern decompose, investigate, second opinion |
-| **Wiki** | 2 | `wiki-*` | Knowledge graph health, search, cleanup, connection discovery, digest |
-| **Team** | 1 | `team-*` | ACO swarm intelligence, colony optimization |
+| **Core Workflow** | 32 | `maestro-*` | Lifecycle engine (ralph), initialization, planning, execution, verification, coordination, milestones, overlays, swarm, companion |
+| **Management** | 10 | `manage-*` | Issue lifecycle, codebase documentation, knowledge capture, memory, harvest, status, knowledge-audit |
+| **Quality** | 7 | `quality-*` | Code review, business testing, UAT, debugging, refactoring, retrospective, sync |
+| **Specification** | 4 | `spec-*` | Project spec initialization, loading, entry, analytics |
+| **Learning** | 4 | `learn-*` | Unified retro (git+decision), follow-along, pattern decompose, investigate |
+| **Odyssey** | 5 | `odyssey-*` | Academic research workflows — lit-review, experiment, paper-draft, data-pipeline, thesis-structure |
+| **Security** | 1 | `security-*` | Security audit |
 
 The global entry point `/maestro` is the smart coordinator that automatically selects the optimal command chain based on user intent and project state.
 
@@ -308,7 +308,7 @@ Discover → Create → Analyze → Plan → Execute → Close
 /spec-setup                                     # Scan project for conventions
 /spec-add coding "All APIs use Hono framework"   # Record a spec
 /spec-load --role implement                     # Load specs
-/manage-codebase-refresh                        # Incremental refresh codebase docs
+/manage-codebase-rebuild                        # Rebuild codebase docs
 /manage-knowhow search "authentication"         # Search knowhow
 /manage-status                                  # Project dashboard
 ```
