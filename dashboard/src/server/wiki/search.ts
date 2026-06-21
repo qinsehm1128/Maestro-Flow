@@ -16,6 +16,98 @@ const STOP_WORDS = new Set([
 ]);
 
 // ---------------------------------------------------------------------------
+// Query expansion: synonyms + stem variants
+// ---------------------------------------------------------------------------
+
+const SYNONYMS: ReadonlyMap<string, readonly string[]> = new Map([
+  ['spec', ['specification', 'rule']],
+  ['specification', ['spec']],
+  ['auth', ['authentication', 'authorization', 'authorize']],
+  ['authentication', ['auth']],
+  ['authorization', ['auth']],
+  ['config', ['configuration', 'settings']],
+  ['configuration', ['config', 'settings']],
+  ['settings', ['config', 'configuration']],
+  ['deploy', ['deployment', 'release', 'publish']],
+  ['deployment', ['deploy']],
+  ['release', ['publish', 'deploy']],
+  ['publish', ['release', 'deploy']],
+  ['bug', ['defect', 'issue', 'fix']],
+  ['error', ['exception', 'failure', 'fault']],
+  ['exception', ['error']],
+  ['test', ['testing', 'verify', 'assertion']],
+  ['testing', ['test']],
+  ['hook', ['hooks', 'lifecycle', 'callback']],
+  ['delegate', ['delegation', 'dispatch']],
+  ['delegation', ['delegate']],
+  ['workflow', ['pipeline', 'orchestration']],
+  ['pipeline', ['workflow']],
+  ['knowledge', ['knowhow', 'wiki']],
+  ['knowhow', ['knowledge']],
+  ['wiki', ['knowledge']],
+  ['command', ['cmd', 'cli']],
+  ['cli', ['command']],
+  ['component', ['module', 'widget']],
+  ['module', ['component']],
+]);
+
+const STEM_SUFFIXES: ReadonlyArray<[RegExp, string]> = [
+  [/ation$/, ''], [/tion$/, ''], [/sion$/, ''],
+  [/ment$/, ''], [/ness$/, ''], [/ies$/, 'y'],
+  [/ing$/, ''], [/ed$/, ''], [/er$/, ''],
+  [/es$/, ''], [/s$/, ''],
+];
+
+function stemVariants(term: string): string[] {
+  const variants: string[] = [];
+  for (const [pattern, replacement] of STEM_SUFFIXES) {
+    if (pattern.test(term)) {
+      const stemmed = term.replace(pattern, replacement);
+      if (stemmed.length >= 2 && stemmed !== term) variants.push(stemmed);
+    }
+  }
+  return variants;
+}
+
+interface WeightedTerm {
+  term: string;
+  weight: number;
+}
+
+function expandQueryTerms(tokens: string[]): WeightedTerm[] {
+  const seen = new Set<string>();
+  const weighted: WeightedTerm[] = [];
+
+  for (const t of tokens) {
+    if (seen.has(t)) continue;
+    seen.add(t);
+    weighted.push({ term: t, weight: 1.0 });
+
+    const syns = SYNONYMS.get(t);
+    if (syns) {
+      for (const s of syns) {
+        const sTokens = tokenize(s);
+        for (const st of sTokens) {
+          if (!seen.has(st)) {
+            seen.add(st);
+            weighted.push({ term: st, weight: 0.3 });
+          }
+        }
+      }
+    }
+
+    for (const v of stemVariants(t)) {
+      if (!seen.has(v)) {
+        seen.add(v);
+        weighted.push({ term: v, weight: 0.5 });
+      }
+    }
+  }
+
+  return weighted;
+}
+
+// ---------------------------------------------------------------------------
 // Field configuration
 // ---------------------------------------------------------------------------
 
@@ -279,8 +371,9 @@ export function searchBM25(
   const terms = tokenize(query);
   if (terms.length === 0 || index.totalDocs === 0) return [];
 
+  const weighted = expandQueryTerms(terms);
   const fetchLimit = (credibilityFactors && credibilityFactors.size > 0) ? limit * 2 : limit;
-  const results = searchBM25F(index, terms, fetchLimit);
+  const results = searchBM25F(index, weighted, fetchLimit);
 
   if (credibilityFactors && credibilityFactors.size > 0) {
     for (const r of results) {
@@ -293,16 +386,15 @@ export function searchBM25(
   return results.slice(0, limit);
 }
 
-function searchBM25F(index: InvertedIndex, terms: string[], limit: number): SearchResult[] {
+function searchBM25F(index: InvertedIndex, weightedTerms: WeightedTerm[], limit: number): SearchResult[] {
   const fp = index.fieldPostings;
   const fl = index.fieldLengths;
   const afl = index.avgFieldLengths;
   const dck = index.docConfigKeys;
   const fields: FieldName[] = ['title', 'summary', 'tags', 'body'];
 
-  const uniqueTerms = [...new Set(terms)];
   const scores = new Map<string, number>();
-  for (const term of uniqueTerms) {
+  for (const { term, weight } of weightedTerms) {
     const postings = fp.get(term);
     if (!postings || postings.length === 0) continue;
 
@@ -325,7 +417,7 @@ function searchBM25F(index: InvertedIndex, terms: string[], limit: number): Sear
         tfTilde += boost * (fieldTfs[f] / (norm || 1));
       }
 
-      const termScore = idf * ((tfTilde * (BM25_K1 + 1)) / (tfTilde + BM25_K1));
+      const termScore = weight * idf * ((tfTilde * (BM25_K1 + 1)) / (tfTilde + BM25_K1));
       scores.set(docId, (scores.get(docId) ?? 0) + termScore);
     }
   }

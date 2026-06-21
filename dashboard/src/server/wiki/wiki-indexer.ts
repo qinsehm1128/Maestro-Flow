@@ -27,6 +27,7 @@ import type {
 } from './wiki-types.js';
 import { buildGraph, type WikiGraph } from './graph-analysis.js';
 import { buildInvertedIndex, searchBM25, type InvertedIndex } from './search.js';
+import type { EmbeddingIndex } from './embedding.js';
 
 export interface LinkedWorkspaceConfig {
   name: string;
@@ -60,6 +61,8 @@ export class WikiIndexer {
   private cache: WikiIndex | null = null;
   private graphCache: WikiGraph | null = null;
   private searchCache: InvertedIndex | null = null;
+  private embeddingCache: EmbeddingIndex | null = null;
+  private embeddingInflight: Promise<EmbeddingIndex | null> | null = null;
   private inflight: Promise<WikiIndex> | null = null;
   private mtimeSnapshot: Map<string, number> = new Map();
 
@@ -82,6 +85,7 @@ export class WikiIndexer {
       this.cache = null;
       this.graphCache = null;
       this.searchCache = null;
+      this.embeddingCache = null;
     }
     return this.rebuild();
   }
@@ -275,13 +279,67 @@ export class WikiIndexer {
   async searchWithScores(query: string, limit = 50): Promise<Array<{ entry: WikiEntry; score: number }>> {
     const index = await this.get();
     const bm25 = await this.getSearchIndex();
-    const ranked = searchBM25(bm25, query, limit);
+    const bm25Results = searchBM25(bm25, query, limit * 2);
+
+    const embIdx = await this.getEmbeddingIndex();
+    if (embIdx && embIdx.docIds.length > 0) {
+      try {
+        const { embedQuery, vectorSearch, mergeRRF } = await import('./embedding.js');
+        const qVec = await embedQuery(query);
+        const vecResults = vectorSearch(qVec, embIdx, limit * 2);
+        const merged = mergeRRF(bm25Results, vecResults, limit);
+        const out: Array<{ entry: WikiEntry; score: number }> = [];
+        for (const r of merged) {
+          const entry = index.byId[r.docId];
+          if (entry) out.push({ entry, score: r.score });
+        }
+        return out;
+      } catch {
+        // Embedding search failed — fall back to BM25 only
+      }
+    }
+
     const out: Array<{ entry: WikiEntry; score: number }> = [];
-    for (const r of ranked) {
+    for (const r of bm25Results.slice(0, limit)) {
       const entry = index.byId[r.docId];
       if (entry) out.push({ entry, score: r.score });
     }
     return out;
+  }
+
+  async getEmbeddingIndex(): Promise<EmbeddingIndex | null> {
+    if (this.embeddingCache) return this.embeddingCache;
+    if (this.embeddingInflight) return this.embeddingInflight;
+
+    this.embeddingInflight = this.loadOrBuildEmbeddings();
+    const result = await this.embeddingInflight;
+    this.embeddingInflight = null;
+    this.embeddingCache = result;
+    return result;
+  }
+
+  private async loadOrBuildEmbeddings(): Promise<EmbeddingIndex | null> {
+    try {
+      const { isAvailable, loadEmbeddingIndex, buildEmbeddingIndex, saveEmbeddingIndex } = await import('./embedding.js');
+      if (!await isAvailable()) return null;
+
+      const cached = loadEmbeddingIndex(this.workflowRoot);
+      if (cached) return cached;
+
+      const index = await this.get();
+      const docs = index.entries.map(e => ({
+        id: e.id,
+        title: e.title,
+        summary: e.summary,
+        tags: e.tags,
+      }));
+
+      const embIdx = await buildEmbeddingIndex(docs);
+      saveEmbeddingIndex(embIdx, this.workflowRoot);
+      return embIdx;
+    } catch {
+      return null;
+    }
   }
 
   async search(query: string, limit = 50): Promise<WikiEntry[]> {
