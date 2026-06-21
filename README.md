@@ -2,22 +2,59 @@
 
 # Maestro-Flow
 
-### The Orchestration Layer for the Multi-Agent Era
+### Intent-Driven Workflow Orchestration for the Multi-Agent Era
 
-**Don't just run agents. Orchestrate them.**
+**Describe what you want. Maestro figures out how to get there.**
 
+<br/>
+
+[![npm version](https://img.shields.io/npm/v/maestro-flow?color=cb3837&logo=npm&logoColor=white)](https://www.npmjs.com/package/maestro-flow)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-≥18-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![MCP](https://img.shields.io/badge/MCP-Protocol-8B5CF6)](https://modelcontextprotocol.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-[English](README.md) | [简体中文](README.zh-CN.md)
+[English](README.md)&nbsp;&nbsp;|&nbsp;&nbsp;[简体中文](README.zh-CN.md)
 
 </div>
 
----
+<br/>
 
-Maestro-Flow is a workflow orchestration framework for multi-agent development with Claude Code, Codex, Gemini, and other AI agents. Describe your intent, and Maestro-Flow routes to the optimal command chain, drives parallel agent execution, and closes the loop through adaptive decision-making, a real-time dashboard, and an evolving knowledge graph.
+> Most AI coding tools let you run one agent on one task.
+> Maestro-Flow orchestrates **multiple agents across an entire development lifecycle** — from brainstorming to deployment — with an adaptive decision engine, a self-reinforcing knowledge graph, and a real-time visual dashboard.
+
+<br/>
+
+## Two Pillars
+
+Maestro-Flow is built on two interconnected systems that reinforce each other:
+
+```
+                         ┌─────────────────────────────────────┐
+                         │         Maestro-Flow                │
+                         │                                     │
+          ┌──────────────┴──────────────┐  ┌──────────────────┴───────────────┐
+          │   Workflow Orchestration     │  │      Knowledge System            │
+          │                             │  │                                  │
+          │  Intent Router              │  │  Knowledge Graph (SQLite)        │
+          │    └─ 40+ chain types       │  │    └─ Code + Knowledge unified   │
+          │  Ralph Decision Engine      │  │  Spec Injection (Hooks)          │
+          │    └─ 11-state FSM          │  │    └─ Auto-inject into prompts   │
+          │  Quality Pipeline           │  │  Wiki + BM25 Search              │
+          │    └─ verify → review → test│  │    └─ Backlinks + health score   │
+          │  Multi-Agent Dispatch       │  │  Learning Loop                   │
+          │    └─ Claude, Gemini, Codex │  │    └─ retro → persist → inject   │
+          │                             │  │                                  │
+          └─────────────┬───────────────┘  └──────────────────┬───────────────┘
+                        │          ▲              │            ▲
+                        │          │  knowledge   │            │
+                        │          │  injection   │            │
+                        │          └──────────────┘            │
+                        │     execution results                │
+                        └──────────────────────────────────────┘
+```
+
+**Workflows generate knowledge. Knowledge improves future workflows.** Agents learn from each session, persist discoveries as specs and knowhow, and future agents automatically receive that context through hook injection — creating a self-reinforcing cycle.
 
 ---
 
@@ -28,24 +65,26 @@ npm install -g maestro-flow
 maestro install
 ```
 
-**Prerequisites**: Node.js >= 18, Claude Code CLI. Optional: Codex CLI, Gemini CLI for multi-agent workflows.
+**Prerequisites**: Node.js ≥ 18, Claude Code CLI. Optional: Codex CLI, Gemini CLI for multi-agent workflows.
 
 ---
 
 ## Quick Start
 
-**`/maestro-ralph`** is the primary entry point — a closed-loop lifecycle engine that reads project state, infers your position, builds an adaptive command chain, and drives it to completion:
+### The Ralph Engine
+
+**`/maestro-ralph`** is the primary entry point — a closed-loop lifecycle engine that reads project state, infers your position in the development lifecycle, and builds an adaptive command chain:
 
 ```bash
 /maestro-ralph "implement OAuth2 authentication with refresh tokens"
 ```
 
-Ralph automatically determines where you are in the lifecycle (brainstorm → blueprint → analyze → roadmap → plan → execute → verify → review → test → milestone-complete) and builds the appropriate chain. Upstream origin commands (brainstorm, blueprint) and roadmap are optional — Ralph skips them based on project state and scope. Decision nodes at key checkpoints evaluate results and dynamically insert debug+fix loops when needed.
+Ralph automatically determines where you are (brainstorm → plan → execute → verify → review → test → milestone) and builds the appropriate chain. Decision nodes at key checkpoints evaluate results and dynamically insert debug → fix → retry loops when needed.
 
 ```bash
 /maestro-ralph status              # View session progress
 /maestro-ralph continue            # Resume after decision pause
-/maestro-ralph -y "build a REST API"  # Full auto mode — no pauses
+/maestro-ralph -y "build a REST API"  # Full auto — no pauses
 ```
 
 ### Other Entry Points
@@ -54,103 +93,169 @@ Ralph automatically determines where you are in the lifecycle (brainstorm → bl
 |---------|-------------|
 | `/maestro "..."` | Describe intent, let AI route to the optimal command chain |
 | `/maestro-quick` | Quick fixes, small features (analyze → plan → execute) |
-| `/maestro-*` | Step-by-step: init, brainstorm, blueprint, analyze, roadmap, plan, execute, verify |
+| `/maestro-*` | Step-by-step: brainstorm, blueprint, analyze, plan, execute, verify |
 
 ---
 
-## Key Features
+## Workflow Orchestration
 
-### 1. Adaptive Lifecycle Engine (`maestro-ralph`)
+### Adaptive Lifecycle Engine
 
-Reads project state → infers lifecycle position → builds command chain with decision nodes. At each checkpoint, Ralph reads actual execution results and decides: continue, or insert a debug → fix → retry loop. The chain grows and shrinks dynamically based on outcomes.
+Ralph is an 11-state finite state machine that **decides** but never executes. It reads project state, infers lifecycle position, builds a command chain with quality gates, and hands off execution to `maestro-ralph-execute`. At each decision node (`◆`), Ralph evaluates actual results and decides: proceed, or insert a debug → fix → retry loop.
 
 ```
 brainstorm → blueprint(opt) → init → analyze(macro) → roadmap(opt) → analyze(micro) → plan → execute → verify
-                                                                                                 ◆ post-verify
-                                              business-test
-                                              ◆ post-business-test
-                                              review
-                                              ◆ post-review
-                                              test
-                                              ◆ post-test
-                                              milestone-audit → milestone-complete
-                                              ◆ post-milestone → next milestone
+                                                                                                 ◆ decision
+                                              review ─── ◆ ─── test ─── ◆ ─── milestone-audit → milestone-complete
+                                                                                                 ◆ → next milestone
 ```
 
-**Three quality modes** — control how thorough each phase is:
+**Three quality modes** control thoroughness:
 
-| Mode | Stages | When |
-|------|--------|------|
-| `full` | verify → business-test → review → test-gen → test | Production features, security-critical code |
-| `standard` | verify → review → test | Default, balanced quality |
-| `quick` | verify → CLI-review | Quick fixes, prototyping |
+| Mode | Pipeline | Use Case |
+|------|----------|----------|
+| `full` | verify → business-test → review → test-gen → test | Production, security-critical |
+| `standard` | verify → review → test | Default, balanced |
+| `quick` | verify → CLI-review | Prototyping, quick fixes |
 
-**Full pipeline explained** — each stage serves a distinct quality gate:
+### Intent-Driven Routing
 
-1. **verify** — goal-backward verification: checks that all plan requirements are implemented, validates architectural constraints, anti-pattern scan, Nyquist test coverage
-2. **business-test** — PRD-forward business testing: requirement traceability, fixture generation, multi-layer execution against acceptance criteria
-3. **review** — multi-dimensional code review: correctness, readability, performance, security, testing, architecture
-4. **test-gen** — coverage gap analysis and automatic test generation (TDD/E2E classification, L0-L3 progressive layers)
-5. **test** — conversational UAT: interactive exploratory testing with session persistence and gap-plan closure
-
-At each `◆` decision node, Ralph evaluates outcomes and decides: pass through, or insert a debug → fix → retry loop. Max retries configurable per decision point.
-
-### 2. Layered Command Topology
-
-Commands are organized in four layers: **upstream origin** (brainstorm, blueprint), **understanding** (analyze with dual-mode: macro for scope exploration, micro for phase-level depth), **orchestration** (roadmap — optional, pure Milestone > Phase decomposition), and **execution** (plan → execute → verify). Six canonical paths (A–F) cover everything from full greenfield projects to small fixes. 64 slash commands across 7 categories power every stage, with all artifacts in `.workflow/scratch/` tracked by `state.json`.
-
-### 3. Issue Closed-Loop
-
-Issues aren't just tickets — they're a self-healing pipeline: discover → analyze → plan → execute → close. Quality commands automatically create issues for problems they find. Issue fixes flow back into the phase pipeline.
-
-### 4. Visual Dashboard
-
-Real-time dashboard at `http://127.0.0.1:3001` with Kanban board, Gantt timeline, sortable table, and command center. Pick an agent on any issue card and dispatch. Built with React 19, Tailwind CSS 4, WebSocket live updates.
+You don't write pipeline YAML. You describe intent in natural language, and Maestro classifies it into one of **40+ chain types**, each a pre-composed sequence of commands. The same intent produces different chains depending on project state:
 
 ```bash
-maestro serve                  # → http://127.0.0.1:3001
-maestro view                   # Terminal TUI alternative
-maestro command-help           # Open interactive command reference in browser (alias: ch)
+/maestro "add user profile page"
+# → New project:     brainstorm → blueprint → analyze → plan → execute → verify
+# → Existing project: analyze → plan → execute → verify
+# → Quick fix:       plan → execute → verify
 ```
 
-### 5. Multi-Agent Engine
+### Layered Command Topology
 
-Coordinates Claude Code, Codex, Gemini, Qwen, and OpenCode in parallel via wave-based execution. Independent tasks run concurrently; dependent tasks wait for predecessors.
+Commands are organized in four layers:
 
-### 6. Smart Knowledge Base
+| Layer | Purpose | Commands |
+|-------|---------|----------|
+| **Origin** | Diverge ideas, converge direction | brainstorm, blueprint |
+| **Understanding** | Explore scope (macro) + deep-dive (micro) | analyze (dual-mode) |
+| **Orchestration** | Structure into milestones and phases | roadmap |
+| **Execution** | Plan, implement, verify | plan, execute, verify, review, test |
 
-Wiki knowledge graph with BM25 search, backlink traversal, and health scoring. Learning toolkit (retro, follow, decompose, investigate, second-opinion) feeds into a unified `lessons.jsonl` store.
+Six canonical paths (A–F) cover everything from full greenfield projects to single-line fixes.
 
-### 7. Hook & Overlay System
+### Multi-Agent Dispatch
 
-17 context-aware hooks inject project specs into agent prompts, monitor context usage, and track delegate execution. The overlay system enables non-invasive patches for `.claude/commands/*.md` that survive upgrades.
+Maestro coordinates **Claude Code, Codex, Gemini, Qwen, and OpenCode** through four composable orchestration patterns:
 
----
+| Pattern | How It Works |
+|---------|-------------|
+| **Delegate** | Dispatch to any CLI tool via `maestro delegate` with SQLite-backed job broker, async execution, and message injection for follow-up chaining |
+| **Team** | Coordinator-worker architecture — coordinators generate role-specs, spawn `team-worker` agents in parallel, supervised by a resident quality observer |
+| **Wave** | Topological sort of tasks into dependency waves; independent tasks run concurrently within each wave |
+| **Swarm** | ACO-driven multi-agent exploration for complex problem spaces with pheromone-guided convergence |
 
-## Commands & Agents
-
-| Category | Count | Prefix | Purpose |
-|----------|-------|--------|---------|
-| **Core Workflow** | 32 | `maestro-*` | Full lifecycle — ralph, init, brainstorm, blueprint, analyze, roadmap, plan, execute, verify, milestones, overlays, swarm, companion |
-| **Management** | 10 | `manage-*` | Issue lifecycle, codebase docs, knowledge capture, memory, status |
-| **Quality** | 7 | `quality-*` | Review, test, debug, test-gen, business-test, refactor, sync |
-| **Learning** | 4 | `learn-*` | Retro, follow-along, pattern decompose, investigate |
-| **Specification** | 4 | `spec-*` | Setup, add, load, analytics |
-| **Odyssey** | 5 | `odyssey-*` | Academic research workflows — lit-review, experiment, paper-draft, data-pipeline, thesis-structure |
-| **Security** | 1 | `security-*` | Security audit |
-
-23 specialized agent definitions in `.claude/agents/` — each a focused Markdown file that Claude Code loads on demand.
+These patterns compose: a team coordinator can delegate subtasks to different LLM backends, wave execution parallelizes independent work, and the dashboard provides a real-time supervisory control loop — all sharing the broker and message bus as coordination primitives.
 
 ---
 
-## Architecture
+## Knowledge System
+
+### Knowledge Graph
+
+A SQLite-backed unified graph that stores both **code structure** (functions, classes, call chains via tree-sitter extraction) and **project knowledge** (specs, knowhow, domain terms, issues) in one queryable structure.
+
+```bash
+maestro kg search <symbol>        # Find nodes
+maestro kg context <node>         # Get surrounding context
+maestro kg callers <function>     # Trace call chains
+maestro kg callees <function>     # Trace dependencies
+```
+
+### Spec Injection
+
+Project rules (coding standards, architecture constraints, quality criteria) are stored as `<spec-entry>` blocks with keyword tags. **Hooks automatically inject relevant specs into every agent prompt** based on keyword matching — agents receive project-specific rules without explicit loading.
+
+### Self-Reinforcing Learning Loop
+
+```
+Agent executes task
+    → Discovers pattern/pitfall/decision
+    → Persists as spec entry or knowhow doc
+    → Hook system indexes new knowledge
+    → Future agents auto-receive via prompt injection
+    → Better execution → more discoveries → ...
+```
+
+Four learning tools feed this cycle: `learn-retro` (retrospective), `learn-follow` (pattern study), `learn-decompose` (architecture breakdown), `learn-investigate` (deep dive).
+
+### Wiki & Search
+
+WikiIndexer walks the `.workflow/` directory, parses frontmatter, builds backlink graphs, and creates a **BM25 inverted index** for full-text search across all project knowledge — specs, knowhow, issues, and KG nodes as virtual entries.
+
+---
+
+## Issue Closed-Loop
+
+Issues aren't just tickets. They're a self-healing pipeline:
+
+```
+discover → analyze → plan → execute → close
+    ▲                                    │
+    └────── quality commands auto-create ─┘
+```
+
+Quality commands (review, test, verify) automatically create issues for problems they find. Issue fixes flow back into the phase pipeline.
+
+---
+
+## Visual Dashboard
+
+Real-time dashboard at `http://127.0.0.1:3001` — Kanban board, Gantt timeline, sortable table, and command center. Pick an agent on any issue card and dispatch.
+
+```bash
+maestro serve                  # Launch web dashboard
+maestro view                   # Terminal TUI alternative
+maestro command-help           # Interactive command reference (alias: ch)
+```
+
+Built with React 19, Zustand, Tailwind CSS 4, Framer Motion, Hono, WebSocket.
+
+---
+
+## At a Glance
+
+| Metric | Count |
+|--------|-------|
+| Source files (TypeScript) | 446 |
+| Lines of code | ~111,000 |
+| Slash commands | 64 |
+| Workflow definitions | 115 |
+| Skill packages | 45 |
+| Agent definitions | 23 |
+| CLI commands | 32 |
+| Templates | 92 |
+| Guides (bilingual) | 66 |
+
+### Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| CLI | Commander.js, TypeScript, ESM |
+| MCP | @modelcontextprotocol/sdk (stdio) |
+| Knowledge Graph | better-sqlite3, Drizzle ORM, web-tree-sitter |
+| Frontend | React 19, Zustand, Tailwind CSS 4, Framer Motion, Radix UI |
+| Backend | Hono, WebSocket, SSE |
+| Agents | Claude Agent SDK, Codex CLI, Gemini CLI, OpenCode |
+| Build | Vite 6, TypeScript 5.7, Vitest |
+
+### Architecture
 
 ```
 maestro/
 ├── bin/                     # CLI entry points
 ├── src/                     # Core CLI (Commander.js + MCP SDK)
-│   ├── commands/            # 32 CLI commands (serve, run, cli, ext, tool, ...)
+│   ├── commands/            # 32 CLI commands
 │   ├── mcp/                 # MCP server (stdio transport)
+│   ├── graph/               # Knowledge Graph (SQLite + tree-sitter)
 │   └── core/                # Tool registry, extension loader
 ├── dashboard/               # Real-time web dashboard
 │   └── src/
@@ -159,37 +264,40 @@ maestro/
 │       └── shared/          # Shared types
 ├── .claude/
 │   ├── commands/            # 64 slash commands (.md)
-│   └── agents/              # 23 agent definitions (.md)
-├── workflows/               # 75 workflow implementations (.md)
-├── templates/               # JSON templates (task, plan, issue, ...)
+│   ├── agents/              # 23 agent definitions (.md)
+│   └── skills/              # 45 skill packages
+├── workflows/               # 115 workflow definitions (.md)
+├── templates/               # 92 JSON templates
 └── extensions/              # Plugin system
 ```
-
-| Layer | Technology |
-|-------|-----------|
-| CLI | Commander.js, TypeScript, ESM |
-| MCP | @modelcontextprotocol/sdk (stdio) |
-| Frontend | React 19, Zustand, Tailwind CSS 4, Framer Motion, Radix UI |
-| Backend | Hono, WebSocket, SSE |
-| Agents | Claude Agent SDK, Codex CLI, Gemini CLI, OpenCode |
-| Build | Vite 6, TypeScript 5.7, Vitest |
 
 ---
 
 ## Documentation
 
-- **[Maestro Ralph Guide](guide/maestro-ralph-guide.en.md)** — Adaptive lifecycle engine: position inference, decision nodes, quality modes, retry escalation
-- **[Command Usage Guide](guide/command-usage-guide.en.md)** — All 64 commands with workflow diagrams, pipeline chaining, Issue closed-loop
-- **[Command Reference (HTML)](guide/command-usage-guide.html)** — Interactive HTML version with search, card grid, and workflow examples (`maestro command-help` to open)
-- **[CLI Commands Reference](guide/cli-commands-guide.en.md)** — All 32 terminal commands: install, delegate, coordinate, wiki, hooks, overlay, collab
-- **[Spec System Guide](guide/spec-system-guide.en.md)** — Project specs with `<spec-entry>` format, keyword-based loading, validation hooks
-- **[Delegate Async Guide](guide/delegate-async-guide.en.md)** — Async task delegation: CLI & MCP usage, message injection, chaining
-- **[Overlay Guide](guide/overlay-guide.en.md)** — Non-invasive command extensions: format, section injection, bundle/import
-- **[Hooks Guide](guide/hooks-guide.en.md)** — Hook system architecture, 17 hooks, spec injection, context budget
-- **[Worktree Guide](guide/worktree-guide.en.md)** — Milestone-level parallel development: fork, sync, merge, dashboard integration
-- **[Collab — User Guide](guide/team-lite-guide.en.md)** — Multi-person collaboration for 2-8 person teams
-- **[Collab — Design](guide/team-lite-design.en.md)** — Architecture, data model, namespace boundaries
+**Getting Started**
+- **[Quick Start Guide](guide/quick-start-guide.en.md)** — Install, first workflow, key concepts
+- **[Maestro Ralph Guide](guide/maestro-ralph-guide.en.md)** — Adaptive lifecycle engine, decision nodes, quality modes
+
+**Workflow**
+- **[Command Usage Guide](guide/command-usage-guide.en.md)** — All 64 commands with workflow diagrams and pipeline chaining
+- **[CLI Commands Reference](guide/cli-commands-guide.en.md)** — All 32 terminal commands
+- **[Workflow Structure Guide](guide/workflow-structure-guide.en.md)** — Command topology, chain composition
+- **[Quality Pipeline Guide](guide/quality-pipeline-guide.en.md)** — Verify, review, test pipeline
+- **[Maestro Coordinator Guide](guide/maestro-coordinator-guide.en.md)** — Multi-agent coordination patterns
+
+**Knowledge**
+- **[Knowledge Management Guide](guide/knowledge-management-guide.en.md)** — KG, specs, knowhow, wiki
+- **[Spec System Guide](guide/spec-system-guide.en.md)** — Spec entries, keyword loading, validation hooks
+- **[Hooks Guide](guide/hooks-guide.en.md)** — 17 hooks, spec injection, context budget
+- **[Learning Tools Guide](guide/learn-tools-guide.en.md)** — Retro, follow, decompose, investigate
+
+**Advanced**
+- **[Delegate Async Guide](guide/delegate-async-guide.en.md)** — Multi-CLI delegation, message injection, chaining
+- **[Overlay Guide](guide/overlay-guide.en.md)** — Non-invasive command extensions
+- **[Worktree Guide](guide/worktree-guide.en.md)** — Milestone-level parallel development
 - **[MCP Tools Reference](guide/mcp-tools-guide.en.md)** — All 9 MCP endpoint tools
+- **[Collab Guide](guide/team-lite-guide.en.md)** — 2-8 person team collaboration
 
 ---
 
@@ -197,7 +305,7 @@ maestro/
 
 - **[GET SHIT DONE](https://github.com/gsd-build/get-shit-done)** by TACHES — The spec-driven development model and context engineering philosophy.
 - **[Claude-Code-Workflow](https://github.com/catlog22/Claude-Code-Workflow)** — The predecessor that pioneered multi-CLI orchestration and skill-based workflow routing.
-- **[Impeccable](https://github.com/pbakaus/impeccable)** by [@pbakaus](https://github.com/pbakaus) — The UI design skill integrated as `maestro-impeccable`. Live variant mode, critique storage, design parser, and CSP detection modules are derived from this project. Licensed under [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+- **[Impeccable](https://github.com/pbakaus/impeccable)** by [@pbakaus](https://github.com/pbakaus) — UI design skill integrated as `maestro-impeccable`. Licensed under [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).
 
 ## Contributors
 

@@ -1,7 +1,7 @@
 {
   "name": "maestro-flow",
   "version": "0.5.33",
-  "description": "Workflow orchestration CLI with MCP endpoint support and extensible architecture",
+  "description": "Intent-driven workflow orchestration for multi-agent AI development with adaptive lifecycle engine and self-reinforcing knowledge graph",
   "type": "module",
   "imports": {
     "#maestro-dashboard/agents/*": "./dashboard/dist-server/dashboard/src/server/agents/*",

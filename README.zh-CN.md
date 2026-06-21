@@ -2,22 +2,58 @@
 
 # Maestro-Flow
 
-### 多智能体时代的编排层
+### 多智能体时代的意图驱动工作流编排
 
-**不仅是执行，更是编排。**
+**描述你想要什么，Maestro 负责搞定。**
 
+<br/>
+
+[![npm version](https://img.shields.io/npm/v/maestro-flow?color=cb3837&logo=npm&logoColor=white)](https://www.npmjs.com/package/maestro-flow)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-≥18-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![MCP](https://img.shields.io/badge/MCP-Protocol-8B5CF6)](https://modelcontextprotocol.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-[English](README.md) | [简体中文](README.zh-CN.md)
+[English](README.md)&nbsp;&nbsp;|&nbsp;&nbsp;[简体中文](README.zh-CN.md)
 
 </div>
 
----
+<br/>
 
-Maestro-Flow 是一个面向 Claude Code、Codex、Gemini 等多智能体的工作流编排框架。你只需描述意图，Maestro-Flow 自动路由到最优命令链，驱动多个 AI 智能体并行执行，通过自适应决策节点、实时仪表盘和知识图谱形成完整的项目交付闭环。
+> 大多数 AI 编程工具只能让一个 agent 做一件事。
+> Maestro-Flow 编排**多个 agent 横跨整个开发生命周期** — 从头脑风暴到部署上线 — 通过自适应决策引擎、自增强知识图谱和实时可视化仪表盘。
+
+<br/>
+
+## 两大支柱
+
+Maestro-Flow 建立在两个相互增强的系统之上：
+
+```
+                         ┌─────────────────────────────────────┐
+                         │         Maestro-Flow                │
+                         │                                     │
+          ┌──────────────┴──────────────┐  ┌──────────────────┴───────────────┐
+          │      工作流编排              │  │         知识系统                  │
+          │                             │  │                                  │
+          │  意图路由                    │  │  知识图谱 (SQLite)               │
+          │    └─ 40+ 链类型            │  │    └─ 代码 + 知识统一存储        │
+          │  Ralph 决策引擎             │  │  Spec 注入 (Hooks)               │
+          │    └─ 11 状态 FSM           │  │    └─ 自动注入 agent 提示词      │
+          │  质量管线                    │  │  Wiki + BM25 搜索               │
+          │    └─ verify → review → test│  │    └─ 反向链接 + 健康评分        │
+          │  多智能体调度                │  │  学习循环                        │
+          │    └─ Claude, Gemini, Codex │  │    └─ 复盘 → 持久化 → 注入      │
+          │                             │  │                                  │
+          └─────────────┬───────────────┘  └──────────────────┬───────────────┘
+                        │          ▲              │            ▲
+                        │          │  知识注入    │            │
+                        │          └──────────────┘            │
+                        │     执行结果                          │
+                        └──────────────────────────────────────┘
+```
+
+**工作流产生知识，知识改善未来的工作流。** Agent 从每次会话中学习，将发现持久化为 spec 和 knowhow，未来的 agent 通过 hook 注入自动获取这些上下文 — 形成自增强循环。
 
 ---
 
@@ -28,19 +64,21 @@ npm install -g maestro-flow
 maestro install
 ```
 
-**前置条件**：Node.js >= 18，Claude Code CLI。可选：Codex CLI、Gemini CLI 用于多智能体工作流。
+**前置条件**：Node.js ≥ 18，Claude Code CLI。可选：Codex CLI、Gemini CLI 用于多智能体工作流。
 
 ---
 
 ## 快速开始
 
-**`/maestro-ralph`** 是主推入口 — 闭环生命周期引擎，自动读取项目状态、推断当前位置、构建自适应命令链并驱动执行：
+### Ralph 引擎
+
+**`/maestro-ralph`** 是主推入口 — 闭环生命周期引擎，自动读取项目状态，推断你在开发生命周期中的位置，构建自适应命令链：
 
 ```bash
 /maestro-ralph "实现基于 OAuth2 的用户认证，带 refresh token"
 ```
 
-Ralph 自动判断你在生命周期中的位置（brainstorm → blueprint → analyze → roadmap → plan → execute → verify → review → test → milestone-complete）并构建相应命令链。上游起源命令（brainstorm、blueprint）和 roadmap 均为可选 — Ralph 根据项目状态和范围自动跳过。关键检查点的 decision 节点根据实际执行结果，动态插入 debug → fix → retry 循环。
+Ralph 自动判断你在哪个阶段（brainstorm → plan → execute → verify → review → test → milestone），构建相应命令链。关键检查点的 decision 节点根据实际结果，动态插入 debug → fix → retry 循环。
 
 ```bash
 /maestro-ralph status              # 查看会话进度
@@ -54,93 +92,169 @@ Ralph 自动判断你在生命周期中的位置（brainstorm → blueprint → 
 |------|---------|
 | `/maestro "..."` | 描述意图，AI 自动路由最优命令链 |
 | `/maestro-quick` | 快速修复、小功能（analyze → plan → execute） |
-| `/maestro-*` | 逐步执行：init、brainstorm、blueprint、analyze、roadmap、plan、execute、verify |
+| `/maestro-*` | 逐步执行：brainstorm、blueprint、analyze、plan、execute、verify |
 
 ---
 
-## 核心特性
+## 工作流编排
 
-### 1. 自适应生命周期引擎（`maestro-ralph`）
+### 自适应生命周期引擎
 
-读取项目状态 → 推断生命周期位置 → 构建含 decision 节点的命令链。每个检查点读取实际执行结果，决定继续还是插入 debug → fix → retry 循环。链在运行中动态增长/收缩。
+Ralph 是一个 11 状态有限状态机，**只做决策，不做执行**。它读取项目状态，推断生命周期位置，构建带质量门的命令链，将执行交给 `maestro-ralph-execute`。在每个 decision 节点（`◆`），Ralph 评估实际结果并决定：继续前进，还是插入 debug → fix → retry 循环。
 
 ```
 brainstorm → blueprint(可选) → init → analyze(宏观) → roadmap(可选) → analyze(微观) → plan → execute → verify
-                                                                                                       ◆ post-verify
-                                              business-test
-                                              ◆ post-business-test
-                                              review
-                                              ◆ post-review
-                                              test
-                                              ◆ post-test
-                                              milestone-audit → milestone-complete
-                                              ◆ post-milestone → 下一里程碑
+                                                                                                 ◆ decision
+                                              review ─── ◆ ─── test ─── ◆ ─── milestone-audit → milestone-complete
+                                                                                                 ◆ → 下一里程碑
 ```
 
-三种质量模式：`full`（verify + business-test + review + test）、`standard`（verify + review + test）、`quick`（verify + CLI-review）。
+**三种质量模式**控制质量深度：
 
-### 2. 完整质量管线
+| 模式 | 管线 | 适用场景 |
+|------|------|---------|
+| `full` | verify → business-test → review → test-gen → test | 生产环境、安全关键代码 |
+| `standard` | verify → review → test | 默认，平衡质量 |
+| `quick` | verify → CLI-review | 原型开发、快速修复 |
 
-每个 `◆` decision 节点是一个质量门禁，根据实际结果动态调整链路：
+### 意图驱动路由
 
-1. **verify** — 目标回溯验证：检查所有 plan 需求是否实现、架构约束校验、反模式扫描、Nyquist 测试覆盖率
-2. **business-test** — PRD 前向业务测试：需求追溯、fixture 生成、验收标准多层执行
-3. **review** — 多维度代码审查：正确性、可读性、性能、安全、测试、架构
-4. **test-gen** — 覆盖率缺口分析 + 自动测试生成（TDD/E2E 分类，L0-L3 渐进层）
-5. **test** — 交互式 UAT：探索性测试，会话持久化，缺口闭环
-
-### 3. 分层命令拓扑
-
-命令按四层组织：**上游起源层**（brainstorm 发散、blueprint 收敛）、**理解层**（analyze 双层模式：宏观探索影响面 + 微观 Phase 级深入）、**编排层**（roadmap — 可选，纯 Milestone > Phase 分解）、**执行层**（plan → execute → verify）。6 条规范路径（Path A–F）覆盖从全新项目到小修复的所有场景。64 个斜杠命令覆盖 7 大类别，所有产物存放于 `.workflow/scratch/`，由 `state.json` 追踪。
-
-### 4. Issue 闭环
-
-Issue 是自修复管线：discover → analyze → plan → execute → close。质量命令自动为发现的问题创建 Issue，修复代码回流到阶段管线。
-
-### 5. 可视化仪表盘
-
-实时看板 `http://127.0.0.1:3001`，React 19 + Tailwind CSS 4 + WebSocket 实时更新。Kanban 看板、甘特时间线、可排序表格、指挥中心。在 Issue 卡片上选择智能体，一键派发。
+你不需要编写 pipeline YAML。用自然语言描述意图，Maestro 将其分类到 **40+ 链类型**中，每种都是预组合的命令序列。同一意图在不同项目状态下产生不同的链：
 
 ```bash
-maestro serve                  # → http://127.0.0.1:3001
-maestro view                   # 终端 TUI 替代方案
-maestro command-help           # 在浏览器中打开交互式命令参考（别名: ch）
+/maestro "添加用户个人资料页"
+# → 新项目:     brainstorm → blueprint → analyze → plan → execute → verify
+# → 已有项目:    analyze → plan → execute → verify
+# → 快速修复:    plan → execute → verify
 ```
 
-### 6. 多智能体引擎
+### 分层命令拓扑
 
-并行协调 Claude Code、Codex、Gemini、Qwen、OpenCode。波次执行 — 独立任务并行，依赖任务等待前置完成。
+命令按四层组织：
 
-### 7. 智能知识库
+| 层级 | 用途 | 命令 |
+|------|------|------|
+| **起源层** | 发散创意，收敛方向 | brainstorm、blueprint |
+| **理解层** | 探索范围（宏观）+ 深入研究（微观） | analyze（双模式） |
+| **编排层** | 组织为里程碑和阶段 | roadmap |
+| **执行层** | 计划、实现、验证 | plan、execute、verify、review、test |
 
-Wiki 知识图谱支持 BM25 搜索、反向链接遍历、健康评分。学习工具箱（retro、follow、decompose、investigate、second-opinion）汇入统一的 `lessons.jsonl` 知识库。
+6 条规范路径（A–F）覆盖从全新项目到单行修复的所有场景。
+
+### 多智能体调度
+
+Maestro 通过四种可组合的编排模式协调 **Claude Code、Codex、Gemini、Qwen、OpenCode**：
+
+| 模式 | 工作方式 |
+|------|---------|
+| **Delegate** | 通过 `maestro delegate` 派发到任意 CLI 工具，SQLite 任务中介管理异步执行，支持消息注入和链式调用 |
+| **Team** | 协调器-工人架构 — 协调器生成角色规格，并行派生 `team-worker` agent，由常驻质量观察者监督 |
+| **Wave** | 任务拓扑排序为依赖波次，波次内独立任务并行执行 |
+| **Swarm** | ACO 蚁群驱动的多智能体探索，信息素引导收敛 |
+
+这些模式可以**组合**：团队协调器可将子任务委托给不同的 LLM 后端，波次执行并行化独立工作，仪表盘提供实时监控 — 所有模式共享中介和消息总线作为协调原语。
 
 ---
 
-## 命令与 Agent
+## 知识系统
 
-| 类别 | 数量 | 前缀 | 用途 |
-|------|------|------|------|
-| **核心工作流** | 32 | `maestro-*` | 全生命周期 — ralph、init、brainstorm、blueprint、analyze、roadmap、plan、execute、verify、milestones、overlays、swarm、companion |
-| **管理** | 10 | `manage-*` | Issue 生命周期、代码库文档、知识捕获、记忆管理、状态 |
-| **质量** | 7 | `quality-*` | review、test、debug、test-gen、business-test、refactor、sync |
-| **学习** | 4 | `learn-*` | 复盘、跟读、模式拆解、探究 |
-| **规范** | 4 | `spec-*` | setup、add、load、analytics |
-| **奥德赛** | 5 | `odyssey-*` | 学术研究工作流 — 文献综述、实验、论文草稿、数据管线、论文结构 |
-| **安全** | 1 | `security-*` | 安全审计 |
+### 知识图谱
 
-`.claude/agents/` 下 23 个专业化 Agent 定义，Claude Code 按需加载。
+SQLite 支撑的统一图数据库，同时存储**代码结构**（函数、类、调用链，通过 tree-sitter 提取）和**项目知识**（spec、knowhow、领域术语、issue），合并在一个可查询的结构中。
+
+```bash
+maestro kg search <symbol>        # 查找节点
+maestro kg context <node>         # 获取上下文
+maestro kg callers <function>     # 追溯调用链
+maestro kg callees <function>     # 追溯依赖
+```
+
+### Spec 注入
+
+项目规则（编码规范、架构约束、质量标准）以带关键词标签的 `<spec-entry>` 格式存储。**Hook 自动将相关 spec 注入每个 agent 的提示词** — agent 无需手动加载即可获得项目专属规则。
+
+### 自增强学习循环
+
+```
+Agent 执行任务
+    → 发现模式/陷阱/决策
+    → 持久化为 spec 条目或 knowhow 文档
+    → Hook 系统索引新知识
+    → 未来 agent 通过提示词注入自动获取
+    → 更好的执行 → 更多发现 → ...
+```
+
+四个学习工具驱动这个循环：`learn-retro`（复盘）、`learn-follow`（模式学习）、`learn-decompose`（架构拆解）、`learn-investigate`（深度探究）。
+
+### Wiki 与搜索
+
+WikiIndexer 遍历 `.workflow/` 目录，解析 frontmatter，构建反向链接图，并创建 **BM25 倒排索引**用于全文搜索 — 覆盖所有项目知识：spec、knowhow、issue 以及 KG 节点的虚拟条目。
 
 ---
 
-## 架构
+## Issue 闭环
+
+Issue 不仅是工单，更是自修复管线：
+
+```
+discover → analyze → plan → execute → close
+    ▲                                    │
+    └────── 质量命令自动创建 ──────────────┘
+```
+
+质量命令（review、test、verify）自动为发现的问题创建 Issue，修复代码回流到阶段管线。
+
+---
+
+## 可视化仪表盘
+
+实时仪表盘 `http://127.0.0.1:3001` — Kanban 看板、甘特时间线、可排序表格、指挥中心。在 Issue 卡片上选择智能体，一键派发。
+
+```bash
+maestro serve                  # 启动 Web 仪表盘
+maestro view                   # 终端 TUI 替代方案
+maestro command-help           # 交互式命令参考（别名: ch）
+```
+
+基于 React 19、Zustand、Tailwind CSS 4、Framer Motion、Hono、WebSocket 构建。
+
+---
+
+## 项目概览
+
+| 指标 | 数量 |
+|------|------|
+| 源文件 (TypeScript) | 446 |
+| 代码行数 | ~111,000 |
+| 斜杠命令 | 64 |
+| 工作流定义 | 115 |
+| 技能包 | 45 |
+| Agent 定义 | 23 |
+| CLI 命令 | 32 |
+| 模板 | 92 |
+| 指南（双语） | 66 |
+
+### 技术栈
+
+| 层级 | 技术 |
+|------|------|
+| CLI | Commander.js, TypeScript, ESM |
+| MCP | @modelcontextprotocol/sdk (stdio) |
+| 知识图谱 | better-sqlite3, Drizzle ORM, web-tree-sitter |
+| 前端 | React 19, Zustand, Tailwind CSS 4, Framer Motion, Radix UI |
+| 后端 | Hono, WebSocket, SSE |
+| 智能体 | Claude Agent SDK, Codex CLI, Gemini CLI, OpenCode |
+| 构建 | Vite 6, TypeScript 5.7, Vitest |
+
+### 架构
 
 ```
 maestro/
 ├── bin/                     # CLI 入口
 ├── src/                     # 核心 CLI (Commander.js + MCP SDK)
-│   ├── commands/            # 32 个 CLI 命令 (serve, run, cli, ext, tool, ...)
+│   ├── commands/            # 32 个 CLI 命令
 │   ├── mcp/                 # MCP 服务器 (stdio 传输)
+│   ├── graph/               # 知识图谱 (SQLite + tree-sitter)
 │   └── core/                # 工具注册、扩展加载器
 ├── dashboard/               # 实时 Web 仪表盘
 │   └── src/
@@ -149,37 +263,40 @@ maestro/
 │       └── shared/          # 共享类型
 ├── .claude/
 │   ├── commands/            # 64 个斜杠命令 (.md)
-│   └── agents/              # 23 个 Agent 定义 (.md)
-├── workflows/               # 75 个工作流实现 (.md)
-├── templates/               # JSON 模板 (task, plan, issue, ...)
+│   ├── agents/              # 23 个 Agent 定义 (.md)
+│   └── skills/              # 45 个技能包
+├── workflows/               # 115 个工作流定义 (.md)
+├── templates/               # 92 个 JSON 模板
 └── extensions/              # 插件系统
 ```
-
-| 层级 | 技术 |
-|------|------|
-| CLI | Commander.js, TypeScript, ESM |
-| MCP | @modelcontextprotocol/sdk (stdio) |
-| 前端 | React 19, Zustand, Tailwind CSS 4, Framer Motion, Radix UI |
-| 后端 | Hono, WebSocket, SSE |
-| 智能体 | Claude Agent SDK, Codex CLI, Gemini CLI, OpenCode |
-| 构建 | Vite 6, TypeScript 5.7, Vitest |
 
 ---
 
 ## 文档
 
-- **[Maestro Ralph 指南](guide/maestro-ralph-guide.md)** — 自适应生命周期引擎：位置推断、decision 节点、质量模式、重试升级
-- **[命令使用指南](guide/command-usage-guide.md)** — 全部 64 个命令，含工作流图表、管线衔接、Issue 闭环
-- **[命令参考 (HTML)](guide/command-usage-guide.html)** — 交互式 HTML 版本，支持搜索、卡片网格、工作流示例（`maestro command-help` 打开）
-- **[CLI 命令参考](guide/cli-commands-guide.en.md)** — 全部 32 个终端命令：install、delegate、coordinate、wiki、hooks、overlay、collab
-- **[Spec 系统指南](guide/spec-system-guide.md)** — `<spec-entry>` 格式、keyword 加载、验证 Hook、session dedup 注入
-- **[Delegate 异步执行指南](guide/delegate-async-guide.md)** — 异步任务委派：CLI & MCP 用法、消息注入、链式调用
-- **[Overlay 系统指南](guide/overlay-guide.md)** — 非侵入式命令扩展：格式、section 注入、bundle 打包/导入
-- **[Hook 系统指南](guide/hooks-guide.md)** — Hook 系统架构、17 个 Hook、Spec 注入、上下文预算
-- **[Worktree 并行开发指南](guide/worktree-guide.md)** — 里程碑级 worktree 并行：fork、sync、merge、dashboard 集成
-- **[Collab 协作 — 使用指南](guide/team-lite-guide.md)** — 2-8 人小团队协作
-- **[Collab 协作 — 设计文档](guide/team-lite-design.md)** — 架构、数据模型、命名空间边界
-- **[MCP 工具参考](guide/mcp-tools-guide.en.md)** — 全部 9 个 MCP 端点工具
+**快速入门**
+- **[快速开始指南](guide/quick-start-guide.md)** — 安装、第一个工作流、核心概念
+- **[Maestro Ralph 指南](guide/maestro-ralph-guide.md)** — 自适应生命周期引擎、decision 节点、质量模式
+
+**工作流**
+- **[命令使用指南](guide/command-usage-guide.md)** — 全部 64 个命令，含工作流图表和管线衔接
+- **[CLI 命令参考](guide/cli-commands-guide.md)** — 全部 32 个终端命令
+- **[工作流结构指南](guide/workflow-structure-guide.md)** — 命令拓扑、链组合
+- **[质量管线指南](guide/quality-pipeline-guide.md)** — verify、review、test 管线
+- **[Maestro 协调器指南](guide/maestro-coordinator-guide.md)** — 多智能体协调模式
+
+**知识系统**
+- **[知识管理指南](guide/knowledge-management-guide.md)** — KG、spec、knowhow、wiki
+- **[Spec 系统指南](guide/spec-system-guide.md)** — spec 条目、关键词加载、验证 Hook
+- **[Hook 系统指南](guide/hooks-guide.md)** — 17 个 Hook、Spec 注入、上下文预算
+- **[学习工具指南](guide/learn-tools-guide.md)** — 复盘、跟读、拆解、探究
+
+**进阶**
+- **[Delegate 异步执行指南](guide/delegate-async-guide.md)** — 多 CLI 委派、消息注入、链式调用
+- **[Overlay 系统指南](guide/overlay-guide.md)** — 非侵入式命令扩展
+- **[Worktree 并行开发指南](guide/worktree-guide.md)** — 里程碑级并行开发
+- **[MCP 工具参考](guide/mcp-tools-guide.md)** — 全部 9 个 MCP 端点工具
+- **[Collab 协作指南](guide/team-lite-guide.md)** — 2-8 人团队协作
 
 ---
 
@@ -187,6 +304,7 @@ maestro/
 
 - **[GET SHIT DONE](https://github.com/gsd-build/get-shit-done)** by TACHES — 规格驱动开发模型和上下文工程理念。
 - **[Claude-Code-Workflow](https://github.com/catlog22/Claude-Code-Workflow)** — 前身项目，开创了多 CLI 编排和 skill 路由工作流。
+- **[Impeccable](https://github.com/pbakaus/impeccable)** by [@pbakaus](https://github.com/pbakaus) — UI 设计技能，集成为 `maestro-impeccable`。基于 [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0) 许可。
 
 ## 贡献者
 
