@@ -293,7 +293,7 @@ Read `.workflow/state.json` and route by condition:
      "scope_verdict": null, "analyze_macro_id": null, "blueprint_id": null,
      "auto_mode": false,
      "context": { "issue_id": null, "scratch_dir": null, "plan_dir": null,
-       "analysis_dir": null, "brainstorm_dir": null, "blueprint_dir": null },
+       "analysis_dir": null, "brainstorm_dir": null, "blueprint_dir": null, "grill_id": null },
      "steps": [{
        "index": 0, "type": "skill|decision",
        "skill": "", "args": "",
@@ -328,12 +328,27 @@ Read `.workflow/state.json` and route by condition:
 
 Direct in-context skill invocation — **replaces the old spawn/wave/CSV mechanism**.
 
-1. **buildSkillCall**: replace placeholders `{phase}`/`{plan_dir}`/`{analysis_dir}`/`{brainstorm_dir}`/`{spec_session_id}`; append auto-yes flag if `auto_mode` (see Appendix: Auto-Yes Flag Map)
+1. **buildSkillCall**: replace placeholders + append auto-yes flag if `auto_mode` (see Appendix: Auto-Yes Flag Map):
+
+   | Placeholder | Source |
+   |-------------|--------|
+   | `{phase}` | session.phase |
+   | `{plan_dir}` | session.context.plan_dir |
+   | `{analysis_dir}` | session.context.analysis_dir |
+   | `{brainstorm_dir}` | session.context.brainstorm_dir |
+   | `{spec_session_id}` | session.context.spec_session_id |
+   | `{GRL}` | session.context.grill_id |
+   | `{ANL}` | session.analyze_macro_id |
+   | `{BLP}` | session.blueprint_id |
+   | `{intent}` | session.intent |
+
+   **--from auto-injection**: 当 step 是 `maestro-plan`，args 含 `{phase}` 但无 `--from` 且无 `--dir`，且 `session.context.analysis_dir` 已填充 → 查 state.json 同 phase+milestone 最新 completed analyze artifact → 注入 `--from analyze:{id}`，写 `step.source_artifact_ref`
 2. Mark step `status="running"`, persist status.json + `update_plan` (this step → in_progress)
 3. **Invoke the skill directly**: execute `$skill {resolved_args}` in coordinator context (NO spawn). Read its produced artifacts directly
 4. On success: capture summary; mark step `status="done"`. **Barrier-context update** (when step is a context-producing skill):
    | Skill | Read | Context Updates |
    |-------|------|-----------------|
+   | maestro-grill | grill-report.md, state.json | grill_id |
    | maestro-analyze | context.md, state.json | analysis_dir, gaps, phase |
    | maestro-plan | plan.json, .task/TASK-*.json | plan_dir, task_count |
    | maestro-brainstorm | .brainstorming/ | brainstorm_dir, features |

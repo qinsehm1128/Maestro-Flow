@@ -15,14 +15,31 @@ Wave 3 compares Decision Digests from each role's `analysis.md` §2 and patches 
 <context>
 $ARGUMENTS — topic text and optional flags.
 
-**Flags**: `-y` (auto), `-c N` (concurrency, default 6), `--continue` (resume), `--count N` (roles, default 3 max 9), `--skip-questions`, `--review-only` (skip Wave 1/2; run Wave 3 only against existing */analysis.md)
+**Flags**: `-y` (auto), `-c N` (concurrency, default 6), `--continue` (resume), `--count N` (roles, default 3 max 9), `--skip-questions`, `--review-only` (skip Wave 1/2; run Wave 3 only against existing */analysis.md), `--from <source>` (load upstream context package)
+
+**--from resolution** (upstream context loading):
+```
+--from grill:ID     → state.json.artifacts[type=grill, id=ID].context_package → load context-package.json
+--from blueprint:ID → state.json.artifacts[type=blueprint, id=ID].context_package → load
+--from @file        → load file directly as context-package.json
+--from path/        → load path/context-package.json
+```
+When loaded, pre-seed guidance-specification.md with:
+- `constraints[status=locked]` → §4 locked decisions (skip in interview)
+- `domain.terminology[]` → §2 Concepts & Terminology (seed)
+- `non_goals[]` → §3 Non-Goals (seed)
+- `open_questions[]` → interview priority topics
+- `insights[]` → W2 role analysis context
+
+When `--from` is absent, auto-discover from state.json: latest `type=grill` artifact in same milestone → load its `context_package` if available. No match → proceed without upstream context.
 
 **9 valid roles**: data-architect, product-manager, product-owner, scrum-master, subject-matter-expert, system-architect, test-strategist, ui-designer, ux-expert
 
-### Pre-load specs
+### Pre-load
 1. **Architecture specs**: `maestro spec load --category arch` — load architecture constraints as context for multi-role design (roles respect documented decisions).
 2. **Role Knowledge**: `maestro search --category arch` → identify relevant entries → `maestro wiki load <id1> [id2...]`
-3. Both optional — proceed without if unavailable.
+3. **Project context**: Read `.workflow/project.md` (if exists) → Validated requirements (already shipped) as constraints, Active requirements as current scope. Read `state.json.accumulated_context` → deferred items as brainstorming seeds, key_decisions as locked constraints.
+4. All optional — proceed without if unavailable.
 
 **Session**: `.workflow/.csv-wave/{YYYYMMDD}-brainstorm-{slug}/`
 
@@ -432,7 +449,16 @@ Protocol: read before analysis, append-only, dedup by type+key.
 - [ ] discoveries.ndjson append-only throughout
 - [ ] context.md aggregates session results with next-step routing
 - [ ] Session sealed via finish-work (auto mode only)
+- [ ] Ralph-invoked: `maestro ralph complete <idx> --status {STATUS}` called with correct verdict
 </success_criteria>
+
+<ralph_completion>
+When invoked as a ralph session step, end by calling the CLI (no standalone report):
+```
+maestro ralph complete <idx> --status {STATUS} [--evidence {path}]
+```
+Status verdicts: **DONE** (normal), **DONE_WITH_CONCERNS** (caveats; pass `--concerns`), **NEEDS_RETRY** (transient error), **BLOCKED** (hard blocker; pass `--reason`).
+</ralph_completion>
 
 <on_complete>
 @~/.maestro/workflows/finish-work.md — SESSION_DIR={output_dir}, SESSION_TYPE=brainstorm, SESSION_ID={artifact_id}, LINKED_MILESTONE=null

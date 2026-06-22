@@ -110,7 +110,16 @@ Resume routing:
 - [ ] `context-package.json` generated with schema "context-package/1.0"
 - [ ] Artifact registered in state.json (type=grill, id=GRL-xxx)
 - [ ] Session sealed via finish-work
+- [ ] Ralph-invoked: `maestro ralph complete <idx> --status {STATUS}` called with correct verdict
 </success_criteria>
+
+<ralph_completion>
+When invoked as a ralph session step, end by calling the CLI (no standalone report):
+```
+maestro ralph complete <idx> --status {STATUS} [--evidence {path}]
+```
+Status verdicts: **DONE** (normal), **DONE_WITH_CONCERNS** (caveats; pass `--concerns`), **NEEDS_RETRY** (transient error), **BLOCKED** (hard blocker; pass `--reason`).
+</ralph_completion>
 
 <on_complete>
 @~/.maestro/workflows/finish-work.md — SESSION_DIR={output_dir}, SESSION_TYPE=grill, SESSION_ID={artifact_id}, LINKED_MILESTONE=null

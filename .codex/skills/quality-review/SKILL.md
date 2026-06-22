@@ -413,4 +413,13 @@ echo '{"ts":"<ISO>","worker":"{id}","type":"vulnerability","data":{"location":"s
 - [ ] Issues auto-created for qualifying severity findings
 - [ ] Phase index.json updated with review status
 - [ ] discoveries.ndjson append-only throughout
+- [ ] Ralph-invoked: `maestro ralph complete <idx> --status {STATUS}` called with correct verdict
 </success_criteria>
+
+<ralph_completion>
+When invoked as a ralph session step, end by calling the CLI (no standalone report):
+```
+maestro ralph complete <idx> --status {STATUS} [--evidence {path}]
+```
+Status verdicts: **DONE** (normal), **DONE_WITH_CONCERNS** (caveats; pass `--concerns`), **NEEDS_RETRY** (transient error), **BLOCKED** (hard blocker; pass `--reason`).
+</ralph_completion>

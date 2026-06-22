@@ -27,10 +27,17 @@ $ARGUMENTS -- phase number, topic text, and optional flags.
 - `--continue`: Resume existing session
 - `-q, --quick`: Skip exploration + scoring, Wave 3 only
 - `--gaps [ISS-ID]`: Issue root cause analysis. If ISS-ID: single issue. If omitted: all open/registered from issues.jsonl.
-- `--from <source>`: Load upstream context package (brainstorm:ID, analyze:ID, @file, or path). Resolves to context-package.json for upstream context inheritance.
+- `--from <source>`: Load upstream context package (grill:ID, brainstorm:ID, analyze:ID, blueprint:BLP-xxx, @file, or path). Resolves to context-package.json via state.json artifact lookup for typed references, or direct path for @file/path.
 
 **Session**: `.workflow/.csv-wave/{YYYYMMDD}-analyze-{slug}/`
 **Output**: tasks.csv, results.csv, discoveries.ndjson, context.md, context-package.json (all modes), analysis.md + conclusions.json (full mode AND quick mode; quick writes minimal conclusions.json with `scope_verdict` + `implementation_scope[]` only)
+
+### Pre-load (runs unconditionally, including -y auto mode)
+1. **Codebase docs**: IF `.workflow/codebase/doc-index.json` exists → Read ARCHITECTURE.md for module boundaries
+2. **Specs**: `maestro spec load --category arch` — load architecture constraints
+3. **Wiki search**: `maestro search "{topic keywords}" --json` → top 5-10 entries as prior knowledge
+4. **Role Knowledge**: `maestro search --category debug` → select relevant → `maestro wiki load`
+5. All optional — proceed without if unavailable (log warning)
 </context>
 
 <interview_protocol>
@@ -310,7 +317,16 @@ Protocol: read before analysis, append-only, dedup by type+key.
 - [ ] discoveries.ndjson append-only throughout
 - [ ] Next step routed (plan for Go, brainstorm for No-Go, plan --gaps for Gaps)
 - [ ] Session sealed via finish-work (archive.json written, optional spec/knowhow extraction)
+- [ ] Ralph-invoked: `maestro ralph complete <idx> --status {STATUS}` called with correct verdict
 </success_criteria>
+
+<ralph_completion>
+When invoked as a ralph session step, end by calling the CLI (no standalone report):
+```
+maestro ralph complete <idx> --status {STATUS} [--evidence {path}]
+```
+Status verdicts: **DONE** (normal), **DONE_WITH_CONCERNS** (caveats; pass `--concerns`), **NEEDS_RETRY** (transient error), **BLOCKED** (hard blocker; pass `--reason`).
+</ralph_completion>
 
 <on_complete>
 @~/.maestro/workflows/finish-work.md — SESSION_DIR=OUTPUT_DIR, SESSION_TYPE=analyze, SESSION_ID={artifact_id}, LINKED_MILESTONE={target_milestone or null}
