@@ -74,7 +74,7 @@ interface WeightedTerm {
   weight: number;
 }
 
-function expandQueryTerms(tokens: string[]): WeightedTerm[] {
+function expandQueryTerms(tokens: string[], index?: InvertedIndex): WeightedTerm[] {
   const seen = new Set<string>();
   const weighted: WeightedTerm[] = [];
 
@@ -100,6 +100,27 @@ function expandQueryTerms(tokens: string[]): WeightedTerm[] {
       if (!seen.has(v)) {
         seen.add(v);
         weighted.push({ term: v, weight: 0.5 });
+      }
+    }
+  }
+
+  // IDF-aware reweighting: boost specific terms, dampen generic ones in long queries
+  if (index && tokens.length > 3) {
+    const fp = index.fieldPostings;
+    const N = index.totalDocs;
+    if (N > 0) {
+      const originals = weighted.filter(wt => wt.weight === 1.0);
+      const idfs = originals.map(wt => {
+        const df = fp.get(wt.term)?.length ?? 0;
+        return Math.log(1 + (N - df + 0.5) / (df + 0.5));
+      });
+      if (idfs.length > 1) {
+        const sorted = [...idfs].sort((a, b) => a - b);
+        const medianIdf = sorted[Math.floor(sorted.length / 2)];
+        for (let i = 0; i < originals.length; i++) {
+          if (idfs[i] > medianIdf * 1.5) originals[i].weight = 1.3;
+          else if (idfs[i] < medianIdf * 0.5) originals[i].weight = 0.7;
+        }
       }
     }
   }
@@ -206,22 +227,38 @@ function cjkNgrams(run: string): string[] {
 export function tokenize(text: string): string[] {
   if (!text) return [];
   const out: string[] = [];
-  const parts = text.toLowerCase().split(/[^\p{L}\p{N}]+/u);
-  for (const p of parts) {
-    if (!p) continue;
-    if (HAS_CJK.test(p)) {
-      const cjkRuns = p.match(CJK_RUN) ?? [];
+  // Split preserving original case so camelCase boundaries are detectable
+  const rawParts = text.split(/[^\p{L}\p{N}]+/u);
+  for (const raw of rawParts) {
+    if (!raw) continue;
+    const lower = raw.toLowerCase();
+    if (HAS_CJK.test(lower)) {
+      const cjkRuns = lower.match(CJK_RUN) ?? [];
       for (const run of cjkRuns) {
         for (const g of cjkNgrams(run)) out.push(g);
       }
-      const latinRemainder = p.replace(CJK_RUN, ' ').split(/\s+/).filter(Boolean);
+      const latinRemainder = lower.replace(CJK_RUN, ' ').split(/\s+/).filter(Boolean);
       for (const lr of latinRemainder) {
         if (lr.length >= 2 && !STOP_WORDS.has(lr)) out.push(lr);
       }
     } else {
-      if (p.length < 2) continue;
-      if (STOP_WORDS.has(p)) continue;
-      out.push(p);
+      // CamelCase split: "DetailedTopologySVG" → ["Detailed","Topology","SVG"]
+      const camelParts = raw
+        .replace(/([a-z])([A-Z])/g, '$1\x00$2')
+        .replace(/([A-Z]+)([A-Z][a-z])/g, '$1\x00$2')
+        .split('\x00');
+      if (camelParts.length > 1) {
+        for (const cp of camelParts) {
+          const lc = cp.toLowerCase();
+          if (lc.length >= 2 && !STOP_WORDS.has(lc)) out.push(lc);
+        }
+        // Keep full joined form for exact identifier matching
+        if (lower.length >= 2 && !STOP_WORDS.has(lower)) out.push(lower);
+      } else {
+        if (lower.length < 2) continue;
+        if (STOP_WORDS.has(lower)) continue;
+        out.push(lower);
+      }
     }
   }
   return out;
@@ -371,7 +408,7 @@ export function searchBM25(
   const terms = tokenize(query);
   if (terms.length === 0 || index.totalDocs === 0) return [];
 
-  const weighted = expandQueryTerms(terms);
+  const weighted = expandQueryTerms(terms, index);
   const fetchLimit = (credibilityFactors && credibilityFactors.size > 0) ? limit * 2 : limit;
   const results = searchBM25F(index, weighted, fetchLimit);
 

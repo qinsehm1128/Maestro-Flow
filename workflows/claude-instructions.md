@@ -11,12 +11,27 @@
 
 ## Knowledge System
 
-**Gate rule: On any coding/modification/debugging task, the FIRST tool call MUST be `maestro search`. Do NOT read code or edit files until search is done.**
+**Gate rule: On any coding/modification/debugging task, run `maestro search` BEFORE reading code or editing files. Use targeted queries — multiple short searches beat one long one.**
 
 ### Required search (every task, no exceptions)
 
 ```bash
-maestro search "<feature/module keywords>"
+maestro search "<1-3 word topic phrase>"
+```
+
+**Query rules:**
+- Use **1-3 core keywords** per query — never dump all context into one search
+- Separate concepts from symbols: `maestro search "topology layout"` then `maestro search "DetailedTopologySVG" --code`
+- Run multiple targeted searches rather than one broad query
+
+```bash
+# ❌ Bad: keyword dump (5+ unrelated terms → diluted BM25 scores)
+maestro search "topology display frontend DetailedTopologySVG elk"
+
+# ✅ Good: targeted multi-search
+maestro search "topology layout"
+maestro search "DetailedTopologySVG" --code
+maestro search "elk layout" --type knowhow
 ```
 
 Then add follow-up searches based on results:

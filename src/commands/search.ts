@@ -234,6 +234,10 @@ export function registerSearchCommand(program: Command): void {
         console.log(`Search: "${q}" (${wikiResults.length} results)`);
       }
 
+      if (qTerms.length > 4) {
+        console.log(`  Hint: ${qTerms.length} terms detected — split into 1-3 keyword queries for better precision`);
+      }
+
       if (wikiResults.length === 0 && codeResults.length === 0) {
         console.log('  No matches found.');
         return;

@@ -185,6 +185,24 @@ describe('BM25 stress — 2000-doc corpus', () => {
   it('tokenize drops stop words and sub-2-char tokens', () => {
     expect(tokenize('a The an Quick I am')).toEqual(['quick', 'am']);
   });
+
+  it('tokenize splits camelCase identifiers into component tokens', () => {
+    const tokens = tokenize('DetailedTopologySVG');
+    expect(tokens).toContain('detailed');
+    expect(tokens).toContain('topology');
+    expect(tokens).toContain('svg');
+    expect(tokens).toContain('detailedtopologysvg');
+  });
+
+  it('tokenize handles mixed camelCase and regular words', () => {
+    const tokens = tokenize('the UserService handles auth');
+    expect(tokens).toContain('user');
+    expect(tokens).toContain('service');
+    expect(tokens).toContain('userservice');
+    expect(tokens).toContain('handles');
+    expect(tokens).toContain('auth');
+    expect(tokens).not.toContain('the');
+  });
 });
 
 // ---------------------------------------------------------------------------

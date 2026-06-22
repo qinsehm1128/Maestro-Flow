@@ -1,34 +1,105 @@
 # Codex Code Guidelines
-## Delegate & CLI
+
 
 - **Delegate Usage**: @~/.maestro/workflows/delegate-usage.md
 - **CLI Endpoints Config**: @~/.maestro/cli-tools.json
 
 **Strictly follow the cli-tools.json configuration**
 
-## Core Principles
+# Coding Philosophy
 
-- Follow project's existing patterns and conventions
-- Single responsibility, DRY, YAGNI
-- Small testable changes, commit frequently
-- Study 3+ similar patterns before implementing
-- Boring solutions over clever code
+## Core Beliefs
 
-**Git Operations:**
-- Only stage/commit files produced by current task
-- Use `git add <specific-files>` instead of `git add .`
+- **Pursue good taste** - Eliminate edge cases to make code logic natural and elegant
+- **Embrace extreme simplicity** - Complexity is the root of all evil
+- **Be pragmatic** - Code must solve real-world problems, not hypothetical ones
+- **Data structures first** - Bad programmers worry about code; good programmers worry about data structures
+- **Never break backward compatibility** - Existing functionality is sacred and inviolable
+- **Incremental progress over big bangs** - Small changes that compile and pass tests
+- **Learning from existing code** - Study and plan before implementing
+- **Clear intent over clever code** - Be boring and obvious
+- **Follow existing code style** - Match import patterns, naming conventions, and formatting of existing codebase
+- **Minimize changes** - Only modify what's directly required; avoid refactoring, adding features, or "improving" code beyond the request
+- **No unsolicited documentation** - NEVER generate reports, documentation files, or summaries without explicit user request. If required, save to .workflow/.scratchpad/
 
-**Multi-CLI Coexistence (CRITICAL):**
-- Conflicts with uncommitted changes → **STOP and report**, never overwrite
+## Simplicity Means
+
+- Single responsibility per function/class
+- Avoid premature abstractions
+- No clever tricks - choose the boring solution
+- If you need to explain it, it's too complex
+
+## Fix, Don't Hide
+
+**Solve problems, don't silence symptoms** - Skipped tests, `@ts-ignore`, empty catch, `as any`, excessive timeouts = hiding bugs, not fixing them
+
+**NEVER**:
+- Make assumptions - verify with existing code
+- Generate reports, summaries, or documentation files without explicit user request
+- Use suppression mechanisms (`skip`, `ignore`, `disable`) without fixing root cause
+
+**ALWAYS**:
+- Plan complex tasks thoroughly before implementation
+- Generate task decomposition for multi-module work (>3 modules or >5 subtasks)
+- Track progress using TODO checklists for complex tasks
+- Validate planning documents before starting development
+- Commit working code incrementally
+- Update plan documentation and progress tracking as you go
+- Learn from existing implementations
+- Stop after 3 failed attempts and reassess
+- **Edit fallback**: When Edit tool fails 2+ times on same file, try Bash sed/awk first, then Write to recreate if still failing
+
+## Learning the Codebase
+
+- Find 3 similar features/components
+- Identify common patterns and conventions
+- Use same libraries/utilities when possible
+- Follow existing test patterns
+
+## Tooling
+
+- Use project's existing build system
+- Use project's test framework
+- Use project's formatter/linter settings
+- Don't introduce new tools without strong justification
+
+## Content Uniqueness Rules
+
+- **Each layer owns its abstraction level** - no content sharing between layers
+- **Reference, don't duplicate** - point to other layers, never copy content
+- **Maintain perspective** - each layer sees the system at its appropriate scale
+- **Avoid implementation creep** - higher layers stay architectural
+
+# Context Requirements
+
+Before implementation, always:
+- Identify 3+ existing similar patterns
+- Map dependencies and integration points
+- Understand testing framework and coding conventions
 
 ## Knowledge System
 
-**Gate rule: On any coding/modification/debugging task, the FIRST tool call MUST be `maestro search`. Do NOT read code or edit files until search is done.**
+**Gate rule: On any coding/modification/debugging task, run `maestro search` BEFORE reading code or editing files. Use targeted queries — multiple short searches beat one long one.**
 
 ### Required search (every task, no exceptions)
 
 ```bash
-maestro search "<feature/module keywords>"
+maestro search "<1-3 word topic phrase>"
+```
+
+**Query rules:**
+- Use **1-3 core keywords** per query — never dump all context into one search
+- Separate concepts from symbols: `maestro search "topology layout"` then `maestro search "DetailedTopologySVG" --code`
+- Run multiple targeted searches rather than one broad query
+
+```bash
+# ❌ Bad: keyword dump (5+ unrelated terms → diluted BM25 scores)
+maestro search "topology display frontend DetailedTopologySVG elk"
+
+# ✅ Good: targeted multi-search
+maestro search "topology layout"
+maestro search "DetailedTopologySVG" --code
+maestro search "elk layout" --type knowhow
 ```
 
 Then add follow-up searches based on results:
