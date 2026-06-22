@@ -1,7 +1,7 @@
 ---
 name: maestro-execute
 description: Use when a confirmed plan is ready for implementation
-argument-hint: "[-y|--yes] [-c|--concurrency N] [--continue] \"<phase> [--auto-commit] [--method agent|cli] [--dir <path>]\""
+argument-hint: "[-y|--yes] [--concurrency N] [-c|--continue] \"<phase> [--auto-commit] [--method agent|cli] [--dir <path>]\""
 allowed-tools: spawn_agents_on_csv, Read, Write, Edit, Bash, Glob, Grep, request_user_input
 ---
 
@@ -75,8 +75,8 @@ $maestro-execute --continue "20260318-execute-P3-phase3"
 
 **Flags**:
 - `-y, --yes`: Skip all confirmations (auto mode)
-- `-c, --concurrency N`: Max concurrent agents within each wave (default: 5)
-- `--continue`: Resume existing session
+- `--concurrency N`: Max concurrent agents within each wave (default: 5)
+- `-c, --continue`: Resume existing session
 
 **Inner flags** (passed inside quotes):
 - `--auto-commit`: Atomic git commit after each task completion
@@ -334,6 +334,28 @@ After each wave: if blocked tasks exist, prompt user to continue or stop (AUTO_Y
 #### Cascading Skip
 
 Blocked/failed tasks cascade: mark all downstream dependents as `skipped` with error "Dependency {dep_id} blocked/failed".
+
+### Phase 2.5: Verification Gate
+
+**Objective**: Cross-validate execution results against convergence criteria using external model perspective.
+
+1. **Collect verification targets**: For each completed task, read `.summaries/TASK-{NNN}-summary.md` + convergence criteria from `.task/TASK-{NNN}.json`
+2. **Delegate verification**: Run `maestro delegate` with accumulated evidence:
+   ```
+   maestro delegate "PURPOSE: 验证执行结果是否满足 convergence criteria
+   TASK: 逐项检查 | 对照 criteria | 标注 pass/fail | 汇总 gaps
+   CONTEXT: @.summaries/ @.task/
+   EXPECTED: verification.json { tasks: [{ id, criteria_met: bool, gaps: [] }], overall_pass: bool }
+   CONSTRAINTS: 只验证不修改" --role analyze --mode analysis
+   ```
+3. **Write verification.json** to plan directory with per-task pass/fail and gap list
+4. **Gate decision**:
+   - `overall_pass == true` → proceed to Phase 3
+   - Critical gaps (task criteria all failed) → log warning, mark affected tasks as `needs_retry`
+   - Non-critical gaps → record as `concerns` in verification.json, proceed
+5. **Register VRF artifact**: `{ id: "VRF-{next}", type: "verify", scope, path: verification.json, depends_on: "EXC-{id}" }`
+
+Skip Phase 2.5 when `--skip-verify` flag present or task count == 0.
 
 ### Phase 3: Results Aggregation
 

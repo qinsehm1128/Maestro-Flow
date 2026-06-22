@@ -181,7 +181,22 @@ Assembly agent produces roadmap.md with Milestone > Phase hierarchy (goal, depen
 3. Generate context.md (summary + analysis findings + roadmap stats)
 4. Write .workflow/roadmap.md with Milestone > Phase hierarchy
 5. Update state.json milestones + current_milestone
-6. Next-step routing: need analysis -> maestro-analyze; ready to plan -> maestro-plan; UI first -> maestro-impeccable build; need formal specs -> maestro-blueprint
+6. **Generate context-package.json** (schema `context-package/1.0`):
+   ```jsonc
+   {
+     "$schema": "context-package/1.0",
+     "source": { "type": "roadmap", "artifact_id": "RDM-{id}", "session_path": "...", "generated_at": "..." },
+     "requirements": [],       // from milestone phase goals → { id, title, acceptance }
+     "constraints": [],         // from scope decisions → locked items
+     "domain": {},              // inherit from upstream --from context-package if loaded
+     "non_goals": [],           // deferred scope items
+     "insights": [],            // from risk analysis and dependency findings
+     "open_questions": [],      // unresolved scope areas
+     "references": [{ "type": "roadmap", "path": "roadmap.md" }]
+   }
+   ```
+   Register `context_package` path in RDM artifact entry so downstream `--from roadmap:ID` can resolve.
+7. Next-step routing: need analysis -> maestro-analyze; ready to plan -> maestro-plan; UI first -> maestro-impeccable build; need formal specs -> maestro-blueprint
 
 </actions>
 

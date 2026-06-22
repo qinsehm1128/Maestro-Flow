@@ -1,7 +1,7 @@
 ---
 name: maestro-brainstorm
 description: Use when exploring ideas, evaluating approaches, or needing multi-perspective analysis before implementation
-argument-hint: "[topic] [-y|--yes] [-c|--concurrency N] [--continue] [--count N] [--skip-questions] [--review-only]"
+argument-hint: "[topic] [-y|--yes] [--concurrency N] [-c|--continue] [--count N] [--skip-questions] [--review-only]"
 allowed-tools: spawn_agents_on_csv, Read, Write, Edit, Bash, Glob, Grep, request_user_input
 ---
 
@@ -15,7 +15,7 @@ Wave 3 compares Decision Digests from each role's `analysis.md` §2 and patches 
 <context>
 $ARGUMENTS — topic text and optional flags.
 
-**Flags**: `-y` (auto), `-c N` (concurrency, default 6), `--continue` (resume), `--count N` (roles, default 3 max 9), `--skip-questions`, `--review-only` (skip Wave 1/2; run Wave 3 only against existing */analysis.md), `--from <source>` (load upstream context package)
+**Flags**: `-y` (auto), `--concurrency N` (default 6), `-c`/`--continue` (resume), `--count N` (roles, default 3 max 9), `--skip-questions`, `--review-only` (skip Wave 1/2; run Wave 3 only against existing */analysis.md), `--from <source>` (load upstream context package)
 
 **--from resolution** (upstream context loading):
 ```

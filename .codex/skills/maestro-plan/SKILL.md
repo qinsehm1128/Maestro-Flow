@@ -1,7 +1,7 @@
 ---
 name: maestro-plan
 description: Use when creating, revising, or verifying an execution plan for a phase or task
-argument-hint: "[-y|--yes] [-c|--concurrency N] [--continue] \"<phase> [--dir <path>] [--from <source>] [--gaps] [--spec SPEC-xxx] [--collab]\""
+argument-hint: "[-y|--yes] [--concurrency N] [-c|--continue] \"<phase> [--dir <path>] [--from <source>] [--gaps] [--spec SPEC-xxx] [--collab]\""
 allowed-tools: spawn_agents_on_csv, Read, Write, Edit, Bash, Glob, Grep, request_user_input
 ---
 
@@ -65,7 +65,7 @@ All mean: **follow the cycle anyway**.
 <context>
 $ARGUMENTS — phase number/text and optional flags.
 
-**Flags**: `-y` (auto), `-c N` (concurrency, default 4), `--continue` (resume), `--dir <path>`, `--from <source>` (load upstream context directly: analyze:ANL-xxx, blueprint:BLP-xxx, brainstorm:ID, @file, path), `--gaps` (issue-linked), `--spec SPEC-xxx`, `--collab`, `--revise`, `--check`, `--tdd` (RED-GREEN-REFACTOR task chains)
+**Flags**: `-y` (auto), `--concurrency N` (default 4), `-c`/`--continue` (resume), `--dir <path>`, `--from <source>` (load upstream context directly: analyze:ANL-xxx, blueprint:BLP-xxx, brainstorm:ID, @file, path), `--gaps` (issue-linked), `--spec SPEC-xxx`, `--collab`, `--revise`, `--check`, `--tdd` (RED-GREEN-REFACTOR task chains)
 
 **Scope routing** (priority, per redesign §5.2):
 1. `--from analyze:ANL-xxx` → CONTEXT_DIR = ANL artifact path; scope=`standalone`
@@ -89,6 +89,14 @@ Write resolved milestone into PLN artifact registration and `plan.json.milestone
 **Scratch**: `.workflow/scratch/{YYYYMMDD}-plan-P{N}-{slug}/` (.task/ subdir)
 
 **Pre-load** (optional): context-package.json (via `--from`, takes precedence), context.md (prior analyze), conclusions.json, codebase ARCHITECTURE.md, `maestro search`, `maestro spec load --category arch`, team preflight `maestro collab preflight`.
+
+**D-008 Ad-hoc Milestone Auto-Creation**: When scope resolves to `standalone` via standard resolution (routes 6 or 7, NOT via `--from`), and `state.json.current_milestone == null`, auto-create an adhoc milestone:
+```
+milestone_id = "ADH-{YYYYMMDD}-{slug}"
+state.json.milestones.push({ id: milestone_id, name: "{intent slug}", type: "adhoc", status: "active", phase_slugs: [] })
+state.json.current_milestone = milestone_id
+```
+**Exception**: `--from analyze:ANL-xxx` or `--from blueprint:BLP-xxx` → skip adhoc creation (upstream artifact provides milestone context or is intentionally milestone-free).
 </context>
 
 <csv_schema>
@@ -197,7 +205,22 @@ Each explores one angle: architecture (module boundaries, deps), patterns (simil
 Consumes all exploration findings + context.md + specs. Produces:
 - `plan.json`: summary, approach, task_ids, waves (with phase labels), confidence section
 - `.task/TASK-*.json`: each with read_first[], convergence.criteria[] (grep-verifiable), concrete action/implementation
-- Deep Work Rules: every task has read_first with file being modified + source of truth files
+
+**Deep Work Rules** (MANDATORY for every task):
+1. `read_first[]`: MUST contain the file being modified + source-of-truth files (tests, interfaces, schemas)
+2. `convergence.criteria[]`: MUST be grep-verifiable (e.g., `"src/auth.ts contains export function verifyToken("`) — no subjective language ("well-structured", "properly implemented")
+3. `action`: concrete implementation verb (create/modify/delete/refactor) + target path
+4. `implementation[]`: ordered steps with file:change pairs — each step < 60 min
+- Anti-pattern: `"Implement the feature"` (vague). Correct: `"Create src/auth.ts with verifyToken() and generateToken() functions using jsonwebtoken"`
+- Anti-pattern: `read_first: []` (empty). Every file change requires reading the target first.
+
+**Anti-splitting Rules**:
+1. One feature = one task (don't split "create auth module" into "create file" + "add exports")
+2. Group trivial changes (< 5 min each) into a single task
+3. `depends_on` only for genuine data/API dependencies, not arbitrary sequencing
+4. Task count guards: simple scope → 1-2 tasks, medium → 2-4, complex → 4-8
+
+**UI-observable criteria**: If plan touches UI paths (components/, pages/, styles/) or frontend keywords, at least 1 convergence criterion per delivery wave MUST be UI-observable (e.g., `"page renders without console errors"`, `"button click triggers API call"`).
 
 Verifies plan.json and every .task/*.json exists on disk before reporting completed; else report blocked.
 

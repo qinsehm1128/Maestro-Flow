@@ -1,7 +1,7 @@
 ---
 name: maestro-analyze
 description: Use when a topic needs structured multi-dimensional investigation before planning or decision-making
-argument-hint: "[-y|--yes] [-c|--concurrency N] [--continue] [--from <source>] \"<phase|topic> [-q|--quick] [--gaps [ISS-ID]]\""
+argument-hint: "[-y|--yes] [--concurrency N] [-c|--continue] [--from <source>] \"<phase|topic> [-q|--quick] [--gaps [ISS-ID]]\""
 allowed-tools: spawn_agents_on_csv, Read, Write, Edit, Bash, Glob, Grep, request_user_input
 ---
 
@@ -23,7 +23,8 @@ $ARGUMENTS -- phase number, topic text, and optional flags.
 
 **Flags**:
 - `-y, --yes`: Skip all confirmations (auto mode)
-- `-c, --concurrency N`: Max concurrent agents per wave (default: 6)
+- `--concurrency N`: Max concurrent agents per wave (default: 6)
+- `-c, --continue`: Resume existing session
 - `--continue`: Resume existing session
 - `-q, --quick`: Skip exploration + scoring, Wave 3 only
 - `--gaps [ISS-ID]`: Issue root cause analysis. If ISS-ID: single issue. If omitted: all open/registered from issues.jsonl.
