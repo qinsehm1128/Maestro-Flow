@@ -426,6 +426,9 @@ Generate steps from `session.lifecycle_position` to `milestone-complete`.
     - `analyze_macro_id` 存在且当前 step 是 `roadmap` → args 改为 `--from analyze:{analyze_macro_id}`
     - `analyze_macro_id` 存在且 `scope_verdict ∈ {medium, small}` 且当前 step 是 `plan` → args 改为 `--from analyze:{analyze_macro_id}`
     - `blueprint_id` 存在 → 当前 step 是 `plan` → args 改为 `--from blueprint:{blueprint_id}`（优先级低于 phase 数字参数）
+    - **phase-level deferred chaining**（独立模式，step 含 `{phase}` 占位符）：build 阶段前序 artifact 尚未产出，由 A_RESOLVE_ARGS（ralph-execute）运行时从 state.json 查找同 phase+milestone 最新 completed artifact 注入：
+      - `plan` step → `--from analyze:{phase_analyze_id}`，写 `source_artifact_ref`
+      - `execute` step → `--dir {plan_path}`（现有逻辑），写 `source_artifact_ref = "plan:{id}"`
     - 写入 `step.source_artifact_ref` 以便审计
 13. **D-007 Milestone-ref 标注**：每个含 `{phase}` 占位符的 step → `step.milestone_id = session.milestone`（由 A_RESOLVE_PHASE 反查得出），禁止读 `current_milestone`
 14. **动态插入步骤**（A_APPLY_*）同样应用规则 7-13
@@ -761,5 +764,8 @@ decision:post-goal-audit {retry+1}
 - [ ] Decision nodes 由 maestro delegate --role analyze 评估
 - [ ] Ralph 不执行 step，只 evaluate；`$maestro-ralph-execute` 直调 handoff
 - [ ] session.platform = "codex"；所有 CLI 调用携带 `--platform codex`
+- [ ] Phase-level deferred chaining：plan/execute step 的 `--from`/`--dir` 注入由 A_RESOLVE_ARGS（ralph-execute）运行时完成；build 阶段标记意图，不预知 artifact ID
+- [ ] Phase-level plan step 运行时获得 `--from analyze:{phase_analyze_id}`（由 ralph-execute 从 state.json 查找注入）
+- [ ] Phase-level execute step 运行时获得 `source_artifact_ref = "plan:{id}"`
 
 </appendix>
