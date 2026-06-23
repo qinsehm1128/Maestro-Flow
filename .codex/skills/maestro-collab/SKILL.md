@@ -100,7 +100,12 @@ S_FAN_OUT:
   → ERROR(E004)     WHEN: all failed OR fewer than 2 completed
 
 S_CROSS_VERIFY:
-  → S_SYNTHESIZE    DO: A_CROSS_VERIFY
+  → S_BOUNDARY_GRILL  DO: A_CROSS_VERIFY
+
+S_BOUNDARY_GRILL:
+  → S_SYNTHESIZE    WHEN: no boundary conflicts detected     DO: —
+  → S_SYNTHESIZE    WHEN: conflicts detected + resolved      DO: A_BOUNDARY_GRILL
+  GUARD: max 3 conflicts × 3 questions; non-blocking (see boundary-grill.md)
 
 S_SYNTHESIZE:
   → S_AGGREGATE     DO: A_SYNTHESIZE
@@ -229,6 +234,12 @@ Compute: `consensus_level = consensus_count / total_findings * 100`
 
 Write results to `{scratchDir}/cross-verify.md`.
 
+### A_BOUNDARY_GRILL
+
+Run boundary grill per `~/.maestro/workflows/boundary-grill.md` after cross-verification.
+Input: classified CONFLICT findings + per-tool outputs. Check upstream scope if `--from` used.
+IF conflicts → tag with resolution, feed into A_SYNTHESIZE. No conflicts → pass through.
+
 ### A_SYNTHESIZE
 
 Generate 3 output files from cross-verify results:
@@ -313,6 +324,8 @@ Generate 3 output files from cross-verify results:
 - [ ] Blocking poll loop ran until pending_sessions empty — no early exit
 - [ ] Per-tool raw outputs saved to {scratchDir}/per-tool/
 - [ ] Cross-verify: CONSENSUS/CONFLICT/UNIQUE classified, consensus_level computed
+- [ ] Boundary grill executed on CONFLICT items (skip if no boundary conflicts detected)
+- [ ] Boundary grill results written to collab-report.md § Boundary Grill Results (if conflicts found)
 - [ ] collab-report.md + context.md + conclusions.json produced
 - [ ] CLB artifact registered in state.json
 - [ ] Partial degradation: continued if 2+ tools succeeded

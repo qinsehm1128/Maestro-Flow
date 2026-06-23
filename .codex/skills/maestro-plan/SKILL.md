@@ -153,8 +153,13 @@ S_WAVE_1 → S_WAVE_2    DO: spawn parallel explorations, merge results, build p
 
 S_WAVE_2 → S_CHECK     DO: spawn planning agent, merge results
 
-S_CHECK → S_CONFIRM    WHEN: plan passes or max 3 iterations    DO: A_PLAN_CHECK
-S_CHECK → S_WAVE_2     WHEN: plan fails check, iterations < 3   DO: feed checker feedback back
+S_CHECK → S_BOUNDARY_GRILL  WHEN: plan passes or max 3 iterations    DO: A_PLAN_CHECK
+S_CHECK → S_WAVE_2         WHEN: plan fails check, iterations < 3   DO: feed checker feedback back
+
+S_BOUNDARY_GRILL:
+  → S_CONFIRM    WHEN: no boundary conflicts detected     DO: —
+  → S_CONFIRM    WHEN: conflicts detected + resolved      DO: A_BOUNDARY_GRILL
+  GUARD: max 3 conflicts × 3 questions; non-blocking (see boundary-grill.md)
 
 S_CONFIRM → S_REGISTER WHEN: -y OR user confirms
 S_CONFIRM → S_CSV_GEN  WHEN: user wants to modify
@@ -224,6 +229,13 @@ Consumes all exploration findings + context.md + specs. Produces:
 
 Verifies plan.json and every .task/*.json exists on disk before reporting completed; else report blocked.
 
+### A_BOUNDARY_GRILL
+
+Run boundary grill per `~/.maestro/workflows/boundary-grill.md` after plan-checker pass.
+Input: plan.json tasks + convergence criteria + upstream context. Scope guard: "only plan scope; do not re-analyze or re-scope".
+IF conflicts → results to plan.json `boundary_grill` section + affected TASK files. DEC conflicts add `boundary_warning` to confidence.
+Non-blocking: warnings, not hard stops.
+
 ### A_PLAN_CHECK
 Run plan-checker: coverage, dependency validity, criteria quality, pressure pass on highest-complexity task.
 Confidence: 5-dimension factor model + readiness gate.
@@ -263,6 +275,9 @@ Collision detection against same-milestone plans.
 - [ ] .task/TASK-*.json with read_first[] (file being modified + source of truth files)
 - [ ] Every task has convergence.criteria[] with grep-verifiable conditions (no subjective language)
 - [ ] Every task action and implementation contain concrete values (no "align X with Y")
+- [ ] Boundary grill executed after plan-checker pass (skip if no conflicts detected)
+- [ ] Boundary grill results written to plan.json `boundary_grill` section (if conflicts found)
+- [ ] DEC conflicts reflected in confidence `boundary_warning` factor
 - [ ] Plan confidence scored with 5-dimension factor model
 - [ ] Readiness gate checked before collision detection
 - [ ] Pressure pass completed on highest-complexity task

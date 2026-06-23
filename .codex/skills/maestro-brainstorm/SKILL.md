@@ -316,8 +316,13 @@ S_WAVE_2 → S_AGGREGATE WHEN: all failed       DO: skip review
 S_CHECK_2 → S_WAVE_3   WHEN: -y OR user "Proceed"
 S_CHECK_2 → S_WAVE_2   WHEN: user "Add Roles"  DO: add new role rows, spawn only new
 
-S_WAVE_3 → S_RESOLVE   DO: spawn wave-3, capture review_findings (conflicts/gaps/synergies with patch_targets)
-S_WAVE_3 → S_AGGREGATE WHEN: zero findings    DO: log "No cross-role issues detected", skip resolve
+S_WAVE_3 → S_BOUNDARY_GRILL  DO: spawn wave-3, capture review_findings (conflicts/gaps/synergies with patch_targets)
+S_WAVE_3 → S_AGGREGATE      WHEN: zero findings    DO: log "No cross-role issues detected", skip resolve
+
+S_BOUNDARY_GRILL:
+  → S_RESOLVE     WHEN: no boundary conflicts detected     DO: —
+  → S_RESOLVE     WHEN: conflicts detected + resolved      DO: A_BOUNDARY_GRILL
+  GUARD: max 3 conflicts × 3 questions; non-blocking (see boundary-grill.md)
 
 S_RESOLVE → S_AGGREGATE  DO: A_APPLY_RESOLUTIONS (orchestrator iterates patch_targets and applies Edits)
 
@@ -382,6 +387,13 @@ When ui-designer is among selected roles, establish visual direction before Wave
 explore generates multi-style HTML prototypes, visual comparison, user selection/mix, and produces DESIGN.md.
 ui-designer agents in Wave 2 then focus on UX/visual design referencing DESIGN.md.
 
+### A_BOUNDARY_GRILL
+
+Run boundary grill per `~/.maestro/workflows/boundary-grill.md` after cross-role review, before resolution application.
+Input: reviewer findings + role Decision Digests. Scope guard: "only brainstorm decisions; do not pre-resolve roadmap/plan choices".
+IF conflicts → results to `guidance-specification.md` §12.5 Boundary Grill Results + feed into S_RESOLVE.
+Non-blocking: conflicts produce warnings, pipeline continues.
+
 ### A_APPLY_RESOLUTIONS
 
 For each finding in `review_findings`:
@@ -442,6 +454,8 @@ Protocol: read before analysis, append-only, dedup by type+key.
 - [ ] system-architect/analysis.md §3 includes Data Model + State Machine when system-architect selected
 - [ ] Each {role}/analysis.md §2 Decisions table has ≥ 1 row per feature
 - [ ] Cross-role review (W3) executed; reviewer output includes `patch_targets[]` for every finding
+- [ ] Boundary grill executed after cross-role review (skip if no conflicts detected)
+- [ ] Boundary grill results written to guidance-specification.md §12.5 (if conflicts found)
 - [ ] If findings: resolutions applied via Edit AND logged in guidance §12 "Cross-Role Resolutions"
 - [ ] If zero findings: final report explicitly notes "No cross-role issues detected"; guidance §12 unchanged
 - [ ] Heading-drift patch failures surfaced (not silently dropped)

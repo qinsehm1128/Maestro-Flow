@@ -151,7 +151,12 @@ S_WAVE_1:
   -> ERROR        WHEN: all failed
 
 S_WAVE_2:
-  -> S_WAVE_3     DO: A_SPAWN_WAVE_2
+  -> S_BOUNDARY_GRILL   DO: A_SPAWN_WAVE_2
+
+S_BOUNDARY_GRILL:
+  -> S_WAVE_3     WHEN: no boundary conflicts detected     DO: —
+  -> S_WAVE_3     WHEN: conflicts detected + resolved      DO: A_BOUNDARY_GRILL
+  GUARD: max 3 conflicts × 3 questions; non-blocking (see boundary-grill.md)
 
 S_WAVE_3:
   -> S_AGGREGATE  DO: A_SPAWN_WAVE_3
@@ -237,6 +242,14 @@ Write to `conclusions.json.scope_verdict` (all modes that produce conclusions); 
 
 Gray area detection: domain-aware (things users SEE/CALL/RUN/READ), phase-specific (skip prior decided areas).
 
+### A_BOUNDARY_GRILL
+
+Run boundary grill per `~/.maestro/workflows/boundary-grill.md` after Wave 2 scoring, before Wave 3 synthesis.
+Input: Wave 1 exploration findings + Wave 2 dimension scores. Scope guard: "only analyze decisions; do not prejudge plan/execute concerns".
+Detect RSC (scope violations), MOD (module boundary crossings), DEC (upstream locked vs code reality).
+IF conflicts → results to `analysis.md` § Boundary Grill Results + update `context.md` Locked/Free/Deferred.
+Non-blocking: conflicts produce warnings, pipeline continues.
+
 ### A_AGGREGATE_RESULTS
 
 1. Export results.csv
@@ -310,6 +323,8 @@ Protocol: read before analysis, append-only, dedup by type+key.
 - [ ] Decision Recording Protocol applied to all decisions
 - [ ] Confidence scored per dimension with factor-based model (full mode)
 - [ ] Readiness gate checked before synthesis (wave 3)
+- [ ] Boundary grill executed between Wave 2 and Wave 3 (skip if no conflicts detected)
+- [ ] Boundary grill results written to analysis.md § Boundary Grill Results (if conflicts found)
 - [ ] Pressure pass completed ≥ 1 time on highest-risk dimension before synthesis
 - [ ] Deferred items auto-created as issues
 - [ ] Scope creep redirected to Deferred section

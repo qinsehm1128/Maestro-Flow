@@ -25,6 +25,7 @@ Produces plan.json + TASK files; registers PLN artifact in state.json.
 - [plan.json](~/.maestro/templates/plan.json) — read when generating plan output
 - [task.json](~/.maestro/templates/task.json) — read when generating task files
 - [state.json](~/.maestro/templates/state.json) — read when registering artifact
+- [boundary-grill.md](~/.maestro/workflows/boundary-grill.md) — read when boundary conflicts detected (in P4)
 </deferred_reading>
 
 <context>
@@ -84,8 +85,15 @@ Follow '~/.maestro/workflows/plan.md' completely.
 - REQUIRED: Main flow inline planning is FORBIDDEN (see P3 Agent Constraint below).
 - BLOCKED if missing: plan.json or TASK files not produced by planner agent — do not proceed to checking.
 
+**GATE P3.5 → P4: Boundary Grill → Plan Check**
+Run boundary grill per `~/.maestro/workflows/boundary-grill.md`.
+Input: plan.json tasks + convergence criteria + upstream context. Scope guard: "only plan scope; do not re-analyze or re-scope".
+IF conflicts → results to plan.json `boundary_grill` section + affected TASK files. DEC conflicts add `boundary_warning` to confidence.
+NON-BLOCKING: warnings, not hard stops.
+
 **GATE P4 → P5: Plan Check → User Confirmation**
 - REQUIRED: Plan-checker passed (or minor issues acknowledged).
+- REQUIRED: Boundary grill completed (conflicts resolved or accepted as risks).
 - REQUIRED: Confidence scored with 5-dimension factor model.
 - REQUIRED: Pressure pass completed on highest-complexity task.
 - REQUIRED: If plan touches UI (检出 `dashboard/` 或 UI 关键词 `landing|page|dashboard|frontend|UI|component|界面`), each delivery wave has ≥1 `[UI-observable]` convergence criterion (vertical-slice delivery, not backend-only).
@@ -216,6 +224,9 @@ Status verdicts:
 - [ ] Every task has `convergence.criteria[]` with grep-verifiable conditions (no subjective language)
 - [ ] UI plans: each delivery wave has ≥1 `[UI-observable]` convergence criterion (vertical slice; verified at runtime by ralph frontend-verify gate)
 - [ ] Every task `action` and `implementation` contain concrete values (no "align X with Y")
+- [ ] Boundary grill executed in P3.5 (skip if no conflicts detected)
+- [ ] Boundary grill results written to plan.json `boundary_grill` section (if conflicts found)
+- [ ] DEC conflicts reflected in confidence `boundary_warning` factor
 - [ ] Plan confidence scored in P4 with 5-dimension factor model
 - [ ] Plan readiness gate checked before P4.5 collision detection
 - [ ] Pressure pass completed on highest-complexity task
