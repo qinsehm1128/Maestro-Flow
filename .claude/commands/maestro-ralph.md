@@ -273,7 +273,8 @@ wants_roadmap = (--roadmap flag)
 | passed==true, no review.json | `business-test` |
 | review.json: verdict=="BLOCK" | `review-failed` |
 | review.json: verdict!="BLOCK" | `test` |
-| uat.md: all passed | `milestone-audit` |
+| uat.md: all passed + `session.milestone` 存在 | `milestone-audit` |
+| uat.md: all passed + `session.milestone=null` (standalone) | 标记 session completed（无 milestone 可审计） |
 | uat.md: has failures | `test-failed` |
 
 ### A_DETERMINE_QUALITY_MODE
@@ -355,7 +356,7 @@ narrow → derive defaults from intent + codebase, skip questions.
 
 ### A_BUILD_STEPS
 
-Generate steps from `session.lifecycle_position` to `milestone-complete`.
+Generate steps from `session.lifecycle_position` to `milestone-complete`（`session.milestone` 存在时）或最后一个质量门（standalone 时）。
 
 | Stage | Skill (independent) | Skill (unified) | Decision after | quality_mode |
 |-------|---------------------|-----------------|----------------|--------------|
@@ -391,7 +392,7 @@ Generate steps from `session.lifecycle_position` to `milestone-complete`.
 3.6. **frontend-verify UI 门控**：仅当当前 phase 交付前端（检出 `dashboard/` 目录，或 phase 目标/计划含 UI 关键词 `landing|page|dashboard|frontend|UI|component|界面`）时保留 `frontend-verify` stage + `post-frontend-verify` decision；纯后端 phase 删除该 stage
 4. **决策节点**：每个 Decision after 非空的 stage 之后插入 `{ decision: "<gate>", retry_count: 0, max_retries: 2, command_scope: null, command_path: null }`
 5. **goal-audit 插入**：`task_decomposition` 存在时，在最后一个 evidence-producing stage（execute/review/test）之后、`milestone-complete` 之前插入 `decision:post-goal-audit`
-6. **终点硬约束**：chain 以 `milestone-complete` 结尾
+6. **终点硬约束**：`session.milestone` 存在时 chain 以 `milestone-complete` 结尾；`session.milestone=null`（standalone）时跳过 `milestone-audit` + `milestone-complete` stage，chain 以最后一个质量门 stage 结尾
 7. **goal_ref 传播**：`task_decomposition` 存在时，每个 step 按 `step.stage ∈ g.lifecycle` 匹配 `step.goal_ref = g.id`（多匹配取字典序最小）；decision 节点不打 goal_ref
 8. **占位符**：independent 保留 `{phase}` `{intent}`；unified 不带 `{phase}`
 9. **command_path 解析**（每个执行 step，decision 节点跳过）：

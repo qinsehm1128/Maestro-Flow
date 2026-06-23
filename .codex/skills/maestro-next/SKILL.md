@@ -132,7 +132,8 @@ ls -la .workflow/.maestro/ 2>/dev/null | head -5  # 进行中的 session
 | 最新 artifact = plan | execute | `maestro-execute {phase}` |
 | 最新 artifact = execute | review | `quality-review {phase}` |
 | review verdict=PASS | test-gen | `quality-auto-test {phase}` |
-| 测试全绿 | milestone-audit | `maestro-milestone-audit` |
+| 测试全绿 + current_milestone 存在 | milestone-audit | `maestro-milestone-audit` |
+| 测试全绿 + current_milestone=null (standalone) | review-done | 回退到 `quality-review` 或 `manage-status`（无 milestone 上下文时不推荐 milestone 命令） |
 | 当前 milestone 全 phase 完成 | milestone-complete | `maestro-milestone-complete` |
 | 任一 stage 产物含 gaps/failed | debug | `quality-debug {gap}` |
 
@@ -155,6 +156,16 @@ brainstorm → blueprint → init → analyze-macro → roadmap
 | `name` 关键词命中 intent | 中 | intent 含 "test" → quality-test/quality-auto-test 加分 |
 | Workflow 簇匹配 | 中 | intent 涉及学习/知识/issue 等场景触发对应簇 |
 | Recent activity 反向避免 | 低 | 刚完成的 stage 短期内降权 |
+| **前置条件不满足** | **禁止** | 候选 skill 的前置条件未满足时，直接从候选池移除（如 `maestro-milestone-*` 在 `current_milestone=null` 时移除） |
+
+**前置条件检查（评分前执行，不满足则移除候选）：**
+
+| Skill | 前置条件 |
+|-------|---------|
+| `maestro-milestone-audit` | `current_milestone` 存在且非 null |
+| `maestro-milestone-complete` | `current_milestone` 存在且非 null |
+| `maestro-milestone-release` | `current_milestone` 存在且非 null |
+| `maestro-merge` | 存在活跃的 fork 分支 |
 
 **特殊意图处理：**
 
