@@ -138,8 +138,10 @@ maestro search "<query>" [--type <type>] [--category <cat>] [--code] [--kg] [--j
 
 ### Record
 
-- **Spec** → `/spec-add <category> "title" "content" --keywords kw1,kw2 --description "summary"`
-- **Knowhow** → persist non-obvious knowledge (deviations, root causes, constraints)
+| What | Command |
+|------|---------|
+| Spec | `/spec-add <category> "title" "content" --keywords kw1,kw2 --description "summary"` |
+| Knowhow | Persist non-obvious knowledge (deviations, root causes, constraints) |
 
 Category routing: decisions→`arch`, patterns→`coding`, pitfalls→`debug`/`learning`, rules→`review`, tests→`test`.
 
@@ -148,12 +150,12 @@ Category routing: decisions→`arch`, patterns→`coding`, pitfalls→`debug`/`l
 When search results conflict with current context, **mark the entry**:
 
 ```bash
-maestro spec conflict mark <file> <line> --note "<conflict reason>"
-maestro spec conflict list                    # view all marked entries
+maestro spec conflict mark <file> <line> --note "<reason>"
+maestro spec conflict list
 ```
 
-Confidence levels: `high` (verified) → `medium` (default) → `low` (stale) → `contested` (conflict detected).
+Levels: `high` (verified) → `medium` (default) → `low` (stale) → `contested` (conflict detected).
 
-- `contested` → 注入时排末尾，`[CONTESTED]` 标记 + 冲突说明
-- `low` → `[LOW CONFIDENCE]` 标记
-- 消除由 `/manage-knowledge-audit` 审查命令专门处理
+- `contested` → sorted last during injection, labeled `[CONTESTED]` with conflict note
+- `low` → labeled `[LOW CONFIDENCE]`
+- Resolution handled by `/manage-knowledge-audit`

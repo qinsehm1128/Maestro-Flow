@@ -488,3 +488,19 @@ export function migrateComponentIds(ids: string[]): string[] {
   }
   return Array.from(result);
 }
+
+/**
+ * Migrate old IDs + merge new default-selected components.
+ * Used during `maestro update` reinstall so new-version components
+ * with `defaultSelected !== false` are automatically included.
+ */
+export function mergeNewDefaults(existingIds: string[]): string[] {
+  const migrated = migrateComponentIds(existingIds);
+  const migratedSet = new Set(migrated);
+  for (const def of COMPONENT_DEFS) {
+    if (!migratedSet.has(def.id) && def.defaultSelected !== false) {
+      migrated.push(def.id);
+    }
+  }
+  return migrated;
+}

@@ -201,8 +201,9 @@ export function registerInstallCommand(program: Command): void {
     .option('--statusline [theme]', 'Install statusline with optional theme (with --force)')
     .option('--export [path]', 'Export current install config as profile JSON')
     .option('--import <path>', 'Import profile and install non-interactively')
+    .option('--upgrade', 'With --import: merge new default-selected components (used by update)')
     .option('--load <path>', 'Load profile into interactive TUI (pre-fill state)')
-    .action(async (opts: { force?: boolean; global?: boolean; path?: string; hooks?: string; mcp?: boolean; codexHooks?: string; codexMcp?: boolean; agyHooks?: string; extraMcp?: string; components?: string; statusline?: boolean | string; export?: boolean | string; import?: string; load?: string }) => {
+    .action(async (opts: { force?: boolean; global?: boolean; path?: string; hooks?: string; mcp?: boolean; codexHooks?: string; codexMcp?: boolean; agyHooks?: string; extraMcp?: string; components?: string; statusline?: boolean | string; export?: boolean | string; import?: string; upgrade?: boolean; load?: string }) => {
       const pkgRoot = getPackageRoot();
 
       // Validate package root
@@ -227,18 +228,22 @@ export function registerInstallCommand(program: Command): void {
       // Profile import — non-interactive install from profile
       if (opts.import) {
         const { importProfile } = await import('../core/install-profile.js');
-        const { migrateComponentIds: migrateIds } = await import('./install-backend.js');
+        const { migrateComponentIds: migrateIds, mergeNewDefaults } = await import('./install-backend.js');
         const profile = importProfile(opts.import);
         console.error(`Importing profile: ${profile.name} (${profile.scope})`);
+        const componentIds = opts.upgrade
+          ? mergeNewDefaults(profile.components.selectedIds)
+          : migrateIds(profile.components.selectedIds);
         await forceInstall(pkgRoot, version, {
           global: profile.scope === 'global',
+          path: opts.path,
           hooks: profile.claude.hooks.basePreset,
           mcp: profile.claude.mcp.enabled || undefined,
           codexHooks: profile.codex.hooks.basePreset,
           codexMcp: profile.codex.mcp.enabled || undefined,
           agyHooks: profile.agy.hooks.basePreset,
           extraMcp: profile.extraMcp.enabled ? profile.extraMcp.targetIds.join(',') : undefined,
-          components: migrateIds(profile.components.selectedIds).join(','),
+          components: componentIds.join(','),
           statusline: profile.claude.statusline.enabled ? profile.claude.statusline.theme : undefined,
           claudeHooksSelection: profile.claude.hooks.isCustom ? profile.claude.hooks : undefined,
           codexHooksSelection: profile.codex.hooks.isCustom ? profile.codex.hooks : undefined,

@@ -81,12 +81,6 @@
       "route": { "graph": "singles/execute" }
     },
     {
-      "type": "verify",
-      "regex": "verif[iy]|validate.*result|验证|校验",
-      "flags": "i",
-      "route": { "graph": "singles/execute" }
-    },
-    {
       "type": "review",
       "regex": "\\breview.*code|code.*review|代码.*审查",
       "flags": "i",

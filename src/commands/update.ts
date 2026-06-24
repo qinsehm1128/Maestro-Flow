@@ -8,10 +8,13 @@
 // ---------------------------------------------------------------------------
 
 import type { Command } from 'commander';
-import { exec } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { exec, spawn } from 'node:child_process';
+import { existsSync, writeFileSync, mkdirSync, unlinkSync, readdirSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { getPackageVersion } from '../utils/get-version.js';
 import { getAllManifests } from '../core/manifest.js';
+import { manifestToProfile } from '../core/install-profile.js';
 import { loadMigrations, planMigrations, runPendingMigrations } from '../utils/migration-registry.js';
 import { applyNotices, planNotices, printNoticePlan } from '../utils/update-notices.js';
 
@@ -145,9 +148,16 @@ async function stopViewServer(): Promise<boolean> {
 // ---------------------------------------------------------------------------
 
 /**
- * After npm install, exec the NEW version of maestro to reinstall
- * previously installed workflow components. This ensures new-version
- * code and assets are used (current process still runs old code).
+ * After npm install, export each manifest as a profile JSON and hand it
+ * to the NEW version of maestro via `install --import --upgrade`.
+ *
+ * Using a profile file instead of CLI args avoids:
+ *   - Windows command-line length limits (~8192 chars)
+ *   - Shell escaping issues with paths
+ *   - Loss of custom hook selections (only level was passed before)
+ *
+ * The `--upgrade` flag tells the new binary to merge newly added
+ * default-selected components into the existing selection.
  */
 async function reinstallWorkflows(version: string): Promise<void> {
   const manifests = getAllManifests();
@@ -166,48 +176,49 @@ async function reinstallWorkflows(version: string): Promise<void> {
     deduped.push(m);
   }
 
+  const tmpDir = join(tmpdir(), 'maestro-reinstall');
+  if (!existsSync(tmpDir)) mkdirSync(tmpDir, { recursive: true });
+
   for (const m of deduped) {
-    const args: string[] = ['--force'];
+    if (m.scope === 'project' && !existsSync(m.targetPath)) {
+      console.error(`  [-] Skipped ${m.targetPath} (directory not found)`);
+      continue;
+    }
+
+    const profile = manifestToProfile(m);
+    const profilePath = join(tmpDir, `reinstall-${m.id}.json`);
+    writeFileSync(profilePath, JSON.stringify(profile, null, 2), 'utf-8');
+
+    const args = ['install', '--import', profilePath, '--upgrade'];
     if (m.scope === 'global') {
       args.push('--global');
     } else {
-      if (!existsSync(m.targetPath)) {
-        console.error(`  [-] Skipped ${m.targetPath} (directory not found)`);
-        continue;
-      }
-      args.push('--path', `"${m.targetPath}"`);
-    }
-
-    const hookLevel = m.hooks?.claude?.level ?? m.hookLevel ?? 'none';
-    if (hookLevel !== 'none') args.push('--hooks', hookLevel);
-
-    const codexLevel = m.hooks?.codex?.level ?? 'none';
-    if (codexLevel !== 'none') args.push('--codex-hooks', codexLevel);
-
-    const agyLevel = m.hooks?.agy?.level ?? 'none';
-    if (agyLevel !== 'none') args.push('--agy-hooks', agyLevel);
-
-    if (m.mcp?.codex) args.push('--codex-mcp');
-
-    if (m.mcp?.claude) args.push('--mcp');
-
-    const extraMcpTargets = m.mcp?.extras?.map(e => e.targetId).filter(Boolean);
-    if (extraMcpTargets?.length) args.push('--extra-mcp', extraMcpTargets.join(','));
-
-    if (m.statusline) args.push('--statusline', m.statusline.theme || 'notion');
-
-    if (m.selectedComponentIds?.length) {
-      args.push('--components', m.selectedComponentIds.join(','));
+      args.push('--path', m.targetPath);
     }
 
     const label = m.scope === 'global' ? 'Global' : m.targetPath;
     try {
-      await execAsync(`maestro install ${args.join(' ')}`);
+      await spawnAsync('maestro', args);
       console.error(`  [+] ${label} reinstalled (v${version})`);
+      try { unlinkSync(profilePath); } catch { /* ignore */ }
     } catch (err) {
       console.error(`  [x] ${label} reinstall failed: ${err instanceof Error ? err.message : err}`);
+      console.error(`      Profile saved: ${profilePath}`);
     }
   }
+
+  // Clean up empty temp dir
+  try {
+    if (readdirSync(tmpDir).length === 0) rmSync(tmpDir);
+  } catch { /* ignore */ }
+}
+
+function spawnAsync(cmd: string, args: string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd, args, { stdio: 'inherit', shell: true });
+    child.on('exit', code => code === 0 ? resolve() : reject(new Error(`exit code ${code}`)));
+    child.on('error', reject);
+  });
 }
 
 // ---------------------------------------------------------------------------

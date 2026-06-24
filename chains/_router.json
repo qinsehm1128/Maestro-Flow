@@ -44,8 +44,7 @@
         { "value": "analyze", "target": "check_has_plan" },
         { "value": "brainstorm", "target": "to_analyze" },
         { "value": "plan", "target": "to_execute" },
-        { "value": "execute", "target": "to_verify" },
-        { "value": "verify", "target": "check_verify_result" },
+        { "value": "execute", "target": "check_review" },
         { "default": true, "target": "to_analyze" }
       ]
     },
@@ -53,16 +52,8 @@
       "type": "decision",
       "eval": "ctx.project.has_pending_plans",
       "edges": [
-        { "value": true, "target": "to_execute_verify" },
+        { "value": true, "target": "to_execute" },
         { "default": true, "target": "to_plan" }
-      ]
-    },
-    "check_verify_result": {
-      "type": "decision",
-      "eval": "ctx.project.verification_status",
-      "edges": [
-        { "value": "passed", "target": "check_review" },
-        { "default": true, "target": "to_quality_loop_partial" }
       ]
     },
     "check_review": {
@@ -112,11 +103,6 @@
       "status": "delegate",
       "delegate_graph": "singles/execute"
     },
-    "to_verify": {
-      "type": "terminal",
-      "status": "delegate",
-      "delegate_graph": "singles/execute"
-    },
     "to_review": {
       "type": "terminal",
       "status": "delegate",
@@ -137,11 +123,6 @@
       "status": "delegate",
       "delegate_graph": "singles/debug",
       "delegate_inputs": { "args_prefix": "--from-uat" }
-    },
-    "to_execute_verify": {
-      "type": "terminal",
-      "status": "delegate",
-      "delegate_graph": "singles/execute"
     },
     "to_milestone_close": {
       "type": "terminal",
