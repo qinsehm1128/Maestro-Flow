@@ -76,10 +76,10 @@ Source priority:
 
 Process:
   1. 从 session 产物中收集术语候选
-  2. 过滤已注册的 `glossary.json` terms
+  2. 过滤已注册的 `glossary.yaml` terms
   3. 0 个新候选 → 跳过（静默）
   4. ≥ 1 个新候选 → 交互确认（domain 注册始终需要用户确认，`-y` 对 domain 无效）
-  5. 确认的术语写入 `glossary.json` via `maestro domain add`
+  5. 确认的术语写入 `glossary.yaml` via `maestro domain add`
   6. 记录到 `archive.json` 的 `extraction.domain_ids[]`
 
 Skip conditions:

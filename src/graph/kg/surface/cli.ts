@@ -576,12 +576,15 @@ export function registerKgCommands(program: Command): void {
         },
         {
           name: 'domain-glossary',
-          path: resolve(workflowRoot, 'domain', 'glossary.json'),
+          path: existsSync(resolve(workflowRoot, 'domain', 'glossary.yaml'))
+            ? resolve(workflowRoot, 'domain', 'glossary.yaml')
+            : resolve(workflowRoot, 'domain', 'glossary.json'),
           estimateNodes: (p: string) => {
             if (!existsSync(p)) return 0;
             try {
               const { readFileSync } = require('node:fs');
-              const data = JSON.parse(readFileSync(p, 'utf-8'));
+              const raw = readFileSync(p, 'utf-8');
+              const data = p.endsWith('.yaml') ? require('yaml').parse(raw) : JSON.parse(raw);
               return Array.isArray(data) ? data.length : Object.keys(data).length;
             } catch { return 0; }
           },

@@ -180,6 +180,9 @@ Extract:
 | `overlay` | Create/edit command overlays |
 | `update` | Update maestro itself |
 | `harvest` | Extract knowledge from artifacts |
+| `domain_add` | Register a domain term into glossary |
+| `domain_list` | List registered domain terms |
+| `domain_discover` | Discover domain term candidates from codebase |
 | `wiki` | Manage wiki graph |
 | `knowhow` | Manage knowhow entries |
 | `ui_design` | UI design, build new UI |
@@ -434,6 +437,9 @@ S_DECISION_EVAL 入口；镜像 maestro-ralph `A_GOAL_AUDIT_EVALUATE`。Condense
 | `spec_load` | `spec-load` |
 | `spec_map` | `manage-codebase-rebuild` |
 | `spec_remove` | `spec-remove "{description}"` |
+| `domain_add` | `domain-add "{description}"` |
+| `domain_list` | `domain-list` |
+| `domain_discover` | `domain-discover` |
 | `knowhow_capture` | `manage-knowhow-capture "{description}"` |
 | `knowhow` | `manage-knowhow "{description}"` |
 | `issue` | `manage-issue "{description}"` |
@@ -459,26 +465,26 @@ S_DECISION_EVAL 入口；镜像 maestro-ralph `A_GOAL_AUDIT_EVALUATE`。Condense
 
 | Chain | Steps (→ = sequential, [B] = context-producing barrier) |
 |-------|---------------------------------------|
-| `feature` | [B] maestro-plan → [B] maestro-execute → quality-review |
+| `feature` | [B] maestro-plan → [B] maestro-execute → quality-review → manage-harvest --auto |
 | `quality-fix` | [B] maestro-analyze --gaps → [B] maestro-plan --gaps → [B] maestro-execute → quality-review |
 | `deploy` | quality-review → maestro-milestone-release |
-| `blueprint-driven` | maestro-init → [B] maestro-blueprint → [B] maestro-plan --from blueprint:{BLP} → [B] maestro-execute → quality-review |
-| `analyze-macro-driven` | [B] maestro-analyze "{intent}" → ◆ post-analyze-scope → (large: [B] maestro-roadmap --from analyze:{ANL} → [B] maestro-analyze {phase} → [B] maestro-plan {phase}) / (medium\|small: [B] maestro-plan --from analyze:{ANL}) → [B] maestro-execute → quality-review |
-| `grill-brainstorm` | [B] maestro-grill → [B] maestro-brainstorm --from grill:{GRL} → [B] maestro-plan → [B] maestro-execute → quality-review (**auto_mode: skip grill step, fall back to brainstorm-driven**) |
-| `brainstorm-driven` | [B] maestro-brainstorm → [B] maestro-plan → [B] maestro-execute → quality-review |
-| `ui-craft-build` | maestro-impeccable build → [B] maestro-plan → [B] maestro-execute → quality-review |
-| `roadmap-driven` | maestro-init → [B] maestro-roadmap → [B] maestro-plan → [B] maestro-execute → quality-review |
-| `next-milestone` | [B] maestro-roadmap → [B] maestro-plan → [B] maestro-execute → quality-review |
-| `full-lifecycle` | [B] maestro-plan → [B] maestro-execute → quality-review → quality-test → maestro-milestone-audit → maestro-milestone-complete |
+| `blueprint-driven` | maestro-init → [B] maestro-blueprint → [B] maestro-plan --from blueprint:{BLP} → [B] maestro-execute → quality-review → manage-harvest --auto |
+| `analyze-macro-driven` | [B] maestro-analyze "{intent}" → ◆ post-analyze-scope → (large: [B] maestro-roadmap --from analyze:{ANL} → [B] maestro-analyze {phase} → [B] maestro-plan {phase}) / (medium\|small: [B] maestro-plan --from analyze:{ANL}) → [B] maestro-execute → quality-review → manage-harvest --auto |
+| `grill-brainstorm` | [B] maestro-grill → [B] maestro-brainstorm --from grill:{GRL} → [B] maestro-plan → [B] maestro-execute → quality-review → manage-harvest --auto (**auto_mode: skip grill step, fall back to brainstorm-driven**) |
+| `brainstorm-driven` | [B] maestro-brainstorm → [B] maestro-plan → [B] maestro-execute → quality-review → manage-harvest --auto |
+| `ui-craft-build` | maestro-impeccable build → [B] maestro-plan → [B] maestro-execute → quality-review → manage-harvest --auto |
+| `roadmap-driven` | maestro-init → [B] maestro-roadmap → [B] maestro-plan → [B] maestro-execute → quality-review → manage-harvest --auto |
+| `next-milestone` | [B] maestro-roadmap → [B] maestro-plan → [B] maestro-execute → quality-review → manage-harvest --auto |
+| `full-lifecycle` | [B] maestro-plan → [B] maestro-execute → quality-review → quality-test → maestro-milestone-audit → maestro-milestone-complete → manage-harvest --auto |
 | `execute-review` | [B] maestro-execute → quality-review |
-| `analyze-plan-execute` | [B] maestro-analyze -q → [B] maestro-plan --dir {scratch_dir} → [B] maestro-execute --dir {scratch_dir} |
+| `analyze-plan-execute` | [B] maestro-analyze -q → [B] maestro-plan --dir {scratch_dir} → [B] maestro-execute --dir {scratch_dir} → manage-harvest --auto |
 | `quality-loop` | quality-review → quality-test → quality-debug --from-uat → [B] maestro-plan --gaps → [B] maestro-execute |
 | `quality-loop-partial` | [B] maestro-plan --gaps → [B] maestro-execute → quality-review |
 | `review-fix` | [B] maestro-plan --gaps → [B] maestro-execute → quality-review |
 | `milestone-close` | maestro-milestone-audit → maestro-milestone-complete |
 | `milestone-release` | maestro-milestone-audit → maestro-milestone-release |
 | `phase_transition` | maestro-milestone-audit → maestro-milestone-complete |
-| `issue-full` | [B] maestro-analyze --gaps → [B] maestro-plan --gaps → [B] maestro-execute → quality-review → manage-issue close |
+| `issue-full` | [B] maestro-analyze --gaps → [B] maestro-plan --gaps → [B] maestro-execute → quality-review → manage-issue close → manage-harvest --auto |
 | `issue-quick` | [B] maestro-plan --gaps → [B] maestro-execute → quality-review → manage-issue close |
 
 > When S_DECOMPOSE ran, a `decision:post-goal-audit` node is appended as the final node (after the last evidence-producing step; before milestone-complete/close-out if the chain ends with one). `[B]` now denotes a context-producing skill (artifacts read into `session.context`) — execution is still sequential (no parallelism; spawning removed).

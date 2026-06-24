@@ -200,9 +200,12 @@ Pass into Steps 2 and 3.
 
 ### Step 2: Terminology & Boundary Definition (Auto Mode)
 
-1. Extract 5-10 core domain terms (merge upstream locked terms if available)
-2. AskUserQuestion for Non-Goals (multiSelect, include "其他" option)
-3. Store terminology + non_goals to session
+1. Load existing domain terms: read `.workflow/domain/glossary.yaml` 中已注册术语，避免重复定义
+2. Extract 5-10 core domain terms (merge upstream locked terms + existing glossary terms)
+3. AskUserQuestion for Non-Goals (multiSelect, include "其他" option)
+4. Store terminology + non_goals to session
+
+新候选术语仅存入 `context-package.json#domain.terminology[]`，不直接写 glossary.yaml。由 chain 末尾 `manage-harvest --auto` 触发 finish-work Step 3.5 统一提升为正式术语。
 
 **Skip if**: `--yes` (auto-generate terms, empty non-goals)
 

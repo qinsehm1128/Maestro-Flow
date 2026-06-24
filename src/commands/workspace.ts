@@ -203,9 +203,15 @@ function countEntries(workflowRoot: string, shareType: string): number {
         return countMdRecursive(dir);
       }
       case 'domain': {
-        const glossary = join(workflowRoot, 'domain', 'glossary.json');
-        if (!existsSync(glossary)) return 0;
-        const raw = JSON.parse(readFileSync(glossary, 'utf-8'));
+        const glossaryYaml = join(workflowRoot, 'domain', 'glossary.yaml');
+        const glossaryJson = join(workflowRoot, 'domain', 'glossary.json');
+        const glossary = existsSync(glossaryYaml) ? glossaryYaml : existsSync(glossaryJson) ? glossaryJson : null;
+        if (!glossary) return 0;
+        const content = readFileSync(glossary, 'utf-8');
+        const YAML = require('yaml');
+        const raw = glossary.endsWith('.yaml')
+          ? YAML.parse(content)
+          : JSON.parse(content);
         return Array.isArray(raw.terms) ? raw.terms.length : 0;
       }
       case 'codebase': {

@@ -20,7 +20,7 @@ export function registerDomainCommand(program: Command): void {
   // ── init ──────────────────────────────────────────────────────────────
   domain
     .command('init')
-    .description('Initialize .workflow/domain/ with empty glossary.json')
+    .description('Initialize .workflow/domain/ with empty glossary.yaml')
     .option('--project <name>', 'Project name for glossary metadata')
     .action(async (opts) => {
       const { initDomain } = await import('../tools/domain-loader.js');
@@ -412,7 +412,8 @@ export function registerDomainCommand(program: Command): void {
           }
           const domainPath = join(getWorkflowRoot(), 'domain');
           mkdirSync(domainPath, { recursive: true });
-          writeFileSync(join(domainPath, 'glossary.json'), JSON.stringify(glossary, null, 2) + '\n', 'utf-8');
+          const YAML = await import('yaml');
+          writeFileSync(join(domainPath, 'glossary.yaml'), YAML.default.stringify(glossary, { lineWidth: 120 }), 'utf-8');
         } finally {
           lock.release();
         }
@@ -443,13 +444,13 @@ export function registerDomainCommand(program: Command): void {
   // ── validate ──────────────────────────────────────────────────────────
   domain
     .command('validate')
-    .description('Validate glossary.json schema and relationships')
+    .description('Validate glossary schema and relationships')
     .action(async () => {
       const { validateGlossaryFile } = await import('../tools/domain-loader.js');
       const { errors, warnings } = validateGlossaryFile(getWorkflowRoot());
 
       if (errors.length === 0 && warnings.length === 0) {
-        console.log('✓ glossary.json is valid.');
+        console.log('✓ glossary is valid.');
         return;
       }
 

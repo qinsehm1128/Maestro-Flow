@@ -113,6 +113,14 @@ If `.workflow/specs/` does not exist:
    - Skip spec-setup (nothing to scan)
    - Note: Specs will be progressively populated as pipeline stages produce knowledge
 
+## Step 2.5: Domain Init (first-run only)
+
+If `.workflow/domain/` does not exist:
+
+1. Run `Bash("maestro domain init")` — creates `.workflow/domain/glossary.yaml` with empty terms array
+2. If brownfield project (has source files): run `maestro domain discover --auto` to scan codebase for initial term candidates, present top 5 for confirmation
+3. If greenfield project: skip discovery (no codebase to scan); domain terms will be populated by grill/brainstorm sessions via finish-work extraction
+
 
 ---
 
@@ -126,6 +134,7 @@ Verify all required directories and files exist:
   state.json         ✓
   config.json        ✓
   specs/             ✓
+  domain/            ✓ (glossary.yaml)
   research/          ✓ (if research enabled)
   scratch/           ✓ (create empty)
   milestones/        ✓ (create empty)

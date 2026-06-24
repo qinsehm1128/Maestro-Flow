@@ -589,6 +589,13 @@ Append unique entries to .workflow/specs/learnings.md using <spec-entry> closed-
   category="learning", keywords (3-5 terms), date, source="execute"
 
 Mark artifact.harvested = true; write state.json (atomic)
+
+// Domain knowledge note:
+// E5 仅提取 incremental learnings (spec category=learning)。
+// 完整的知识提取（constraints → spec, decisions → knowhow, terminology → domain glossary）
+// 由 chain 末尾的 manage-harvest --auto 触发 finish-work 统一处理。
+// Domain compact/expanded 注入是 hook 自动行为，execute 期间无需手动加载——
+// 已注册术语通过 keyword-spec-injector 自动注入到 agent context 中。
 ```
 
 ---

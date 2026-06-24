@@ -163,11 +163,13 @@ Parse $ARGUMENTS to determine mode and flags:
    - `constraints[status=open]` → prioritize for analysis
    - `open_questions[]` → seed discussion topics
 6. Load project specs: `specs_content = maestro spec load --category arch`
+7. Load domain glossary: read `.workflow/domain/glossary.yaml`（如存在）— 分析过程中使用 canonical term names 保持术语一致性；新发现的术语候选记入 `context-package.json#domain.terminology[]`
 
 **Load prior context** (adhoc/standalone scope):
 1. Read `.workflow/project.md` (if exists) — project vision, Validated requirements, Active requirements, Key Decisions
 2. Read `.workflow/state.json` (if exists) → `accumulated_context` (key_decisions, deferred, blockers)
 3. Load project specs: `specs_content = maestro spec load --category arch`
+4. Load domain glossary: read `.workflow/domain/glossary.yaml`（如存在）
 
 **Quick mode routing**: If QUICK_MODE, skip to Step 8 (Decision Extraction) after loading context.
 

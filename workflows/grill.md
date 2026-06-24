@@ -451,7 +451,20 @@ Write `{output_dir}/context-package.json`:
 }
 ```
 
-### 7.2: Completion Report
+### 7.2: Domain Knowledge Flow
+
+Grill 产出的领域术语通过以下路径沉淀到项目知识库：
+
+```
+terminology.md (locked terms)  ──→  finish-work Step 3.5  ──→  .workflow/domain/glossary.yaml
+context-package.json#domain.terminology[]  ──→  finish-work Step 3.5  ──→  glossary.yaml
+```
+
+- Grill 期间**不应**直接调用 `maestro domain add` — 术语在 grilling 过程中可能被修改或推翻
+- 所有术语经 Step 5 synthesis 锁定后，由 chain 末尾的 `manage-harvest --auto` 自动触发 finish-work 提取
+- finish-work Step 3.5 的 domain extraction 始终交互确认（`-y` 对 domain 注册无效）
+
+### 7.3: Completion Report
 
 ```
 Grill session {artifact_id} completed.
