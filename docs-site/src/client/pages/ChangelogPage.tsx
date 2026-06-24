@@ -17,6 +17,18 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '0.5.37',
+    date: '2026-06',
+    changes: [
+      { type: 'feat', text_en: 'Profile-based reinstall for maestro update — avoids Windows cmd length limits', text_zh: 'update 重装改用 profile-based --import --upgrade 机制，解决 Windows 命令行长度限制' },
+      { type: 'feat', text_en: 'Unified maestro load command — merged spec/wiki/session loading', text_zh: '统一 maestro load 命令——合并 spec/wiki/session 加载' },
+      { type: 'feat', text_en: 'maestro search --kg mode — unified KG full-source search', text_zh: 'maestro search --kg 模式——KG 全源统一搜索' },
+      { type: 'feat', text_en: 'Search cold-start optimization — from ~3200ms down to ~280ms', text_zh: 'search 命令冷启动优化——从 ~3200ms 降至 ~280ms' },
+      { type: 'refactor', text_en: 'Replace gemini CLI with agy CLI globally', text_zh: '全局替换 gemini CLI 为 agy CLI' },
+      { type: 'chore', text_en: 'Migrate 37 node:test suites to vitest', text_zh: '测试体系统一——37 个 node:test 全迁 vitest' },
+    ],
+  },
+  {
     version: '0.5.36',
     date: '2026-06',
     changes: [
