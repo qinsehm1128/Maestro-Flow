@@ -245,12 +245,13 @@ export function registerKgCommands(program: Command): void {
 
   kg
     .command('search <text>')
-    .description('Compatibility alias for query')
+    .description('[deprecated] Use "maestro search --kg" instead')
     .option('--source <types>', 'Filter by source type (comma-separated)')
     .option('--kind <types>', 'Filter by node kind')
     .option('--limit <n>', 'Max results', '20')
     .option('--json', 'Output as JSON')
     .action(async (text: string, opts) => {
+      console.warn('[deprecated] Use "maestro search --kg" instead');
       const mg = await openGraph();
       try {
         const parsed = parseQuery(text);

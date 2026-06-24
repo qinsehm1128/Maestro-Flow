@@ -108,9 +108,10 @@ maestro search "elk layout" --type knowhow
 ```
 
 Then add follow-up searches based on results:
-- Specific symbol/function → `maestro kg search <symbol>` or `maestro kg context <node>`
+- Specific symbol/function → `maestro search "SymbolName" --kg` or `maestro kg context <node>`
 - Architecture/testing → `maestro search --type spec --category arch|test`
 - Call chains → `maestro kg callers <fn>` / `maestro kg callees <fn>`
+- KG 全源搜索 → `maestro search "<query>" --kg`
 - Domain rules → `maestro load --type spec --category <cat> [--keyword <kw>]`
 
 ### Load (unified knowledge loading)

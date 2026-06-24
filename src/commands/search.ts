@@ -184,6 +184,42 @@ function incrementSearchHitsAsync(entryIds: string[]): void {
   }).catch(() => {});
 }
 
+/** A KG unified search result from MaestroGraph. */
+export interface KgSearchResult {
+  id: string;
+  sourceType: string;
+  kind: string;
+  name: string;
+  definition: string;
+  filePath: string;
+  score: number;
+}
+
+async function runKgSearch(q: string, limit: number): Promise<{ results: KgSearchResult[]; summary: Record<string, number> }> {
+  try {
+    const { MaestroGraph } = await import('../graph/kg/engine.js');
+    if (!MaestroGraph.isInitialized(resolve('.'))) return { results: [], summary: {} };
+    const mg = await MaestroGraph.open(resolve('.'));
+    try {
+      const output = mg.searchUnified(q, { limit });
+      const results: KgSearchResult[] = output.directMatches.map(r => ({
+        id: r.node.id,
+        sourceType: r.node.sourceType,
+        kind: r.node.kind,
+        name: r.node.name,
+        definition: r.node.definition?.substring(0, 120) || '',
+        filePath: r.node.filePath,
+        score: r.score,
+      }));
+      return { results, summary: output.summary };
+    } finally {
+      mg.close();
+    }
+  } catch {
+    return { results: [], summary: {} };
+  }
+}
+
 /**
  * Search MaestroGraph for code nodes matching the query. Gracefully returns
  * empty when MaestroGraph is not initialized.
@@ -218,6 +254,7 @@ export function registerSearchCommand(program: Command): void {
     .option('--type <type>', `Filter by type: ${VALID_TYPES.join(', ')}`)
     .option('--category <cat>', 'Filter by category (e.g. coding, arch, debug, test, review, learning)')
     .option('--code', 'Code graph results only (no wiki)')
+    .option('--kg', 'KG unified search (MaestroGraph full-source)')
     .option('--all', 'Alias for default mixed mode (backward compat)')
     .option('--wiki-only', 'Search wiki only, skip code results')
     .option('--workspace <name>', 'Filter results to a specific linked workspace')
@@ -229,6 +266,7 @@ export function registerSearchCommand(program: Command): void {
       const limit = parseInt(opts.limit, 10) || 20;
       const wikiOnly = opts.wikiOnly === true;
       const codeOnly = opts.code === true && !opts.all;
+      const kgMode = opts.kg === true;
 
       if (opts.type && !VALID_TYPES.includes(opts.type)) {
         console.error(`Error: --type must be one of ${VALID_TYPES.join(', ')} (got "${opts.type}")`);
@@ -236,6 +274,36 @@ export function registerSearchCommand(program: Command): void {
       }
 
       const skipEmbedding = opts.emb === false;
+      const isTTY = process.stdout.isTTY === true;
+      const qTerms = q.toLowerCase().split(/\s+/).filter(Boolean);
+
+      // --kg: MaestroGraph unified search
+      if (kgMode) {
+        const { results: kgResults, summary } = await runKgSearch(q, limit);
+        if (opts.json) {
+          console.log(JSON.stringify({ query: q, engine: 'maestrograph', count: kgResults.length, summary, results: kgResults }, null, 2));
+          return;
+        }
+        const parts: string[] = [];
+        if (summary.codeSymbols) parts.push(`codegraph ${summary.codeSymbols}`);
+        if (summary.domainTerms) parts.push(`domain ${summary.domainTerms}`);
+        if (summary.specRules) parts.push(`spec ${summary.specRules}`);
+        if (summary.knowhowDocs) parts.push(`knowhow ${summary.knowhowDocs}`);
+        const headerSummary = parts.length > 0 ? `${parts.join(' + ')} = ${kgResults.length}` : `${kgResults.length}`;
+        console.log(`Search: "${q}" (${headerSummary}, KG)`);
+        if (kgResults.length === 0) {
+          console.log('  No matches found.');
+          return;
+        }
+        for (const r of kgResults) {
+          const name = isTTY ? highlightTerms(r.name, qTerms) : r.name;
+          const def = r.definition ? `  ${truncate(r.definition, 70)}` : '';
+          const scoreTag = `  (${r.score.toFixed(1)})`;
+          console.log(`  [${r.sourceType}:${r.kind}]  ${name}${def}${scoreTag}`);
+        }
+        return;
+      }
+
       // Parallel: wiki + code search (skip irrelevant source based on flags)
       const [wikiResults, codeResults] = await Promise.all([
         codeOnly ? [] : runUnifiedSearch(q, { type: opts.type, category: opts.category, workspace: opts.workspace, limit, skipEmbedding }),
@@ -244,8 +312,6 @@ export function registerSearchCommand(program: Command): void {
 
       const meta = getLastSearchMeta();
       const embTag = meta.embeddingUsed ? `+emb(${meta.embeddingDocs})` : 'bm25';
-      const isTTY = process.stdout.isTTY === true;
-      const qTerms = q.toLowerCase().split(/\s+/).filter(Boolean);
 
       // --code: code graph results only
       if (codeOnly) {
