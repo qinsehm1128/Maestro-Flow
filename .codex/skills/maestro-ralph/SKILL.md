@@ -48,6 +48,10 @@ Mutual invocation with `$maestro-ralph-execute` forms a self-perpetuating work l
 ```
 </purpose>
 
+<deferred_reading>
+- [ralph-amend-goal.md](~/.maestro/workflows/ralph-amend-goal.md) — read when `--amend` flag active for goal amendment flow
+</deferred_reading>
+
 <context>
 $ARGUMENTS — intent text, flags, or keywords.
 
@@ -599,7 +603,7 @@ Runs only when `task_decomposition` present.
 
 ### A_AMEND_GOAL
 
-修改 running session 目标。详细流程：deferred_reading `ralph-amend-goal.md`。
+修改 running session 目标。详细流程由 `<deferred_reading>` 加载 `ralph-amend-goal.md`。
 
 | Phase | 行为 | 产出 |
 |-------|------|------|
