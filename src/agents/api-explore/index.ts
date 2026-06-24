@@ -1,29 +1,10 @@
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
-import { resolve, join } from 'node:path';
-import { homedir } from 'node:os';
+import { readdirSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { createClient, type LlmConfig } from './llm.js';
 import { TOOL_SCHEMAS } from './tools.js';
 import { buildSystemPrompt } from './system-prompt.js';
 import { agentLoop } from './agent-loop.js';
-
-interface ApiExploreConfig {
-  baseUrl?: string;
-  apiKey?: string;
-  model?: string;
-  maxTurns?: number;
-  /** Model-specific extra body params (e.g. {"enable_thinking": true} for Qwen) */
-  extraBody?: Record<string, unknown>;
-}
-
-function loadConfigFile(): ApiExploreConfig {
-  const configPath = join(homedir(), '.maestro', 'api-explore.json');
-  if (!existsSync(configPath)) return {};
-  try {
-    return JSON.parse(readFileSync(configPath, 'utf-8')) as ApiExploreConfig;
-  } catch {
-    return {};
-  }
-}
+import { loadExploreConfig, getDefaultEndpoint, applyProxyEnv } from './config.js';
 
 function parseArgs(argv: string[]): { llmConfig: LlmConfig; cwd: string; maxTurns: number } {
   let model = '';
@@ -52,8 +33,8 @@ function parseArgs(argv: string[]): { llmConfig: LlmConfig; cwd: string; maxTurn
     }
   }
 
-  // Priority: CLI args > config file > env vars
-  const fileConfig = loadConfigFile();
+  const fileConfig = loadExploreConfig();
+  applyProxyEnv(fileConfig);
 
   model = model || fileConfig.model || process.env.API_EXPLORE_MODEL || '';
   baseUrl = baseUrl || fileConfig.baseUrl || process.env.API_EXPLORE_BASE_URL || '';
@@ -62,6 +43,12 @@ function parseArgs(argv: string[]): { llmConfig: LlmConfig; cwd: string; maxTurn
   const extraBody = fileConfig.extraBody;
 
   if (!model || !baseUrl || !apiKey) {
+    // Try named endpoints as fallback
+    const defaultEp = getDefaultEndpoint(fileConfig);
+    if (defaultEp) {
+      return { llmConfig: defaultEp, cwd: resolve(cwd), maxTurns };
+    }
+
     process.stderr.write(
       'Error: model, baseUrl, and apiKey are required.\n' +
       'Configure via ~/.maestro/api-explore.json:\n' +

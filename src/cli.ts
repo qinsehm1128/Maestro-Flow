@@ -67,6 +67,7 @@ const commandLoaders: Record<string, () => Promise<(p: Command) => void>> = {
   domain:     async () => (await import('./commands/domain.js')).registerDomainCommand,
   workspace:  async () => (await import('./commands/workspace.js')).registerWorkspaceCommand,
   ws:         async () => (await import('./commands/workspace.js')).registerWorkspaceCommand,
+  explore:    async () => (await import('./commands/explore.js')).registerExploreCommand,
 };
 
 // Determine which command is being invoked from argv (if any)

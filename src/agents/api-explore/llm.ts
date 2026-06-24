@@ -44,8 +44,8 @@ export async function callLlm(
   const body: any = {
     model: config.model,
     messages,
-    max_completion_tokens: 4_000,
-    temperature: 0.7,
+    max_completion_tokens: 2_000,
+    temperature: 0.2,
     ...config.extraBody,
   };
   if (tools.length > 0) {

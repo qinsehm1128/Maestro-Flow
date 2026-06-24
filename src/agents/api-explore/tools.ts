@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { resolve, relative } from 'node:path';
-import { execSync } from 'node:child_process';
+import { execSync, execFileSync } from 'node:child_process';
 
 export interface ToolSchema {
   type: 'function';
@@ -41,7 +41,7 @@ function glob(args: { pattern: string; path?: string }, cwd: string): string {
   assertWithinCwd(dir, cwd);
 
   try {
-    const output = execSync(`rg --files --glob "${args.pattern}" "${dir}"`, {
+    const output = execFileSync('rg', ['--files', '--glob', args.pattern, dir], {
       encoding: 'utf-8',
       maxBuffer: 1024 * 1024,
       timeout: 10_000,
@@ -87,7 +87,7 @@ function grep(args: {
   const searchPath = args.path ? resolve(cwd, args.path) : cwd;
   assertWithinCwd(searchPath, cwd);
 
-  const rgArgs: string[] = ['rg'];
+  const rgArgs: string[] = [];
   if (args.case_insensitive) rgArgs.push('-i');
   if (args.output_mode === 'files_with_matches') {
     rgArgs.push('-l');
@@ -102,15 +102,15 @@ function grep(args: {
   rgArgs.push('--', args.pattern, searchPath);
 
   try {
-    const output = execSync(rgArgs.join(' '), {
+    const output = execFileSync('rg', rgArgs, {
       encoding: 'utf-8',
       maxBuffer: 1024 * 1024,
       timeout: 10_000,
     });
     const lines = output.trim().split('\n');
-    const limit = args.head_limit ?? 100;
+    const limit = args.head_limit ?? 20;
     if (lines.length > limit) {
-      return lines.slice(0, limit).join('\n') + `\n... (${lines.length - limit} more lines)`;
+      return lines.slice(0, limit).join('\n') + `\n... (${lines.length - limit} more matches, ${lines.length} total)`;
     }
     return lines.join('\n') || 'No matches found.';
   } catch (err) {

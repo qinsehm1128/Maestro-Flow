@@ -2,9 +2,21 @@
 
 
 - **Delegate Usage**: @~/.maestro/workflows/delegate-usage.md
+- **Explore Usage**: @~/.maestro/workflows/explore-usage.md
 - **CLI Endpoints Config**: @~/.maestro/cli-tools.json
 
 **Strictly follow the cli-tools.json configuration**
+
+## Explore Priority
+
+Commands with codebase exploration/search steps should prefer `maestro explore` over inline Grep/Read:
+- **odyssey-\*** (archaeology, explore, discover phases)
+- **analyze, blueprint, grill** (discovery/scan phases)
+- **learn-investigate** (evidence gathering)
+- **issue-discover** (multi-perspective scan)
+- **impeccable teach/explore** (codebase scan)
+
+Use structured prompt format (`FIND/SCOPE/EXCLUDE/ATTENTION/EXPECTED`) for targeted searches. Multi-prompt parallel for multi-angle scans.
 
 # Coding Philosophy
 

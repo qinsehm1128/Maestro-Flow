@@ -1,0 +1,146 @@
+import { readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { homedir } from 'node:os';
+import type { LlmConfig } from './llm.js';
+
+const CLI_TOOLS_PATH = join(homedir(), '.maestro', 'cli-tools.json');
+
+export interface EndpointConfig {
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  extraBody?: Record<string, unknown>;
+  /** Max concurrent jobs on this endpoint (default: 1 = serial) */
+  concurrency?: number;
+  /** Max agent turns for jobs on this endpoint (overrides global maxTurns) */
+  maxTurns?: number;
+}
+
+export interface ProxyConfig {
+  enabled: boolean;
+  httpProxy?: string;
+  httpsProxy?: string;
+  noProxy?: string;
+}
+
+export interface ExploreConfig {
+  /** Legacy single-endpoint fields (backward compat) */
+  baseUrl?: string;
+  apiKey?: string;
+  model?: string;
+  extraBody?: Record<string, unknown>;
+  maxTurns?: number;
+  concurrency?: number;
+  /** Named endpoints for parallel multi-endpoint usage */
+  endpoints?: Record<string, EndpointConfig>;
+  /** Proxy config — also falls back to cli-tools.json proxy */
+  proxy?: ProxyConfig;
+}
+
+const CONFIG_PATH = join(homedir(), '.maestro', 'api-explore.json');
+
+export function loadExploreConfig(): ExploreConfig {
+  if (!existsSync(CONFIG_PATH)) return {};
+  try {
+    return JSON.parse(readFileSync(CONFIG_PATH, 'utf-8')) as ExploreConfig;
+  } catch {
+    return {};
+  }
+}
+
+export function getDefaultEndpoint(config: ExploreConfig): LlmConfig | null {
+  const model = config.model || process.env.API_EXPLORE_MODEL || '';
+  const baseUrl = config.baseUrl || process.env.API_EXPLORE_BASE_URL || '';
+  const apiKey = config.apiKey || process.env.API_EXPLORE_API_KEY || process.env.OPENAI_API_KEY || '';
+  if (!model || !baseUrl || !apiKey) return null;
+  return { model, baseUrl, apiKey, extraBody: config.extraBody };
+}
+
+export function getNamedEndpoint(name: string, config: ExploreConfig): LlmConfig | null {
+  const ep = config.endpoints?.[name];
+  if (!ep || !ep.model || !ep.baseUrl || !ep.apiKey) return null;
+  return { model: ep.model, baseUrl: ep.baseUrl, apiKey: ep.apiKey, extraBody: ep.extraBody };
+}
+
+export interface NamedEndpoint {
+  name: string;
+  llmConfig: LlmConfig;
+  maxTurns?: number;
+}
+
+export function getAllEndpoints(config: ExploreConfig): NamedEndpoint[] {
+  const results: NamedEndpoint[] = [];
+
+  const def = getDefaultEndpoint(config);
+  if (def) {
+    results.push({ name: 'default', llmConfig: def });
+  }
+
+  if (config.endpoints) {
+    for (const [name, ep] of Object.entries(config.endpoints)) {
+      if (!ep.model || !ep.baseUrl || !ep.apiKey) continue;
+      results.push({
+        name,
+        llmConfig: { model: ep.model, baseUrl: ep.baseUrl, apiKey: ep.apiKey, extraBody: ep.extraBody },
+        maxTurns: ep.maxTurns,
+      });
+    }
+  }
+
+  return results;
+}
+
+export function resolveEndpoints(
+  config: ExploreConfig,
+  endpointFilter?: string,
+  all?: boolean,
+): NamedEndpoint[] {
+  if (endpointFilter) {
+    const names = endpointFilter.split(',').map(s => s.trim()).filter(Boolean);
+    const results: NamedEndpoint[] = [];
+    for (const name of names) {
+      const ep = name === 'default' ? getDefaultEndpoint(config) : getNamedEndpoint(name, config);
+      const epConfig = config.endpoints?.[name];
+      if (ep) results.push({ name, llmConfig: ep, maxTurns: epConfig?.maxTurns });
+    }
+    return results;
+  }
+
+  if (all) return getAllEndpoints(config);
+
+  // Single: first named endpoint, or default
+  const allEps = getAllEndpoints(config);
+  return allEps.length > 0 ? [allEps[0]] : [];
+}
+
+function loadCliToolsProxy(): ProxyConfig | undefined {
+  if (!existsSync(CLI_TOOLS_PATH)) return undefined;
+  try {
+    const raw = JSON.parse(readFileSync(CLI_TOOLS_PATH, 'utf-8')) as { proxy?: ProxyConfig };
+    return raw.proxy;
+  } catch {
+    return undefined;
+  }
+}
+
+export function applyProxyEnv(config: ExploreConfig): void {
+  if (process.env.HTTP_PROXY || process.env.HTTPS_PROXY) return;
+
+  const proxy = config.proxy ?? loadCliToolsProxy();
+  if (!proxy?.enabled) return;
+
+  const httpUrl = proxy.httpProxy;
+  const httpsUrl = proxy.httpsProxy ?? httpUrl;
+  if (httpUrl) {
+    process.env.HTTP_PROXY = httpUrl;
+    process.env.http_proxy = httpUrl;
+  }
+  if (httpsUrl) {
+    process.env.HTTPS_PROXY = httpsUrl;
+    process.env.https_proxy = httpsUrl;
+  }
+  if (proxy.noProxy) {
+    process.env.NO_PROXY = proxy.noProxy;
+    process.env.no_proxy = proxy.noProxy;
+  }
+}

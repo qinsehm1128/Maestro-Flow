@@ -56,7 +56,7 @@ Multi-dimension tech debt scanner. Scan codebase across 5 dimensions (code, arch
 - Classify findings into dimensions
 
 **Medium/High Complexity** (Fan-out):
-- Fan-out A: CLI exploration (structure, patterns, dependencies angles) via `maestro delegate --role explore --mode analysis`
+- Fan-out A: `maestro explore` multi-prompt parallel (structure, patterns, dependencies angles) — preferred over delegate for exploration
 - Fan-out B: CLI dimension analysis (parallel per dimension -- code, architecture, testing, dependency, documentation) via `--role analyze`
 - Fan-out C (High only): Multi-perspective analysis (security, performance, code-quality, architecture) via `--role analyze`
 - Fan-in: Merge results, cross-deduplicate by file:line, boost severity for multi-source findings
