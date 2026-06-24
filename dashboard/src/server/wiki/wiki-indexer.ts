@@ -130,22 +130,16 @@ export class WikiIndexer {
   private async hasSourceChanges(): Promise<boolean> {
     if (this.mtimeSnapshot.size === 0) return true;
     const { singletons, dirs } = this.getSourcePaths();
-    for (const p of singletons) {
-      try {
-        const st = await stat(p);
+    const allPaths = [...singletons, ...dirs];
+    const results = await Promise.allSettled(allPaths.map(p => stat(p)));
+    for (let i = 0; i < allPaths.length; i++) {
+      const p = allPaths[i];
+      const result = results[i];
+      if (result.status === 'fulfilled') {
         const prev = this.mtimeSnapshot.get(p);
-        if (prev === undefined || st.mtimeMs !== prev) return true;
-      } catch {
+        if (prev === undefined || result.value.mtimeMs !== prev) return true;
+      } else {
         if (this.mtimeSnapshot.has(p)) return true;
-      }
-    }
-    for (const dir of dirs) {
-      try {
-        const st = await stat(dir);
-        const prev = this.mtimeSnapshot.get(dir);
-        if (prev === undefined || st.mtimeMs !== prev) return true;
-      } catch {
-        if (this.mtimeSnapshot.has(dir)) return true;
       }
     }
     return false;
@@ -154,11 +148,13 @@ export class WikiIndexer {
   private async captureMtimeSnapshot(): Promise<Map<string, number>> {
     const snap = new Map<string, number>();
     const { singletons, dirs } = this.getSourcePaths();
-    for (const p of singletons) {
-      try { snap.set(p, (await stat(p)).mtimeMs); } catch { /* missing is fine */ }
-    }
-    for (const dir of dirs) {
-      try { snap.set(dir, (await stat(dir)).mtimeMs); } catch { /* missing */ }
+    const allPaths = [...singletons, ...dirs];
+    const results = await Promise.allSettled(allPaths.map(p => stat(p)));
+    for (let i = 0; i < allPaths.length; i++) {
+      if (results[i].status === 'fulfilled') {
+        const st = (results[i] as PromiseFulfilledResult<Awaited<ReturnType<typeof stat>>>).value;
+        snap.set(allPaths[i], Number(st.mtimeMs));
+      }
     }
     return snap;
   }
@@ -168,7 +164,7 @@ export class WikiIndexer {
     if (!existsSync(cachePath)) return false;
 
     try {
-      const raw = readFileSync(cachePath, 'utf-8');
+      const raw = await readFile(cachePath, 'utf-8');
       const cached = JSON.parse(raw);
       if (cached.version !== 1 || !Array.isArray(cached.entries)) return false;
 

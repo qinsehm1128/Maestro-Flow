@@ -378,11 +378,6 @@ export function buildInvertedIndex(entries: WikiEntry[]): InvertedIndex {
   const fieldLengths = new Map<string, FieldLengths>();
   const docConfigKeys = new Map<string, FieldConfigKey>();
 
-  // Legacy flat postings + docLengths for backward-compat consumers
-  const postings = new Map<string, Posting[]>();
-  const docLengths = new Map<string, number>();
-  let totalLength = 0;
-
   const totalFieldLengths: FieldLengths = { title: 0, summary: 0, tags: 0, body: 0 };
   const fields: FieldName[] = ['title', 'summary', 'tags', 'body'];
 
@@ -397,8 +392,6 @@ export function buildInvertedIndex(entries: WikiEntry[]): InvertedIndex {
     };
     const lengths: FieldLengths = { title: 0, summary: 0, tags: 0, body: 0 };
 
-    const flatTermCounts = new Map<string, number>();
-
     for (const f of fields) {
       if (configs[f].boost === 0) continue;
       const tokens = tokenize(texts[f]);
@@ -406,13 +399,11 @@ export function buildInvertedIndex(entries: WikiEntry[]): InvertedIndex {
       totalFieldLengths[f] += tokens.length;
       for (const t of tokens) {
         perField[f].set(t, (perField[f].get(t) ?? 0) + 1);
-        flatTermCounts.set(t, (flatTermCounts.get(t) ?? 0) + 1);
       }
     }
 
     fieldLengths.set(entry.id, lengths);
 
-    // Build field-level postings
     const allTerms = new Set<string>();
     for (const f of fields) {
       for (const t of perField[f].keys()) allTerms.add(t);
@@ -430,16 +421,6 @@ export function buildInvertedIndex(entries: WikiEntry[]): InvertedIndex {
         },
       });
     }
-
-    let flatTotal = 0;
-    for (const c of flatTermCounts.values()) flatTotal += c;
-    docLengths.set(entry.id, flatTotal);
-    totalLength += flatTotal;
-    for (const [term, tf] of flatTermCounts) {
-      let list = postings.get(term);
-      if (!list) { list = []; postings.set(term, list); }
-      list.push({ docId: entry.id, tf });
-    }
   }
 
   const totalDocs = entries.length;
@@ -451,9 +432,9 @@ export function buildInvertedIndex(entries: WikiEntry[]): InvertedIndex {
   };
 
   return {
-    postings,
-    docLengths,
-    avgDocLength: totalDocs === 0 ? 0 : totalLength / totalDocs,
+    postings: new Map(),
+    docLengths: new Map(),
+    avgDocLength: 0,
     totalDocs,
     fieldPostings,
     fieldLengths,

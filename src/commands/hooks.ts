@@ -1264,7 +1264,7 @@ const HOOK_RUNNERS: Record<string, HookRunner> = {
     if (!workspace) return;
 
     const workflowRoot = join(workspace, '.workflow');
-    const { spawnDaemon } = await import('../search/daemon.js');
+    const { spawnDaemon } = await import('../search/daemon-client.js');
     await spawnDaemon(workflowRoot);
   },
 };

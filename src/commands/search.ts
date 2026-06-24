@@ -17,10 +17,10 @@ import type { Command } from 'commander';
 import { resolve, join } from 'node:path';
 
 import { truncate, extractSnippet, highlightTerms } from '../utils/cli-format.js';
-import { WikiIndexer } from '#maestro-dashboard/wiki/wiki-indexer.js';
+import type { WikiIndexer } from '#maestro-dashboard/wiki/wiki-indexer.js';
 import type { WikiEntry, WikiNodeType } from '#maestro-dashboard/wiki/wiki-types.js';
 import { loadWorkspaceConfig, resolveWorkspaceLinks } from '../config/index.js';
-import { tryDaemonSearch, startDaemon, stopDaemon, spawnDaemon, readDaemonInfo, isDaemonAlive, getDaemonPath } from '../search/daemon.js';
+import { tryDaemonSearch, stopDaemon, spawnDaemon, readDaemonInfo, isDaemonAlive, getDaemonPath } from '../search/daemon-client.js';
 
 // Valid type filter values — matches WikiNodeType + virtual aliases.
 const VALID_TYPES = ['project', 'roadmap', 'spec', 'issue', 'knowhow', 'note', 'domain', 'session', 'scratch'] as const;
@@ -64,10 +64,11 @@ export interface UnifiedSearchOptions {
 
 // ── Lazy offline client ────────────────────────────────────────────────
 
-let _indexer: WikiIndexer | null = null;
+let _indexer: InstanceType<typeof import('#maestro-dashboard/wiki/wiki-indexer.js').WikiIndexer> | null = null;
 
-function getIndexer(): WikiIndexer {
+async function getIndexer(): Promise<WikiIndexer> {
   if (!_indexer) {
+    const { WikiIndexer: Cls } = await import('#maestro-dashboard/wiki/wiki-indexer.js');
     const workflowRoot = resolve('.workflow');
     const projectPath = process.cwd();
     const wsConfig = loadWorkspaceConfig(projectPath);
@@ -75,7 +76,7 @@ function getIndexer(): WikiIndexer {
     const linkedWorkspaces = resolved
       .filter(lw => lw.valid)
       .map(lw => ({ name: lw.name, workflowRoot: lw.workflowRoot, shareTypes: lw.share }));
-    _indexer = new WikiIndexer({ workflowRoot, linkedWorkspaces });
+    _indexer = new Cls({ workflowRoot, linkedWorkspaces });
   }
   return _indexer;
 }
@@ -108,11 +109,14 @@ export async function runUnifiedSearch(q: string, opts: UnifiedSearchOptions & {
     embeddingUsed = daemonResult.embeddingUsed ?? false;
     embeddingDocs = daemonResult.embeddingDocs ?? 0;
   } else {
-    const indexer = getIndexer();
-    const result = await indexer.searchWithMeta(q, candidateLimit, { skipEmbedding: opts.skipEmbedding });
+    // Daemon unavailable — use BM25-only to avoid ONNX cold-start (~1800ms).
+    // Spawn daemon in background so future searches get embedding.
+    const indexer = await getIndexer();
+    const result = await indexer.searchWithMeta(q, candidateLimit, { skipEmbedding: true });
     scored = result.results;
     embeddingUsed = result.embeddingUsed;
     embeddingDocs = result.embeddingDocs;
+    spawnDaemon(workflowRoot).catch(() => {});
   }
   _lastSearchMeta = { embeddingUsed, embeddingDocs };
 
@@ -433,6 +437,7 @@ export function registerSearchCommand(program: Command): void {
         const linkedWorkspaces = resolved
           .filter(lw => lw.valid)
           .map(lw => ({ name: lw.name, workflowRoot: lw.workflowRoot, shareTypes: lw.share }));
+        const { startDaemon } = await import('../search/daemon.js');
         const { port } = await startDaemon(workflowRoot, { workflowRoot, linkedWorkspaces });
         console.log(`Search daemon started (pid=${process.pid}, port=${port})`);
         // Keep process alive
@@ -469,6 +474,7 @@ export function registerSearchCommand(program: Command): void {
         .filter(lw => lw.valid)
         .map(lw => ({ name: lw.name, workflowRoot: lw.workflowRoot, shareTypes: lw.share }));
       try {
+        const { startDaemon } = await import('../search/daemon.js');
         await startDaemon(workflowRoot, { workflowRoot, linkedWorkspaces });
       } catch { process.exit(0); }
     });

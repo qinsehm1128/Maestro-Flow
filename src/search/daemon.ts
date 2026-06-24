@@ -11,7 +11,6 @@ import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
 import { WikiIndexer, type WikiIndexerConfig } from '#maestro-dashboard/wiki/wiki-indexer.js';
-import { buildInvertedIndex, searchBM25Planned, rerankByPhraseProximity, type InvertedIndex } from '#maestro-dashboard/wiki/search.js';
 import type { WikiEntry } from '#maestro-dashboard/wiki/wiki-types.js';
 
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
@@ -98,9 +97,8 @@ export async function startDaemon(
 
   const indexer = new WikiIndexer(config);
 
-  // Pre-warm: build index + BM25 + embedding
-  const index = await indexer.rebuild();
-  let bm25: InvertedIndex = buildInvertedIndex(index.entries);
+  // Pre-warm: build index + embedding
+  await indexer.rebuild();
   const embeddingWarm = indexer.getEmbeddingIndex().catch(() => null);
 
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -117,7 +115,7 @@ export async function startDaemon(
       if (nlIdx === -1) return;
       const line = buf.slice(0, nlIdx);
       buf = buf.slice(nlIdx + 1);
-      handleRequest(line, indexer, () => bm25, socket).then(() => {
+      handleRequest(line, indexer, socket).then(() => {
         resetIdle(server);
       });
     });
@@ -132,6 +130,7 @@ export async function startDaemon(
       const port = addr.port;
       const info: DaemonInfo = { pid: process.pid, port, startedAt: new Date().toISOString() };
       writeFileSync(getDaemonPath(workflowRoot), JSON.stringify(info));
+      try { unlinkSync(join(workflowRoot, 'search-daemon-spawning')); } catch {}
       resetIdle(server);
       res({ port, server });
     });
@@ -142,7 +141,6 @@ export async function startDaemon(
 async function handleRequest(
   line: string,
   indexer: WikiIndexer,
-  getBm25: () => InvertedIndex,
   socket: import('node:net').Socket,
 ): Promise<void> {
   let resp: DaemonSearchResponse;
