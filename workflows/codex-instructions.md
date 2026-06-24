@@ -107,12 +107,37 @@ maestro search "DetailedTopologySVG" --code
 maestro search "elk layout" --type knowhow
 ```
 
-Then add follow-up searches based on results:
-- Specific symbol/function → `maestro search "SymbolName" --kg` or `maestro kg context <node>`
-- Architecture/testing → `maestro search --type spec --category arch|test`
-- Call chains → `maestro kg callers <fn>` / `maestro kg callees <fn>`
-- KG 全源搜索 → `maestro search "<query>" --kg`
-- Domain rules → `maestro load --type spec --category <cat> [--keyword <kw>]`
+### Required follow-up (after initial search, MUST execute before implementation)
+
+**Step 2 — Load specs**: After search, ALWAYS load relevant specs before writing code:
+
+```bash
+# Coding task → load coding specs
+maestro load --type spec --category coding
+
+# Architecture decision → load arch specs
+maestro load --type spec --category arch
+
+# Test writing → load test specs
+maestro load --type spec --category test
+
+# UI work → load ui specs
+maestro load --type spec --category ui
+```
+
+**Step 3 — Deep search** (when initial search shows relevant symbols/patterns):
+
+```bash
+# Code symbol deep dive → KG search
+maestro search "SymbolName" --kg
+
+# Call chain analysis
+maestro kg callers <fn>
+maestro kg callees <fn>
+
+# Node context (7-element: focal + ancestors + children + refs)
+maestro kg context <node>
+```
 
 ### Load (unified knowledge loading)
 
@@ -120,13 +145,14 @@ Then add follow-up searches based on results:
 maestro load --type <type> [--list] [--category <cat>] [--keyword <word>] [--id <id>]
 ```
 
-| 用法 | 示例 |
+| 用法 | 命令 |
 |------|------|
-| 列出 session | `maestro load --type session --list` |
 | 加载 spec | `maestro load --type spec --category coding` |
+| 列出 session | `maestro load --type session --list` |
 | 加载 knowhow | `maestro load --type knowhow --id <id>` |
-| 列出 knowhow | `maestro load --type knowhow --list` |
+| 搜索 session | `maestro search "query" --type session` |
 | 代码图谱搜索 | `maestro search "symbol" --code` |
+| KG 全源搜索 | `maestro search "query" --kg` |
 
 Types: `spec`, `knowhow`, `domain`, `issue`, `session`, `scratch`, `note`, `project`, `roadmap`
 

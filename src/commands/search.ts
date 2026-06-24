@@ -22,8 +22,8 @@ import type { WikiEntry, WikiNodeType } from '#maestro-dashboard/wiki/wiki-types
 import { loadWorkspaceConfig, resolveWorkspaceLinks } from '../config/index.js';
 import { tryDaemonSearch, startDaemon, stopDaemon, spawnDaemon, readDaemonInfo, isDaemonAlive, getDaemonPath } from '../search/daemon.js';
 
-// Valid type filter values — matches WikiNodeType.
-const VALID_TYPES = ['project', 'roadmap', 'spec', 'issue', 'knowhow', 'note', 'domain'] as const;
+// Valid type filter values — matches WikiNodeType + virtual aliases.
+const VALID_TYPES = ['project', 'roadmap', 'spec', 'issue', 'knowhow', 'note', 'domain', 'session', 'scratch'] as const;
 
 // Per-category result caps — prevents low-value sources from dominating.
 const CATEGORY_CAPS: Record<string, number> = {
@@ -118,7 +118,14 @@ export async function runUnifiedSearch(q: string, opts: UnifiedSearchOptions & {
 
   let filtered = scored;
   if (opts.type) {
-    filtered = filtered.filter(r => r.entry.type === opts.type);
+    // Virtual type aliases: session/scratch map to category filter
+    if (opts.type === 'session') {
+      filtered = filtered.filter(r => r.entry.category === 'session');
+    } else if (opts.type === 'scratch') {
+      filtered = filtered.filter(r => r.entry.category === 'scratch');
+    } else {
+      filtered = filtered.filter(r => r.entry.type === opts.type);
+    }
   }
   if (opts.category) {
     filtered = filtered.filter(r => r.entry.category === opts.category);
@@ -127,17 +134,21 @@ export async function runUnifiedSearch(q: string, opts: UnifiedSearchOptions & {
     filtered = filtered.filter(r => r.entry.source.workspace === opts.workspace);
   }
 
+  // CATEGORY_CAPS only when user didn't explicitly filter by type/category
+  const applyCaps = !opts.type && !opts.category;
   const seen = new Set<string>();
   const deduped: typeof filtered = [];
   const catCounts = new Map<string, number>();
   for (const r of filtered) {
     if (seen.has(r.entry.id)) continue;
-    const cat = r.entry.category ?? '';
-    const cap = CATEGORY_CAPS[cat];
-    if (cap !== undefined) {
-      const count = catCounts.get(cat) ?? 0;
-      if (count >= cap) continue;
-      catCounts.set(cat, count + 1);
+    if (applyCaps) {
+      const cat = r.entry.category ?? '';
+      const cap = CATEGORY_CAPS[cat];
+      if (cap !== undefined) {
+        const count = catCounts.get(cat) ?? 0;
+        if (count >= cap) continue;
+        catCounts.set(cat, count + 1);
+      }
     }
     seen.add(r.entry.id);
     deduped.push(r);
