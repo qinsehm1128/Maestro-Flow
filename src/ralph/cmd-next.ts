@@ -54,7 +54,16 @@ export async function runNext(opts: NextCmdOptions): Promise<number> {
       const loc = f.step_index !== undefined ? ` [step ${f.step_index}]` : '';
       console.error(`  ${f.code}${loc}: ${f.message}`);
     }
-    console.error('  → edit status.json manually, then retry');
+    // invariant 8: an E-level prerequisite (e.g. E007 missing required) must
+    // PAUSE the session, not just return. A bare `return 1` leaves
+    // status="running", so a goal-loop that re-invokes `next` retries the same
+    // error forever (the R7/R10 "infinite-retry trap"). Pausing breaks the loop
+    // — the next runNext() refuses at the status!=="running" gate above — and
+    // surfaces the blocker. Mirrors the BLOCKED branch in cmd-complete.ts.
+    data.status = 'paused';
+    data.active_step_index = null;
+    writeStatus(statusPath, data);
+    console.error('  → session paused; fix status.json then set status="running" to resume');
     return 1;
   }
 

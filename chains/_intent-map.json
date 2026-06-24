@@ -84,7 +84,7 @@
       "type": "verify",
       "regex": "verif[iy]|validate.*result|验证|校验",
       "flags": "i",
-      "route": { "graph": "singles/verify" }
+      "route": { "graph": "singles/execute" }
     },
     {
       "type": "review",
