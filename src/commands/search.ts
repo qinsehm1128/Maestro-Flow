@@ -23,6 +23,12 @@ import { tryDaemonSearch, startDaemon, stopDaemon, spawnDaemon, readDaemonInfo, 
 // Valid type filter values — matches WikiNodeType.
 const VALID_TYPES = ['project', 'roadmap', 'spec', 'issue', 'knowhow', 'note', 'domain'] as const;
 
+// Per-category result caps — prevents low-value sources from dominating.
+const CATEGORY_CAPS: Record<string, number> = {
+  session: 3,
+  scratch: 3,
+};
+
 /** A single unified search result with BM25 score and snippet. */
 export interface SearchResult {
   id: string;
@@ -121,8 +127,16 @@ export async function runUnifiedSearch(q: string, opts: UnifiedSearchOptions & {
 
   const seen = new Set<string>();
   const deduped: typeof filtered = [];
+  const catCounts = new Map<string, number>();
   for (const r of filtered) {
     if (seen.has(r.entry.id)) continue;
+    const cat = r.entry.category ?? '';
+    const cap = CATEGORY_CAPS[cat];
+    if (cap !== undefined) {
+      const count = catCounts.get(cat) ?? 0;
+      if (count >= cap) continue;
+      catCounts.set(cat, count + 1);
+    }
     seen.add(r.entry.id);
     deduped.push(r);
     if (deduped.length >= limit) break;
@@ -201,7 +215,7 @@ export function registerSearchCommand(program: Command): void {
     .description('Unified knowledge search across wiki + code (mixed by default)')
     .option('--type <type>', `Filter by type: ${VALID_TYPES.join(', ')}`)
     .option('--category <cat>', 'Filter by category (e.g. coding, arch, debug, test, review, learning)')
-    .option('--code', 'Show wiki and code in separate sections (legacy display)')
+    .option('--code', 'Code graph results only (no wiki)')
     .option('--all', 'Alias for default mixed mode (backward compat)')
     .option('--wiki-only', 'Search wiki only, skip code results')
     .option('--workspace <name>', 'Filter results to a specific linked workspace')
@@ -212,7 +226,7 @@ export function registerSearchCommand(program: Command): void {
       const q = queryParts.join(' ');
       const limit = parseInt(opts.limit, 10) || 20;
       const wikiOnly = opts.wikiOnly === true;
-      const separateSections = opts.code === true && !opts.all;
+      const codeOnly = opts.code === true && !opts.all;
 
       if (opts.type && !VALID_TYPES.includes(opts.type)) {
         console.error(`Error: --type must be one of ${VALID_TYPES.join(', ')} (got "${opts.type}")`);
@@ -220,9 +234,9 @@ export function registerSearchCommand(program: Command): void {
       }
 
       const skipEmbedding = opts.emb === false;
-      // Parallel: wiki + code search
+      // Parallel: wiki + code search (skip irrelevant source based on flags)
       const [wikiResults, codeResults] = await Promise.all([
-        runUnifiedSearch(q, { type: opts.type, category: opts.category, workspace: opts.workspace, limit, skipEmbedding }),
+        codeOnly ? [] : runUnifiedSearch(q, { type: opts.type, category: opts.category, workspace: opts.workspace, limit, skipEmbedding }),
         wikiOnly ? [] : runCodeSearch(q, limit),
       ]);
 
@@ -231,28 +245,19 @@ export function registerSearchCommand(program: Command): void {
       const isTTY = process.stdout.isTTY === true;
       const qTerms = q.toLowerCase().split(/\s+/).filter(Boolean);
 
-      // --code (without --all): legacy separate-section display
-      if (separateSections) {
+      // --code: code graph results only
+      if (codeOnly) {
         if (opts.json) {
-          console.log(JSON.stringify({ query: q, wikiCount: wikiResults.length, codeCount: codeResults.length, wikiResults, codeResults }, null, 2));
+          console.log(JSON.stringify({ query: q, count: codeResults.length, results: codeResults }, null, 2));
           return;
         }
-        console.log(`Search: "${q}" (${wikiResults.length} wiki + ${codeResults.length} code, ${embTag})`);
-        if (wikiResults.length === 0 && codeResults.length === 0) {
+        console.log(`Search: "${q}" (code ${codeResults.length}, ${embTag})`);
+        if (codeResults.length === 0) {
           console.log('  No matches found.');
           return;
         }
-        if (wikiResults.length > 0) {
-          console.log('  [Wiki Results]');
-          for (const r of wikiResults) {
-            printWikiResult(r, '    ', isTTY, qTerms);
-          }
-        }
-        if (codeResults.length > 0) {
-          console.log('  [Code Results]');
-          for (const r of codeResults) {
-            printCodeResult(r, '    ', isTTY, qTerms);
-          }
+        for (const r of codeResults) {
+          printCodeResult(r, '  ', isTTY, qTerms);
         }
         return;
       }
@@ -263,13 +268,38 @@ export function registerSearchCommand(program: Command): void {
       const codeCount = merged.filter(r => r.source === 'code').length;
 
       if (opts.json) {
-        console.log(JSON.stringify({ query: q, wikiCount, codeCount, count: merged.length, results: merged }, null, 2));
+        const typeCountsJson: Record<string, number> = {};
+        for (const r of merged) {
+          let dt: string;
+          if (r.source === 'code') dt = 'code';
+          else if (r.category === 'session') dt = 'session';
+          else if (r.category === 'scratch') dt = 'scratch';
+          else dt = r.kind;
+          typeCountsJson[dt] = (typeCountsJson[dt] ?? 0) + 1;
+        }
+        console.log(JSON.stringify({ query: q, wikiCount, codeCount, typeCounts: typeCountsJson, count: merged.length, results: merged }, null, 2));
         return;
       }
 
+      // Per-type breakdown header
+      const TYPE_DISPLAY_ORDER = ['spec', 'domain', 'knowhow', 'issue', 'project', 'roadmap', 'note', 'session', 'scratch', 'code'];
+      const typeCounts = new Map<string, number>();
+      for (const r of merged) {
+        let displayType: string;
+        if (r.source === 'code') displayType = 'code';
+        else if (r.category === 'session') displayType = 'session';
+        else if (r.category === 'scratch') displayType = 'scratch';
+        else displayType = r.kind;
+        typeCounts.set(displayType, (typeCounts.get(displayType) ?? 0) + 1);
+      }
       const countParts: string[] = [];
-      if (wikiCount > 0) countParts.push(`wiki ${wikiCount}个`);
-      if (codeCount > 0) countParts.push(`代码 ${codeCount}个`);
+      for (const t of TYPE_DISPLAY_ORDER) {
+        const c = typeCounts.get(t);
+        if (c) countParts.push(`${t} ${c}`);
+      }
+      for (const [t, c] of typeCounts) {
+        if (!TYPE_DISPLAY_ORDER.includes(t)) countParts.push(`${t} ${c}`);
+      }
       const countSummary = countParts.length > 0
         ? `${countParts.join(' + ')} = ${merged.length} results`
         : '0 results';
@@ -285,13 +315,15 @@ export function registerSearchCommand(program: Command): void {
       }
 
       for (const r of merged) {
-        const name = isTTY ? highlightTerms(r.name, qTerms) : r.name;
+        const displayName = truncate(r.name, 60);
+        const name = isTTY ? highlightTerms(displayName, qTerms) : displayName;
         const scoreTag = `  (${r.normalizedScore.toFixed(4)})`;
         if (r.source === 'wiki') {
           console.log(`  [wiki:${r.kind}]  ${name}  ${r.detail}${scoreTag}`);
-          if (r.snippet) {
-            const snippet = isTTY ? highlightTerms(r.snippet, qTerms) : r.snippet;
-            console.log(`    ${snippet}`);
+          const subtitle = pickSubtitle(r);
+          if (subtitle) {
+            const text = isTTY ? highlightTerms(subtitle, qTerms) : subtitle;
+            console.log(`    ${text}`);
           }
         } else {
           const sigTag = r.signature ? `  ${truncate(r.signature, 60)}` : '';
@@ -432,6 +464,27 @@ export function registerSearchCommand(program: Command): void {
 
 // ── Display helpers ──────────────────────────────────────────────────
 
+function isDuplicate(text: string, title: string): boolean {
+  const a = text.replace(/^#+\s+/, '').replace(/^[-*]\s+/, '').trim();
+  const b = title.trim();
+  if (!a || !b) return true;
+  if (a === b) return true;
+  if (a.startsWith(b.slice(0, 30)) || b.startsWith(a.slice(0, 30))) return true;
+  return false;
+}
+
+function pickSubtitle(r: MergedResult): string | null {
+  if (r.snippet) {
+    const content = r.snippet.replace(/^L\d+:\s*/, '');
+    if (!isDuplicate(content, r.name)) return r.snippet;
+  }
+  if (r.summary) {
+    const cleaned = r.summary.replace(/^#+\s+/, '').trim();
+    if (!isDuplicate(cleaned, r.name)) return truncate(cleaned, 80);
+  }
+  return null;
+}
+
 function printWikiResult(r: SearchResult, indent: string, isTTY: boolean, qTerms: string[]): void {
   const typeTag = `[${r.type}]`;
   const catTag = r.category ? ` ${r.category}` : '';
@@ -469,7 +522,9 @@ export interface MergedResult {
   detail: string;
   normalizedScore: number;
   snippet?: string;
+  summary?: string;
   signature?: string;
+  category?: string;
 }
 
 const WIKI_TYPE_BOOST: Record<string, number> = {
@@ -593,6 +648,8 @@ function mergeAndNormalize(wiki: SearchResult[], code: CodeSearchResult[], limit
       detail: r.category ? `${r.category}  ${r.id}` : r.id,
       normalizedScore: wikiRanks[i] * WIKI_WEIGHT,
       snippet: r.snippet ?? undefined,
+      summary: r.summary || undefined,
+      category: r.category ?? undefined,
     });
   }
   for (let i = 0; i < codeScored.length; i++) {
