@@ -26,6 +26,10 @@ export interface CompleteCmdOptions {
   evidence: string[];
   concerns?: string;
   reason?: string;
+  summary?: string;
+  decisions?: string[];
+  caveats?: string;
+  deferred?: string[];
 }
 
 export async function runComplete(opts: CompleteCmdOptions): Promise<number> {
@@ -78,6 +82,10 @@ function applyStatus(
       step.completion_confirmed = true;
       step.completion_status = 'DONE';
       step.completion_evidence = evidence;
+      step.completion_summary = opts.summary ?? null;
+      step.completion_decisions = opts.decisions?.length ? opts.decisions : null;
+      step.completion_caveats = opts.caveats ?? null;
+      step.completion_deferred = opts.deferred?.length ? opts.deferred : null;
       step.completed_at = now;
       step.concerns = null;
       session.active_step_index = null;
@@ -88,6 +96,10 @@ function applyStatus(
       step.completion_confirmed = true;
       step.completion_status = 'DONE_WITH_CONCERNS';
       step.completion_evidence = evidence;
+      step.completion_summary = opts.summary ?? null;
+      step.completion_decisions = opts.decisions?.length ? opts.decisions : null;
+      step.completion_caveats = opts.caveats ?? null;
+      step.completion_deferred = opts.deferred?.length ? opts.deferred : null;
       step.concerns = opts.concerns ?? null;
       step.completed_at = now;
       session.active_step_index = null;

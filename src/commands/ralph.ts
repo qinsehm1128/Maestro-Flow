@@ -96,12 +96,20 @@ export function registerRalphCommand(program: Command): void {
     .option('--evidence <path>', 'Artifact path / output excerpt (repeatable)', collect, [] as string[])
     .option('--concerns <text>', 'Concerns text (with DONE_WITH_CONCERNS)')
     .option('--reason <text>', 'Reason (with BLOCKED)')
+    .option('--summary <text>', 'One-sentence summary of what this step accomplished')
+    .option('--decisions <text>', 'Key decision made (repeatable)', collect, [] as string[])
+    .option('--caveats <text>', 'Warnings/notes for downstream steps')
+    .option('--deferred <text>', 'Deferred work item (repeatable)', collect, [] as string[])
     .option('--session <id>', 'Session id (default: latest running ralph-*)')
     .action(async (indexArg: string, opts: {
       status: string;
       evidence: string[];
       concerns?: string;
       reason?: string;
+      summary?: string;
+      decisions?: string[];
+      caveats?: string;
+      deferred?: string[];
       session?: string;
     }) => {
       const status = opts.status.toUpperCase() as RalphCompletionStatus;
@@ -122,6 +130,10 @@ export function registerRalphCommand(program: Command): void {
         evidence: opts.evidence,
         concerns: opts.concerns,
         reason: opts.reason,
+        summary: opts.summary,
+        decisions: opts.decisions,
+        caveats: opts.caveats,
+        deferred: opts.deferred,
       });
       process.exit(code);
     });

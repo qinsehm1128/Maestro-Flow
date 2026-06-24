@@ -163,10 +163,11 @@ function emitPrompt(
     '',
     `<!-- maestro ralph: step [${idx}/${total}] skill=${step.skill}${argsLine} session=${sessionId} -->`,
     '<!-- On finish, run exactly one of:',
-    `       maestro ralph complete ${idx} --status DONE [--evidence <path>]`,
-    `       maestro ralph complete ${idx} --status DONE_WITH_CONCERNS --concerns "..."`,
+    `       maestro ralph complete ${idx} --status DONE --summary "..." [--evidence <path>] [--decisions "..."] [--caveats "..."] [--deferred "..."]`,
+    `       maestro ralph complete ${idx} --status DONE_WITH_CONCERNS --summary "..." --concerns "..."`,
     `       maestro ralph retry ${idx}`,
-    `       maestro ralph complete ${idx} --status BLOCKED --reason "<external blocker>" -->`,
+    `       maestro ralph complete ${idx} --status BLOCKED --reason "<external blocker>"`,
+    '     --summary is REQUIRED for DONE/DONE_WITH_CONCERNS (verb-led, ≤100 chars, core outcome). -->',
   ].join('\n');
 
   const tail = configSection ? '\n\n' + configSection + meta : meta;
@@ -179,7 +180,7 @@ function buildSessionAnchor(session: RalphSession, step: RalphStep): string | nu
   if (!intent) return null;
 
   const parts: string[] = [];
-  parts.push(`**Intent**: ${truncateAnchor(intent, 600)}`);
+  parts.push(`**Intent**: ${truncateAnchor(intent, 1200)}`);
   const phase = session.phase ?? '—';
   const scope = session.scope_verdict ?? 'unknown';
   parts.push(`**Scope**: ${scope} | Phase ${phase} | Milestone: ${session.milestone || '—'}`);
@@ -187,11 +188,44 @@ function buildSessionAnchor(session: RalphSession, step: RalphStep): string | nu
   const bc = session.boundary_contract;
   if (bc && (bc.in_scope?.length || bc.out_of_scope?.length || bc.constraints?.length || bc.definition_of_done)) {
     const lines = ['**Boundary Contract**:'];
-    if (bc.in_scope?.length) lines.push(`- In scope: ${capAnchorList(bc.in_scope)}`);
-    if (bc.out_of_scope?.length) lines.push(`- Out of scope: ${capAnchorList(bc.out_of_scope)}`);
-    if (bc.constraints?.length) lines.push(`- Constraints: ${capAnchorList(bc.constraints)}`);
+    if (bc.in_scope?.length) lines.push(`- In scope: ${capAnchorList(bc.in_scope, 8)}`);
+    if (bc.out_of_scope?.length) lines.push(`- Out of scope: ${capAnchorList(bc.out_of_scope, 8)}`);
+    if (bc.constraints?.length) lines.push(`- Constraints: ${capAnchorList(bc.constraints, 8)}`);
     if (bc.definition_of_done) lines.push(`- Done when: ${truncateAnchor(bc.definition_of_done, 300)}`);
     parts.push(lines.join('\n'));
+  }
+
+  // Execution progress — sliding window of recent completed steps
+  const completedSteps = session.steps.filter(
+    s => s.status === 'completed' && s.completion_summary,
+  );
+  if (completedSteps.length > 0) {
+    const recent = completedSteps.slice(-5);
+    const pLines = ['**Execution Progress**:'];
+    for (const s of recent) {
+      pLines.push(`- [${s.index}] ${s.skill} (${s.stage}): ${truncateAnchor(s.completion_summary!, 200)}`);
+      if (s.completion_caveats) {
+        pLines.push(`  ⚠️ ${truncateAnchor(s.completion_caveats, 150)}`);
+      }
+    }
+    const total = session.steps.filter(s => s.status === 'completed').length;
+    const pending = session.steps.filter(s => s.status === 'pending').length;
+    pLines.push(`- Progress: ${total} done, ${pending} pending`);
+    parts.push(pLines.join('\n'));
+  }
+
+  // Task decomposition global view (current goals only, skip superseded)
+  const activeGoals = (session.task_decomposition ?? []).filter(g => g.status !== 'superseded');
+  if (activeGoals.length > 0) {
+    const gLines = ['**Goals Overview**:'];
+    for (const g of activeGoals) {
+      const icon = g.status === 'done' ? '✓' : '○';
+      gLines.push(`- [${icon}] ${g.id}: ${truncateAnchor(g.goal, 100)} — done_when: ${truncateAnchor(g.done_when ?? '', 80)}`);
+    }
+    if (session.goal_changelog?.length) {
+      gLines.push(`- Course corrections: ${session.goal_changelog.length} applied`);
+    }
+    parts.push(gLines.join('\n'));
   }
 
   const goal = resolveGoalContext(session, step);
@@ -200,11 +234,27 @@ function buildSessionAnchor(session: RalphSession, step: RalphStep): string | nu
     lines.push(`- Goal: ${truncateAnchor(goal.goal, 300)}`);
     if (goal.boundary) lines.push(`- Boundary: ${truncateAnchor(goal.boundary, 200)}`);
     if (goal.done_when) lines.push(`- Done when: ${truncateAnchor(goal.done_when, 200)}`);
+    if (goal.origin) lines.push(`- Origin: ${goal.origin}`);
     parts.push(lines.join('\n'));
   }
 
   if (session.execution_criteria?.length) {
     parts.push(`**Execution Criteria**: ${capAnchorList(session.execution_criteria, 5)}`);
+  }
+
+  // Accumulated signals — drift-prone caveats and deferred work from prior steps
+  const allCaveats = session.steps
+    .filter(s => s.status === 'completed' && s.completion_caveats)
+    .map(s => s.completion_caveats!);
+  const allDeferred = session.steps
+    .filter(s => s.status === 'completed' && s.completion_deferred?.length)
+    .flatMap(s => s.completion_deferred!);
+  if (allCaveats.length > 0 || allDeferred.length > 0) {
+    const sLines = ['**⚠️ Accumulated Signals**:'];
+    if (allCaveats.length) sLines.push(`- Caveats: ${allCaveats.slice(-3).join('; ')}`);
+    if (allDeferred.length) sLines.push(`- Deferred work: ${allDeferred.slice(-5).join('; ')}`);
+    sLines.push('- **Before proceeding, verify these signals do not conflict with your current task.**');
+    parts.push(sLines.join('\n'));
   }
 
   return [
@@ -215,7 +265,9 @@ function buildSessionAnchor(session: RalphSession, step: RalphStep): string | nu
     '',
     '<!-- session_anchor: read-only grounding. Honor Intent + Boundary Contract before acting.',
     '     If your work would fall outside in_scope (or hit out_of_scope), stop and report via',
-    '     `maestro ralph complete <N> --status BLOCKED --reason "out_of_scope: ..."` instead of proceeding. -->',
+    '     `maestro ralph complete <N> --status BLOCKED --reason "out_of_scope: ..."` instead of proceeding.',
+    '     If Accumulated Signals suggest prior work conflicts with your task, report via',
+    '     `maestro ralph complete <N> --status BLOCKED --reason "drift_conflict: ..."` instead of proceeding. -->',
     '</session_anchor>',
   ].join('\n');
 }
