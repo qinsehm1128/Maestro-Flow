@@ -174,15 +174,26 @@ async function callEmbeddingApi(texts: string[], config: EmbeddingApiConfig): Pr
 
   const results: Float32Array[] = new Array(texts.length);
 
+  let firstErr: Error | null = null;
   for (let w = 0; w < chunks.length; w += API_CONCURRENCY) {
     const window = chunks.slice(w, w + API_CONCURRENCY);
-    const settled = await Promise.all(
+    const settled = await Promise.allSettled(
       window.map(c => fetchBatchWithRetry(doFetch, url, c.batch, c.offset, config)),
     );
     for (let ci = 0; ci < window.length; ci++) {
-      const vecs = settled[ci];
-      for (let j = 0; j < vecs.length; j++) results[window[ci].offset + j] = vecs[j];
+      const s = settled[ci];
+      if (s.status === 'fulfilled') {
+        for (let j = 0; j < s.value.length; j++) results[window[ci].offset + j] = s.value[j];
+      } else if (!firstErr) {
+        firstErr = s.reason instanceof Error ? s.reason : new Error(String(s.reason));
+      }
     }
+  }
+
+  if (firstErr) {
+    const filled = results.filter(Boolean).length;
+    if (filled === 0) throw firstErr;
+    if (filled < texts.length) throw firstErr;
   }
 
   return results;

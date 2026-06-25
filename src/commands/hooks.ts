@@ -1245,8 +1245,8 @@ const HOOK_RUNNERS: Record<string, HookRunner> = {
     const { readDaemonInfo, isDaemonAlive, queryDaemon } = await import('../search/daemon-client.js');
     const daemonInfo = readDaemonInfo(workflowRoot);
     if (daemonInfo && isDaemonAlive(daemonInfo)) {
-      await queryDaemon(daemonInfo.port, { action: 'invalidate' }).catch(() => {});
-      return;
+      const resp = await queryDaemon(daemonInfo.port, { action: 'invalidate' }).catch(() => null);
+      if (resp?.ok) return;
     }
 
     // No daemon running — rebuild index directly so disk cache is fresh for next search

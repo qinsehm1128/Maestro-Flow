@@ -66,6 +66,7 @@ export class WikiIndexer {
   private searchCache: InvertedIndex | null = null;
   private embeddingCache: EmbeddingIndex | null = null;
   private embeddingInflight: Promise<EmbeddingIndex | null> | null = null;
+  private embeddingGeneration = 0;
   private inflight: Promise<WikiIndex> | null = null;
   private mtimeSnapshot: Map<string, number> = new Map();
 
@@ -302,6 +303,7 @@ export class WikiIndexer {
     this.searchCache = null;
     this.embeddingCache = null;
     this.embeddingInflight = null;
+    this.embeddingGeneration++;
   }
 
   async query(filters: WikiFilters): Promise<WikiEntry[]> {
@@ -401,10 +403,13 @@ export class WikiIndexer {
     if (this.embeddingCache) return this.embeddingCache;
     if (this.embeddingInflight) return this.embeddingInflight;
 
+    const gen = this.embeddingGeneration;
     this.embeddingInflight = this.loadOrBuildEmbeddings();
     const result = await this.embeddingInflight;
-    this.embeddingInflight = null;
-    this.embeddingCache = result;
+    if (this.embeddingGeneration === gen) {
+      this.embeddingInflight = null;
+      this.embeddingCache = result;
+    }
     return result;
   }
 
