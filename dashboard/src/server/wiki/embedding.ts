@@ -9,6 +9,7 @@
  */
 
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'node:fs';
 
@@ -39,6 +40,145 @@ export interface DeviceConfig {
   device: DeviceType;
   dtype: DtypeType;
   batchSize: number;
+}
+
+// ---------------------------------------------------------------------------
+// External embedding API configuration (~/.maestro/api-embedding.json)
+// ---------------------------------------------------------------------------
+
+export interface EmbeddingApiConfig {
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  dimensions?: number;
+  batchSize?: number;
+}
+
+const API_CONFIG_PATH = join(homedir(), '.maestro', 'api-embedding.json');
+
+let _apiConfig: EmbeddingApiConfig | null | undefined;
+
+export function loadEmbeddingApiConfig(): EmbeddingApiConfig | null {
+  if (_apiConfig !== undefined) return _apiConfig;
+  if (!existsSync(API_CONFIG_PATH)) {
+    _apiConfig = null;
+    return null;
+  }
+  try {
+    const raw = JSON.parse(readFileSync(API_CONFIG_PATH, 'utf-8')) as EmbeddingApiConfig;
+    if (raw.baseUrl && raw.apiKey && raw.model) {
+      _apiConfig = raw;
+      return raw;
+    }
+    _apiConfig = null;
+    return null;
+  } catch {
+    _apiConfig = null;
+    return null;
+  }
+}
+
+export function isApiMode(): boolean {
+  return loadEmbeddingApiConfig() !== null;
+}
+
+function getApiProxy(): string | undefined {
+  const proxy = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || process.env.ALL_PROXY;
+  if (proxy) return proxy;
+  const cliToolsPath = join(homedir(), '.maestro', 'cli-tools.json');
+  if (!existsSync(cliToolsPath)) return undefined;
+  try {
+    const raw = JSON.parse(readFileSync(cliToolsPath, 'utf-8')) as { proxy?: { enabled?: boolean; httpProxy?: string } };
+    if (raw.proxy?.enabled && raw.proxy.httpProxy) return raw.proxy.httpProxy;
+  } catch { /* ignore */ }
+  return undefined;
+}
+
+async function buildFetcher(): Promise<(url: string, init: RequestInit) => Promise<Response>> {
+  const proxy = getApiProxy();
+  if (!proxy) return (u, init) => globalThis.fetch(u, init);
+  try {
+    const undici = await import('undici');
+    const dispatcher = new undici.ProxyAgent({ uri: proxy });
+    return (u, init) => undici.fetch(u, { ...init, dispatcher } as any) as unknown as Promise<Response>;
+  } catch {
+    return (u, init) => globalThis.fetch(u, init);
+  }
+}
+
+const MAX_RETRIES = 2;
+const RETRY_STATUS = new Set([429, 500, 502, 503, 504]);
+
+async function callEmbeddingApi(texts: string[], config: EmbeddingApiConfig): Promise<Float32Array[]> {
+  const doFetch = await buildFetcher();
+  const url = config.baseUrl.replace(/\/+$/, '') + '/embeddings';
+  const batchSize = config.batchSize ?? 100;
+  const results: Float32Array[] = new Array(texts.length);
+
+  for (let i = 0; i < texts.length; i += batchSize) {
+    const batch = texts.slice(i, i + batchSize);
+    const body: Record<string, unknown> = {
+      model: config.model,
+      input: batch,
+    };
+    if (config.dimensions) body.dimensions = config.dimensions;
+
+    const reqInit: RequestInit = {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${config.apiKey}`,
+      },
+      body: JSON.stringify(body),
+    };
+
+    let lastErr: Error | null = null;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      if (attempt > 0) {
+        const delay = Math.min(1000 * 2 ** (attempt - 1), 4000);
+        await new Promise(r => setTimeout(r, delay));
+      }
+      try {
+        const resp = await doFetch(url, reqInit);
+
+        if (!resp.ok) {
+          const errText = await resp.text().catch(() => '');
+          if (RETRY_STATUS.has(resp.status) && attempt < MAX_RETRIES) {
+            lastErr = new Error(`Embedding API error ${resp.status}: ${errText}`);
+            continue;
+          }
+          throw new Error(`Embedding API error ${resp.status}: ${errText}`);
+        }
+
+        const json = await resp.json() as { data?: unknown };
+        if (!Array.isArray(json.data)) {
+          throw new Error(`Embedding API returned invalid data: missing "data" array`);
+        }
+
+        for (const item of json.data as Array<{ embedding?: number[]; index?: number }>) {
+          if (!Array.isArray(item.embedding) || typeof item.index !== 'number') continue;
+          results[i + item.index] = new Float32Array(item.embedding);
+        }
+        lastErr = null;
+        break;
+      } catch (e: unknown) {
+        lastErr = e instanceof Error ? e : new Error(String(e));
+        const isNetwork = lastErr.message.includes('fetch failed') || lastErr.message.includes('ECONNREFUSED') || lastErr.message.includes('Timeout');
+        if (isNetwork && attempt < MAX_RETRIES) continue;
+        throw lastErr;
+      }
+    }
+    if (lastErr) throw lastErr;
+
+    // Verify no holes in this batch
+    for (let j = i; j < Math.min(i + batchSize, texts.length); j++) {
+      if (!results[j]) {
+        throw new Error(`Embedding API returned no vector for input index ${j - i} in batch starting at ${i}`);
+      }
+    }
+  }
+
+  return results;
 }
 
 // ---------------------------------------------------------------------------
@@ -188,6 +328,7 @@ export async function detectDevice(): Promise<DeviceConfig> {
 }
 
 export function getDeviceSummary(): string {
+  if (isApiMode()) return 'api (external)';
   if (!_detectedConfig) return 'not initialized';
   return `${_detectedConfig.device}/${_detectedConfig.dtype} batch=${_detectedConfig.batchSize}`;
 }
@@ -222,8 +363,12 @@ export async function getHardwareInfo(): Promise<HardwareInfo> {
 // Pipeline management — lazy-loads model with detected device
 // ---------------------------------------------------------------------------
 
-const DEFAULT_MODEL = 'Xenova/multilingual-e5-small';
-export const DEFAULT_MODEL_ID = DEFAULT_MODEL;
+const DEFAULT_LOCAL_MODEL = 'Xenova/multilingual-e5-small';
+export function getModelId(): string {
+  const apiConf = loadEmbeddingApiConfig();
+  return apiConf ? apiConf.model : DEFAULT_LOCAL_MODEL;
+}
+export const DEFAULT_MODEL_ID = DEFAULT_LOCAL_MODEL;
 const CACHE_FILE = 'embedding-index.json';
 
 let _pipeline: any = null;
@@ -234,7 +379,7 @@ async function configureProxy(): Promise<void> {
   if (!proxy) return;
   try {
     const { ProxyAgent, setGlobalDispatcher } = await import('undici');
-    setGlobalDispatcher(new ProxyAgent(proxy));
+    setGlobalDispatcher(new ProxyAgent({ uri: proxy }));
   } catch { /* undici not available */ }
 }
 
@@ -256,7 +401,7 @@ async function getPipeline(): Promise<any> {
   await configureProxy();
   const config = await detectDevice();
   const { pipeline } = await loadTransformers();
-  _pipeline = await pipeline('feature-extraction', DEFAULT_MODEL, {
+  _pipeline = await pipeline('feature-extraction', DEFAULT_LOCAL_MODEL, {
     dtype: config.dtype,
     device: config.device,
     progress_callback: _progressCallback ?? undefined,
@@ -268,6 +413,10 @@ async function getPipeline(): Promise<any> {
 let _unavailableReason: string | null = null;
 
 export async function isAvailable(): Promise<boolean> {
+  if (isApiMode()) {
+    _available = true;
+    return true;
+  }
   if (_available !== null) return _available;
   try {
     await loadTransformers();
@@ -289,6 +438,11 @@ export function getUnavailableReason(): string | null {
 
 export async function embedTexts(texts: string[]): Promise<Float32Array[]> {
   if (texts.length === 0) return [];
+
+  const apiConf = loadEmbeddingApiConfig();
+  if (apiConf) {
+    return callEmbeddingApi(texts.map(t => t.slice(0, 8192)), apiConf);
+  }
 
   const pipe = await getPipeline();
   const config = await detectDevice();
@@ -316,8 +470,13 @@ export async function embedTexts(texts: string[]): Promise<Float32Array[]> {
 }
 
 export async function embedQuery(query: string): Promise<Float32Array> {
+  const apiConf = loadEmbeddingApiConfig();
+  if (apiConf) {
+    const [vec] = await callEmbeddingApi([query.slice(0, 8192)], apiConf);
+    return vec;
+  }
+
   const pipe = await getPipeline();
-  // E5 models require "query: " prefix for search queries
   const output = await pipe(('query: ' + query).slice(0, 512), { pooling: 'mean', normalize: true });
   return new Float32Array(output.data);
 }
@@ -523,22 +682,24 @@ function docToText(d: DocForEmbedding): string {
   if (d.summary) parts.push(d.summary);
   if (d.tags.length > 0) parts.push(d.tags.join(' '));
   if (d.body) parts.push(d.body.slice(0, 500));
-  // E5 models require "passage: " prefix for documents
-  return 'passage: ' + parts.join('. ');
+  const text = parts.join('. ');
+  return isApiMode() ? text : 'passage: ' + text;
 }
 
 export async function buildEmbeddingIndex(
   docs: DocForEmbedding[],
   existingIndex?: EmbeddingIndex | null,
 ): Promise<EmbeddingIndex> {
-  const config = await detectDevice();
+  const apiMode = isApiMode();
+  const config = apiMode ? null : await detectDevice();
   const t0 = Date.now();
 
   const currentHashes = docs.map(hashDocContent);
   let vectors: Float32Array[];
 
+  const activeModel = getModelId();
   // Model changed → discard all cached vectors, force full rebuild
-  const modelMatch = existingIndex && existingIndex.modelId === DEFAULT_MODEL;
+  const modelMatch = existingIndex && existingIndex.modelId === activeModel;
   if (modelMatch && existingIndex!.docIds.length > 0) {
     // Incremental: reuse vectors only for docs with matching content hash
     const existingMap = new Map<string, { vector: Float32Array; hash: string }>();
@@ -575,13 +736,13 @@ export async function buildEmbeddingIndex(
   }
 
   return {
-    modelId: DEFAULT_MODEL,
+    modelId: activeModel,
     dimension: vectors[0]?.length ?? 384,
     docIds: docs.map(d => d.id),
     vectors,
     contentHashes: currentHashes,
     builtAt: Date.now(),
-    deviceUsed: `${config.device}/${config.dtype}`,
+    deviceUsed: apiMode ? 'api' : `${config!.device}/${config!.dtype}`,
     buildTimeMs: Date.now() - t0,
   };
 }

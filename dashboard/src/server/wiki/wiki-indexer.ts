@@ -431,8 +431,8 @@ export class WikiIndexer {
           body: e.body,
         }));
 
-      const { DEFAULT_MODEL_ID, hashDocContent } = await import('./embedding.js');
-      const modelMatch = cached && cached.modelId === DEFAULT_MODEL_ID;
+      const { getModelId, hashDocContent } = await import('./embedding.js');
+      const modelMatch = cached && cached.modelId === getModelId();
       const currentHashes = docs.map(hashDocContent);
       const cachedHashMap = new Map<string, string>();
       if (cached?.contentHashes) {

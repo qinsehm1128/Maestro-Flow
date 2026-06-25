@@ -485,16 +485,27 @@ export function registerSearchCommand(program: Command): void {
     .argument('[action]', 'status (default), warmup, rebuild', 'status')
     .action(async (action: string) => {
       const workflowRoot = resolve('.workflow');
-      const { isAvailable, getUnavailableReason, loadEmbeddingIndex, embedTexts, getDeviceSummary, detectDevice, setProgressCallback, DEFAULT_MODEL_ID } = await import('#maestro-dashboard/wiki/embedding.js');
+      const { isAvailable, getUnavailableReason, loadEmbeddingIndex, embedTexts, getDeviceSummary, detectDevice, setProgressCallback, DEFAULT_MODEL_ID, isApiMode, getModelId, loadEmbeddingApiConfig } = await import('#maestro-dashboard/wiki/embedding.js');
 
       if (action === 'status') {
-        const avail = await isAvailable();
-        console.log(`Transformers: ${avail ? 'available' : 'NOT available (' + (getUnavailableReason?.() ?? 'unknown') + ')'}`);
-        if (avail) {
-          await detectDevice();
-          console.log(`Device: ${getDeviceSummary()}`);
+        const apiMode = isApiMode();
+        const apiConf = loadEmbeddingApiConfig();
+        if (apiMode && apiConf) {
+          console.log(`Mode: API (external)`);
+          console.log(`Endpoint: ${apiConf.baseUrl}`);
+          console.log(`Model: ${apiConf.model}`);
+          if (apiConf.dimensions) console.log(`Dimensions: ${apiConf.dimensions}`);
+          console.log(`Batch size: ${apiConf.batchSize ?? 100}`);
+        } else {
+          const avail = await isAvailable();
+          console.log(`Transformers: ${avail ? 'available' : 'NOT available (' + (getUnavailableReason?.() ?? 'unknown') + ')'}`);
+          if (avail) {
+            await detectDevice();
+            console.log(`Device: ${getDeviceSummary()}`);
+          }
+          console.log(`Model: ${DEFAULT_MODEL_ID} (~465 MB)`);
         }
-        console.log(`Model: ${DEFAULT_MODEL_ID} (~465 MB)`);
+        console.log(`Active model: ${getModelId()}`);
         const idx = loadEmbeddingIndex(workflowRoot);
         if (idx) {
           console.log(`Index: ${idx.docIds.length} docs, dim=${idx.dimension}, model=${idx.modelId}`);
@@ -512,6 +523,15 @@ export function registerSearchCommand(program: Command): void {
           console.error(`Embedding unavailable: ${getUnavailableReason?.() ?? 'unknown'}`);
           process.exit(1);
         }
+
+        if (isApiMode()) {
+          console.log(`Warming up API embedding (${getModelId()})...`);
+          const t0 = Date.now();
+          await embedTexts(['warmup']);
+          console.log(`API embedding ready (${Date.now() - t0}ms)`);
+          return;
+        }
+
         const isTTY = process.stderr.isTTY === true;
         let downloadStarted = false;
         let lastPct = -1;
