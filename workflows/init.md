@@ -37,7 +37,7 @@ state.json exists → Path C (existing) | source files exist → Path B (brownfi
      - Target users / stakeholders
      - Success criteria
 
-   Decision gate: When enough context for project.md, ask "Ready to create project.md?"
+   Decision gate: When ≥3 research dimensions gathered, ask "Ready to create project.md?"
    - "Create project.md" → proceed
    - "Keep exploring" → continue questioning
 
@@ -67,9 +67,9 @@ state.json exists → Path C (existing) | source files exist → Path B (brownfi
 
    If `--auto`: use template defaults (all the above on).
 
-3. **Research** (optional, based on config.workflow.research) -- Spawn 4 parallel `workflow-project-researcher` agents writing to `.workflow/research/`: STACK.md, FEATURES.md, ARCHITECTURE.md, PITFALLS.md.
+3. **Research** (conditional, triggered when `config.workflow.research == true`) -- MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep when triggered: Spawn 4 parallel `workflow-project-researcher` agents writing to `.workflow/research/`: STACK.md, FEATURES.md, ARCHITECTURE.md, PITFALLS.md.
 
-4. **Synthesize** -- Spawn `workflow-research-synthesizer` agent:
+4. **Synthesize** -- MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Spawn `workflow-research-synthesizer` agent:
    - Input: all `.workflow/research/` documents
    - Output: `.workflow/research/SUMMARY.md` with consolidated findings
 
@@ -103,10 +103,10 @@ state.json exists → Path C (existing) | source files exist → Path B (brownfi
 
 If `.workflow/specs/` does not exist:
 
-1. Run `Bash("maestro spec init")` — creates empty seed files (skeleton only, no codebase scan)
+1. MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Run `Bash("maestro spec init")` — creates empty seed files (skeleton only, no codebase scan)
 
 2. If project has existing source files (package.json, tsconfig.json, pyproject.toml, go.mod, etc.):
-   - Auto-trigger `Skill({ skill: "spec-setup" })` — scan codebase and populate specs with detected conventions
+   - MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: auto-trigger `Skill({ skill: "spec-setup" })` — scan codebase and populate specs with detected conventions
    - Note: Specs are further enriched by analyze, plan, and execute stages via `maestro spec add`
 
 3. If greenfield project (no source files):
@@ -117,8 +117,8 @@ If `.workflow/specs/` does not exist:
 
 If `.workflow/domain/` does not exist:
 
-1. Run `Bash("maestro domain init")` — creates `.workflow/domain/glossary.yaml` with empty terms array
-2. If brownfield project (has source files): run `maestro domain discover --auto` to scan codebase for initial term candidates, present top 5 for confirmation
+1. MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Run `Bash("maestro domain init")` — creates `.workflow/domain/glossary.yaml` with empty terms array
+2. If brownfield project (has source files): MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: run `maestro domain discover --auto` to scan codebase for initial term candidates, present top 5 for confirmation
 3. If greenfield project: skip discovery (no codebase to scan); domain terms will be populated by grill/brainstorm sessions via finish-work extraction
 
 

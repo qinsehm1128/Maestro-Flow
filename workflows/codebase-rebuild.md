@@ -61,6 +61,7 @@ Build component entry:
 ### Step 2.5: Load Project Specs
 
 ```
+# MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep
 specs_content = maestro spec load --category arch
 ```
 
@@ -115,7 +116,8 @@ map to components by keyword analysis. Build ADR entry:
     "title": "{ADR title}",
     "component_ids": ["TC-{NNN}"],
     "decision": "{decision summary}",
-    "rationale": "{rationale summary}"
+    "rationale": "{rationale summary}",
+    "evidence_source": "{evidence source — ADR file ref or code anchor}"
   }
 
 If no ADRs: architecture_decisions = [].
@@ -140,6 +142,8 @@ Assemble the complete doc-index.json:
 
 Write to: .workflow/codebase/doc-index.json
 ```
+
+**GATE Step 6→7**: REQUIRED `doc-index.json` written and valid JSON before tech-registry generation; BLOCKED if `doc-index.json` missing or invalid.
 
 ### Step 7: Generate Tech Registry Docs
 
@@ -177,6 +181,8 @@ b. Update project.md Tech Stack (if exists):
    If changes detected: update section + footer timestamp.
 ```
 
+**GATE Step 8.5→9**: Glob `.workflow/codebase/doc-index.json` AND `.workflow/codebase/knowledge-graph.json` MUST exist before Step 9 report; BLOCKED if missing.
+
 ### Step 9: Report and Commit
 
 ```
@@ -201,6 +207,7 @@ Uses the native `maestro kg index` command (`src/graph/analyzers/fs-analyzer.ts`
 ### Step 10: Generate Knowledge Graph
 
 ```
+# MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep
 maestro kg index --src "$PROJECT_ROOT/src"
 ```
 

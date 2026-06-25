@@ -141,7 +141,7 @@ maestro search "<query>" [--type <type>] [--category <cat>] [--code] [--kg] [--j
 | What | Command |
 |------|---------|
 | Spec | `/spec-add <category> "title" "content" --keywords kw1,kw2 --description "summary"` |
-| Knowhow | Persist non-obvious knowledge (deviations, root causes, constraints) |
+| Knowhow | `/manage-knowhow-capture` (`--spec-category <cat>` to bridge into agent injection) |
 
 Category routing: decisions→`arch`, patterns→`coding`, pitfalls→`debug`/`learning`, rules→`review`, tests→`test`.
 

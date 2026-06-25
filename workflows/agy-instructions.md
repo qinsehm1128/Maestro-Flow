@@ -1,122 +1,161 @@
-# Maestro for Antigravity CLI
+# Codex Code Guidelines
 
-- **Coding Philosophy**: @~/.maestro/workflows/coding-philosophy.md
-
-## Delegate & CLI
 
 - **Delegate Usage**: @~/.maestro/workflows/delegate-usage.md
+- **Explore Usage**: @~/.maestro/workflows/explore-usage.md
 - **CLI Endpoints Config**: @~/.maestro/cli-tools.json
 
 **Strictly follow the cli-tools.json configuration**
 
-## Antigravity Tool Priority
+## Explore Priority
 
-When choosing between equivalent tools, prefer the agy native primitives over shell fallbacks:
+`maestro explore` takes priority over Glob, Grep, and Read. When locating files or searching code patterns, call `maestro explore` first and stop to wait for results.
 
-| Need | Prefer | Fallback |
-|------|--------|----------|
-| Read a file | `view_file(AbsolutePath, StartLine, EndLine)` | `run_command("Get-Content ...")` |
-| Read external URL | `read_url_content(Url)` | `run_command("curl ...")` |
-| Create / overwrite file | `write_to_file(TargetFile, CodeContent, Overwrite)` | n/a |
-| Single-block edit | `replace_file_content(TargetFile, StartLine, EndLine, TargetContent, ReplacementContent)` | n/a |
-| Multi-block edit on same file | `multi_replace_file_content(TargetFile, ReplacementChunks=[...])` | repeated `replace_file_content` |
-| Search text | `grep_search(SearchPath, Query, IsRegex, Includes)` | `run_command("rg ...")` |
-| List directory | `list_dir(DirectoryPath)` | `run_command("ls ...")` |
-| Execute shell | `run_command(CommandLine, Cwd, WaitMsBeforeAsync)` | n/a |
-| Web search | `search_web(query, domain)` | n/a |
-| Ask user | `ask_question(questions=[{question, options, is_multi_select}])` | n/a |
+# Coding Philosophy
 
-Always pass `Cwd` to `run_command`; do not rely on inherited shell cwd. On Windows, set UTF-8 in PowerShell before chained commands:
+## Core Beliefs
 
-```powershell
-[Console]::InputEncoding  = [Text.UTF8Encoding]::new($false)
-[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
-chcp 65001 > $null
-```
+- **Pursue good taste** - Eliminate edge cases to make code logic natural and elegant
+- **Embrace extreme simplicity** - Complexity is the root of all evil
+- **Be pragmatic** - Code must solve real-world problems, not hypothetical ones
+- **Data structures first** - Bad programmers worry about code; good programmers worry about data structures
+- **Never break backward compatibility** - Existing functionality is sacred and inviolable
+- **Incremental progress over big bangs** - Small changes that compile and pass tests
+- **Learning from existing code** - Study and plan before implementing
+- **Clear intent over clever code** - Be boring and obvious
+- **Follow existing code style** - Match import patterns, naming conventions, and formatting of existing codebase
+- **Minimize changes** - Only modify what's directly required; avoid refactoring, adding features, or "improving" code beyond the request
+- **No unsolicited documentation** - NEVER generate reports, documentation files, or summaries without explicit user request. If required, save to .workflow/.scratchpad/
 
-## Sub-Agent Orchestration (Two Phases)
+## Simplicity Means
 
-Antigravity uses an explicit two-phase model for sub-agents — unlike Claude's single `Agent(...)` call:
+- Single responsibility per function/class
+- Avoid premature abstractions
+- No clever tricks - choose the boring solution
+- If you need to explain it, it's too complex
 
-1. **Define**: declare the sub-agent type once per session (idempotent within a session)
-   ```
-   define_subagent(
-     name="team-worker",
-     description="Generic role-spec worker",
-     system_prompt="<contents of antigravity-cli/agents/team-worker.md>",
-     enable_write_tools=true,
-     enable_mcp_tools=true,
-     enable_subagent_tools=false
-   )
-   ```
+## Fix, Don't Hide
 
-2. **Invoke**: spawn one or more instances; capture the returned ConversationId for later messaging
-   ```
-   invoke_subagent([
-     { TypeName: "team-worker",
-       Role:     "<concrete role label>",
-       Prompt:   "<task-specific instructions>",
-       Workspace: "inherit"            # inherit | branch | share
-     }
-   ])
-   ```
+**Solve problems, don't silence symptoms** - Skipped tests, `@ts-ignore`, empty catch, `as any`, excessive timeouts = hiding bugs, not fixing them
 
-**Workspace modes**:
-- `inherit` — share the parent's working directory (default; matches Claude semantics)
-- `branch` — independent filesystem branch (useful for parallel waves that must not collide)
-- `share` — explicit cross-worker sharing (rare; use only when workers must atomically see each other's writes)
+**NEVER**:
+- Make assumptions - verify with existing code
+- Generate reports, summaries, or documentation files without explicit user request
+- Use suppression mechanisms (`skip`, `ignore`, `disable`) without fixing root cause
 
-**Inter-agent messaging**: `send_message(Recipient=<ConversationId>, Message=<text>)`. The Recipient must be a ConversationId returned by `invoke_subagent`, never a role name.
+**ALWAYS**:
+- Plan complex tasks thoroughly before implementation
+- Generate task decomposition for multi-module work (>3 modules or >5 subtasks)
+- Track progress using TODO checklists for complex tasks
+- Validate planning documents before starting development
+- Commit working code incrementally
+- Update plan documentation and progress tracking as you go
+- Learn from existing implementations
+- Stop after 3 failed attempts and reassess
+- **Edit fallback**: When Edit tool fails 2+ times on same file, try Bash sed/awk first, then Write to recreate if still failing
 
-**Background OS tasks vs sub-agents**: `manage_task` handles `run_command` async instances (list / kill / status / send_input). Do **not** repurpose it for named task tracking — use `.workflow/tasks/<id>.json` files instead.
+## Learning the Codebase
 
-## Cross-Skill Invocation
+- Find 3 similar features/components
+- Identify common patterns and conventions
+- Use same libraries/utilities when possible
+- Follow existing test patterns
 
-Agent-internal chaining uses the **inline-execute** pattern:
+## Tooling
 
-```
-view_file(AbsolutePath="<agy-skills-dir>/<target-skill>/SKILL.md") + execute inline (args: "...")
-```
+- Use project's existing build system
+- Use project's test framework
+- Use project's formatter/linter settings
+- Don't introduce new tools without strong justification
 
-`<agy-skills-dir>` resolves to:
-- global install: `~/.gemini/antigravity-cli/skills/`
-- workspace install: `<project>/.agents/skills/`
+## Content Uniqueness Rules
 
-The agent reads the target SKILL.md, treats its body as additional instructions, and executes them in the same conversation context. Args are passed conceptually as input variables — substitute them when running the loaded instructions.
+- **Each layer owns its abstraction level** - no content sharing between layers
+- **Reference, don't duplicate** - point to other layers, never copy content
+- **Maintain perspective** - each layer sees the system at its appropriate scale
+- **Avoid implementation creep** - higher layers stay architectural
 
-User-initiated invocation uses `/skills`.
+# Context Requirements
 
-## Cross-Worker Coordination
-
-Antigravity has no built-in message bus. For shared logs across workers, write JSONL lines to `.workflow/.team/<session>/.msg/messages.jsonl`:
-
-- Log:   `write_to_file(TargetFile=".workflow/.team/<session>/.msg/messages.jsonl", CodeContent="<json line>\n", Overwrite=false)`
-- Read:  `view_file(AbsolutePath=".workflow/.team/<session>/.msg/messages.jsonl")` then filter client-side
-- Status snapshot: write `<session>/.msg/state.json` and read with `view_file`
-
-For point-to-point delivery, use `send_message` directly.
-
-## Code Diagnostics
-
-- **Prefer `mcp__ide__getDiagnostics`** for code error checking over shell-based TypeScript compilation when the MCP channel is available.
+Before implementation, always:
+- Identify 3+ existing similar patterns
+- Map dependencies and integration points
+- Understand testing framework and coding conventions
 
 ## Knowledge System
 
-### Search — Query Before Acting
+**Gate rule: On any coding/modification/debugging task, run `maestro search` + `maestro load` BEFORE reading code or editing files.**
 
-**Before planning or implementing any task, search wiki and spec first** — the knowledge base contains reusable methods, tools, and hard-won experience. Load the right knowledge at the right time: search before you plan, load relevant entries before you implement, and revisit when you hit unfamiliar territory mid-task.
+### Required (every task, no exceptions)
 
-When tackling unfamiliar domains or cross-cutting concerns, search existing knowledge first:
-- `maestro spec load --category <cat>` — load rules by category (coding/arch/debug/test/review/learning)
-- `maestro spec load --keyword <kw>` — cross-category keyword match
-- `maestro wiki search "<query>"` — full-text search across all knowhow
-- `maestro wiki list --category <cat>` → `maestro wiki load <id>` — browse then load full detail
+```bash
+# Search relevant knowledge (1-3 keywords, multiple short queries beat one long one)
+maestro search "<topic phrase>"
 
-### Record — Capture Knowledge
+# Load specs for the task type
+maestro load --type spec --category coding    # coding tasks
+maestro load --type spec --category arch      # architecture decisions
+maestro load --type spec --category test      # test writing
+maestro load --type spec --category ui        # UI work
+```
 
-When execution surfaces non-obvious knowledge (decisions, root causes, pitfalls, patterns), persist it:
+**Query rules:**
+- Use **1-3 core keywords** per query — never dump all context into one search
+- Separate concepts from symbols: `maestro search "topology layout"` + `maestro search "DetailedTopologySVG" --code`
+- Add as needed: `maestro search "query" --kg` (KG full-source), `maestro kg callers <fn>` (call chain), `maestro kg context <node>` (node context)
 
-- **Spec entry** (short rule/constraint) → `/spec-add <category> "title" "content" --keywords kw1,kw2 --description "summary"`
-- **Knowhow document** (detailed recipe/template/decision/reference) → `/manage-knowhow-capture`
+```bash
+# ❌ Bad: keyword dump
+maestro search "topology display frontend DetailedTopologySVG elk"
 
-Category routing: decisions→`arch`, patterns→`coding`, pitfalls→`debug`/`learning`, rules→`review`, test strategy→`test`.
+# ✅ Good: targeted multi-search + spec load
+maestro search "topology layout"
+maestro search "DetailedTopologySVG" --code
+maestro load --type spec --category coding
+```
+
+### Load & Search reference
+
+```bash
+maestro load --type <type> [--list] [--category <cat>] [--keyword <word>] [--id <id>]
+maestro search "<query>" [--type <type>] [--category <cat>] [--code] [--kg] [--json]
+```
+
+**`--category` values** (for `--type spec`): `coding`, `arch`, `debug`, `test`, `review`, `learning`, `ui`
+**`--keyword`**: free-text filter on title/body/tags — use to narrow within a category
+
+**`--type` values**: `spec`, `knowhow`, `domain`, `issue`, `session`, `scratch`, `note`, `project`, `roadmap`
+
+| Action | Command |
+|--------|---------|
+| Load coding specs | `maestro load --type spec --category coding` |
+| Load arch specs with keyword | `maestro load --type spec --category arch --keyword auth` |
+| List sessions | `maestro load --type session --list` |
+| Load specific knowhow | `maestro load --type knowhow --id <id>` |
+| Search sessions | `maestro search "query" --type session` |
+| Code graph search | `maestro search "symbol" --code` |
+| KG full-source search | `maestro search "query" --kg` |
+
+### Record
+
+| What | Command |
+|------|---------|
+| Spec | `/spec-add <category> "title" "content" --keywords kw1,kw2 --description "summary"` |
+| Knowhow | `/manage-knowhow-capture` (`--spec-category <cat>` to bridge into agent injection) |
+
+Category routing: decisions→`arch`, patterns→`coding`, pitfalls→`debug`/`learning`, rules→`review`, tests→`test`.
+
+### Confidence & Conflict Marking
+
+When search results conflict with current context, **mark the entry**:
+
+```bash
+maestro spec conflict mark <file> <line> --note "<reason>"
+maestro spec conflict list
+```
+
+Levels: `high` (verified) → `medium` (default) → `low` (stale) → `contested` (conflict detected).
+
+- `contested` → sorted last during injection, labeled `[CONTESTED]` with conflict note
+- `low` → labeled `[LOW CONFIDENCE]`
+- Resolution handled by `/manage-knowledge-audit`

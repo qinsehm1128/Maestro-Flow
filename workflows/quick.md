@@ -215,7 +215,7 @@ Passed inline to planner agent in Step 5.
 
 **Spawn workflow-planner in quick mode:**
 
-Spawn `workflow-planner` agent with:
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Spawn `workflow-planner` agent with:
 
 - **Context**: mode (`quick` or `quick-full`), directory, description, state.json, CLAUDE.md, specs, context.md (if discuss mode)
 - **Constraints**: single plan with 1-3 atomic tasks, no research phase. Full mode: ~40% context usage + require files/action/convergence.criteria/implementation per task. Default: ~30% context usage.
@@ -243,7 +243,7 @@ Skip entirely if NOT $FULL_MODE.
 Spawning plan checker...
 ```
 
-Spawn `workflow-plan-checker` agent to verify plan.json and TASK-*.json:
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Spawn `workflow-plan-checker` agent to verify plan.json and TASK-*.json:
 
 - **Check dimensions**: requirement coverage, task completeness (files/action/convergence.criteria/implementation), scope sanity (1-3 tasks), context compliance (if discuss mode).
 - **Return**: `## VERIFICATION PASSED` or `## ISSUES FOUND` with structured issue list.
@@ -263,15 +263,17 @@ If iteration_count < 2:
 
 If iteration_count >= 2:
 - Display: "Max iterations reached. {N} issues remain."
-- Offer: 1) Force proceed, 2) Abort
+- Offer: 1) Force proceed, 2) Abort; if Force proceed, flag plan as [LOW CONFIDENCE] (remaining issues)
 
 ---
+
+**GATE Step 6→7**: REQUIRED plan.json verified by plan-checker BEFORE execution; BLOCKED if plan.json not verified
 
 ### Step 7: Spawn Executor
 
 **Spawn workflow-executor:**
 
-Spawn `workflow-executor` agent:
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Spawn `workflow-executor` agent:
 
 - **Read**: plan.json, TASK-*.json, state.json, CLAUDE.md
 - **Constraints**: execute all tasks, atomic commits per task, write summaries to `${QUICK_DIR}/.summaries/TASK-{NNN}-summary.md`
@@ -296,13 +298,13 @@ Skip entirely if NOT $FULL_MODE.
 Spawning verifier...
 ```
 
-Spawn `workflow-verifier` agent: check plan objectives against actual codebase using plan.json and summaries. Write result to `${QUICK_DIR}/verification.json`.
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Spawn `workflow-verifier` agent: check plan objectives against actual codebase using plan.json and summaries. Write result to `${QUICK_DIR}/verification.json`.
 
 Read verification result:
 | Status | Action |
 |--------|--------|
 | passed | Store "Verified", continue |
-| gaps_found | Display gaps, offer: 1) Re-run executor, 2) Accept as-is |
+| gaps_found | Display gaps, offer: 1) Re-run executor, 2) Accept as-is; if Accept as-is, flag execution as [LOW CONFIDENCE] (gaps unresolved) |
 
 ---
 

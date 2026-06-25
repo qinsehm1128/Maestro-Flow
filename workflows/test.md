@@ -275,7 +275,7 @@ issues == 0 → Step 13. issues > 0 → Step 11.
 ### Step 11: Auto-Diagnose
 
 1. **Cluster gaps** by component/area (same file/module → one cluster, same flow → one cluster)
-2. **Spawn one debug agent per cluster** (parallel, `run_in_background: false`): pre-filled symptoms, `goal: find_root_cause`. Include `issue_id` refs.
+2. MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: **Spawn one debug agent per cluster** (parallel, `run_in_background: false`): pre-filled symptoms, `goal: find_root_cause`. Include `issue_id` refs.
 3. **Collect results**, update uat.md gaps:
 ```yaml
 - test: {N}

@@ -135,7 +135,7 @@ delta = { vs_phase, tasks_completed, gaps_found, issues_opened, rework_iteration
 
 ## Stage 4: multi_lens_analysis
 
-Spawn one Agent per active lens **in parallel** (`run_in_background: false`). Each returns JSON.
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Spawn one Agent per active lens **in parallel** (`run_in_background: false`). Each returns JSON.
 
 ### Lens registry
 
@@ -233,9 +233,11 @@ Return ONLY a single JSON object, no prose, matching this schema:
 
 ### Spawn pattern
 
-Spawn all lenses in parallel. Collect into `lens_results`. If any fails, log W001, proceed with successful lenses.
+Spawn all lenses in parallel. Collect into `lens_results`. If any fails, log W001, proceed with successful lenses; flag retrospective as [LOW CONFIDENCE] (partial lenses).
 
 ---
+
+**GATE Stage 4→5**: REQUIRED lens analyses complete BEFORE synthesis; BLOCKED if lens_results missing
 
 ## Stage 5: synthesize
 
@@ -252,6 +254,8 @@ Structure: `{ phase, phase_slug, phase_title, retrospected_at, lenses_run, metri
 Sections: Header (tweetable, metadata) → Metrics table → Delta table (if --compare) → Findings by Lens → Distilled Insights → Routing Recommendations.
 
 Write both to `{artifact_dir}/`.
+
+Glob `{artifact_dir}/retrospective.json` AND `retrospective.md` MUST exist before Stage 8 complete; BLOCKED if missing.
 
 ---
 
@@ -307,7 +311,7 @@ Invoke manage-learn tip with:
 insight.routed_id = "TIP-{captured_id}"
 ```
 
-Fallback: if skill ID cannot be captured, write tip file directly per `workflows/knowhow.md` Part B Step 3 and update `wiki-index.json` per Step 4.
+Fallback: if skill ID cannot be captured, write tip file directly per `workflows/knowhow.md` Part B Step 3 and update `wiki-index.json` per Step 4; flag tip as [LOW CONFIDENCE] (skill not captured).
 
 #### Target: issue
 

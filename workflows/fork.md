@@ -42,7 +42,7 @@ milestoneSlug = kebab-case of milestoneName, max 40 chars.
 
 ## Step 4: Sync Mode (--sync)
 
-If `syncMode` is true, this is a sync operation on an existing worktree, not a fork.
+If `syncMode` is true, treat as sync operation on existing worktree, not a fork.
 
 ```
 IF syncMode:
@@ -154,7 +154,7 @@ Display:
   Or delegate (automated):
     maestro delegate "run full lifecycle for milestone" --cd {wtPath} --mode write
 
-  Sync worktree with main (if needed later):
+  Sync worktree with main (REQUIRED before merge):
     /maestro-fork -m {milestoneNum} --sync
 
   When all phases in milestone complete:

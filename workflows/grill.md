@@ -82,8 +82,8 @@ output_dir = .workflow/scratch/{YYYYMMDD}-grill-{slug}/
 1. Read .workflow/project.md (if exists) → tech_stack, validated_requirements, active_requirements
 2. Read .workflow/state.json (if exists) → accumulated_context, artifacts[]
 3. Read .workflow/roadmap.md (if exists) → phase structure
-4. specs_content = maestro spec load --category arch
-5. wiki_hits = maestro wiki search "{topic keywords}"
+4. specs_content = maestro spec load --category arch  # MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep
+5. wiki_hits = maestro wiki search "{topic keywords}"  # MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep
 ```
 
 ### 2.2: Load Upstream Material
@@ -97,7 +97,7 @@ Store as `upstream_material` (in-memory).
 
 ### 2.3: Codebase Scan
 
-Spawn `Agent(subagent_type: Explore)` to map the codebase surface relevant to the topic:
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: spawn `Agent(subagent_type: Explore)` to map the codebase surface relevant to the topic:
 
 ```
 Agent(
@@ -116,7 +116,7 @@ Agent(
 )
 ```
 
-Store as `codebase_context`. W001 on failure: continue without code grounding.
+Store as `codebase_context`. W001 on failure: continue without code grounding; flag grill output as [LOW CONFIDENCE] (no code grounding).
 
 ### 2.4: Initialize Report
 
@@ -191,7 +191,7 @@ AskUserQuestion({
 })
 ```
 
-**Auto mode (`-y`)**: Use CLI exploration to resolve — prefer existing code naming unless semantically wrong.
+**Auto mode (`-y`)**: Use CLI exploration to resolve — prefer existing code naming; override only when name is semantically incorrect (verify via symbol lookup).
 
 ### 3.4: Write Terminology File
 
@@ -302,6 +302,7 @@ AskUserQuestion({
 
 **Auto mode**: Instead of asking the user, use code exploration to answer:
 ```
+# MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep
 maestro delegate "PURPOSE: Answer '{question}' for the proposal '{topic}'
 TASK: Search codebase for evidence | Analyze existing patterns | Determine most likely answer
 MODE: analysis

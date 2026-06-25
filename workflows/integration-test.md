@@ -30,6 +30,7 @@ If existing session at `${PHASE_DIR}/.tests/integration/state.json`: offer resum
 ### Step 1.3: Load Project Specs
 
 ```
+# MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep
 specs_content = maestro spec load --category test
 arch_content = maestro spec load --category arch
 ```

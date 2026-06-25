@@ -6,7 +6,7 @@ Super mode implies `-y` (all auto flags propagated) plus these additional behavi
 
 ## 1. Requirement Expansion
 
-On receiving user intent, autonomously expand incomplete requirements into a complete product scope. Delegate via role (`maestro delegate --role analyze --mode analysis`) for requirement completeness analysis and gap-filling. Accept requirements that add real user value; discard noise.
+On receiving user intent, autonomously expand incomplete requirements into a complete product scope. MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Delegate via role (`maestro delegate --role analyze --mode analysis`) for requirement completeness analysis and gap-filling. Accept requirements that add real user value; discard noise.
 
 ## 2. Progressive Document Loading
 
@@ -14,7 +14,7 @@ Read execution documents (workflow maestro.md, chain steps) incrementally per-ph
 
 ## 3. Autonomous Decision-Making
 
-All design/architecture/scope decisions are made via Gemini delegate (`--mode analysis`). No AskUserQuestion calls. Decision criteria: mainstream industry standards, pragmatism, simplicity.
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: All design/architecture/scope decisions are made via Gemini delegate (`--mode analysis`). No AskUserQuestion calls. Decision criteria: mainstream industry standards, pragmatism, simplicity.
 
 ## 4. Auto-Advance Milestones
 

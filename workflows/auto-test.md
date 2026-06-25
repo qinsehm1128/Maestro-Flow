@@ -26,6 +26,7 @@ Only Step 2 diverges (scenario source). Everything else is shared.
 
 **Load specs:**
 ```
+# MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep
 specs_test = maestro spec load --category test
 specs_arch = maestro spec load --category arch
 ```
@@ -348,7 +349,7 @@ Build layer-L{N}-write.csv:
   prev_context = findings from completed prior-layer scenarios (cross-layer propagation)
 ```
 
-#### 5b. Parallel Test Writing via spawn_agents_on_csv
+#### 5b. Parallel Test Writing via spawn_agents_on_csv — MANDATORY, NOT SUBSTITUTABLE
 
 ```javascript
 spawn_agents_on_csv({
@@ -384,6 +385,8 @@ spawn_agents_on_csv({
 Merge write-results into master state. Delete temp CSV. Proceed to next layer or Step 6.
 
 **If `--max-iter 1`:** After all layers written and run once, jump directly to Step 8 (single-pass mode, replaces test-gen behavior). Skip Steps 6-7.
+
+**GATE Step 5→6**: write-results merged into master state BEFORE execution; REQUIRED: `.tests/auto-test/.csv-session/layer-L*-write-results.csv` merged and temp CSV deleted; BLOCKED if write-results missing or unmerged.
 
 ---
 
@@ -424,6 +427,7 @@ OUTER LOOP (max_iter iterations):
          Build diagnosis-iter-{N}.csv:
            Columns: id, scenario_id, layer, test_file, error_detail, expected, actual, target_file, source_context
 
+         # MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep
          spawn_agents_on_csv({
            csv_path: `.tests/auto-test/.csv-session/diagnosis-iter-${iter}.csv`,
            id_column: "id",
@@ -611,6 +615,8 @@ Scored after each REFLECT step. Dimensions (5): scenario_coverage, test_quality,
 | `.tests/integration/reflection-log.md` | `.tests/auto-test/reflection-log.md` |
 | `.tests/business/business-test-report.json` | `.tests/auto-test/report.json` (source_route: "spec") |
 | `.tests/business/business-test-summary.md` | `.tests/auto-test/traceability.md` (conditional) |
+
+**GATE Step 8→9**: Glob `.tests/auto-test/report.json` MUST exist before Step 9 post-processing; BLOCKED if missing.
 
 ---
 

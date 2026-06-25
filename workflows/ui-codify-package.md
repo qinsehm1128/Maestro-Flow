@@ -50,7 +50,7 @@ echo "[Phase 3] Token files prepared"
 **Agent Task**:
 
 ```javascript
-Agent(ui-design-agent): `
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Agent(ui-design-agent): `
   [PREVIEW_SHOWCASE_GENERATION]
   Generate interactive multi-component showcase panel for reference package
 

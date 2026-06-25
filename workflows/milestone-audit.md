@@ -46,7 +46,7 @@ For each execute artifact, read `{path}/.task/TASK-*.json` and verify all tasks 
 
 ## Step 5: Integration Check
 
-Spawn `workflow-integration-checker` agent:
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Spawn `workflow-integration-checker` agent:
 
 ```
 Agent({

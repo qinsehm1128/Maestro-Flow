@@ -316,7 +316,7 @@ Append initial Intent Coverage Check to discussion.md.
 
 **Step 4.6: Baseline Confidence Scoring**
 
-Dimensions = the 6 analysis dimensions. Factors (weights): findings_depth(.30), evidence_strength(.25), coverage_breadth(.20), user_validation(.15), consistency(.10). Score each factor per dimension from Round 1 results. Append baseline confidence table to discussion.md. Thresholds: <60% 继续深入 | 60-80% 需用户确认收敛 | >80% 建议收敛.
+Dimensions = the 6 analysis dimensions. Factors (weights): findings_depth(.30), evidence_strength(.25), coverage_breadth(.20), user_validation(.15), consistency(.10). Score each factor per dimension from Round 1 results. Append baseline confidence table to discussion.md. Thresholds: <60% 继续深入 | 60-80% 需用户确认收敛 | >80% → proceed to synthesis (REQUIRED convergence threshold).
 
 ### Step 5: Interactive Discussion Loop
 
@@ -764,7 +764,7 @@ Replaceable blocks (overwritten each round):
 | Error | Resolution |
 |-------|------------|
 | cli-explore-agent fails | Retry once. If still fails: log W001 warning in discussion.md, flag all subsequent decisions as LOW CONFIDENCE (evidence gap), continue with available context |
-| CLI timeout | Retry with shorter prompt, or skip perspective |
+| CLI timeout | Retry with shorter prompt; if still fails, mark perspective [LOW CONFIDENCE] (evidence gap) in discussion.md and continue |
 | Max rounds reached | Force synthesis, offer continuation |
 | No relevant findings | Broaden search, ask user for clarification |
 | Session folder conflict | Append timestamp suffix |

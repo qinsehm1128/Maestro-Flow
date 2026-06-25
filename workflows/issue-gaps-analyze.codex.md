@@ -94,6 +94,7 @@ Write `tasks.csv` to session folder.
 Filter `wave == 1 && status == pending`. Write `wave-1.csv`.
 
 ```javascript
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep:
 spawn_agents_on_csv({
   csv_path: `${sessionFolder}/wave-1.csv`,
   id_column: "id",
@@ -121,6 +122,7 @@ Merge results into master `tasks.csv`, delete `wave-1.csv`.
 Filter `wave == 2 && status == pending`. Build `prev_context` from wave 1 findings of issues in same group. Write `wave-2.csv` with `prev_context` column.
 
 ```javascript
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep:
 spawn_agents_on_csv({
   csv_path: `${sessionFolder}/wave-2.csv`,
   id_column: "id",

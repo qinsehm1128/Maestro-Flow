@@ -40,6 +40,8 @@ Complements `wiki-connect.md` (link discovery) and `wiki-digest.md` (synthesis) 
 
 Run in parallel: `maestro wiki health`, `list --json`, `orphans`, `hubs --top 5`.
 
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: graph operations (`orphans`, `hubs --top 5`) — use the `maestro wiki` CLI to compute orphan sets and hub in-degree.
+
 ### Step 2: Render Dashboard
 
 Display: health score, entry counts by type, broken links, orphan count, top hubs. Include health status message and quick-action commands (`/wiki-connect --fix`, `/wiki-digest`, `/manage-wiki cleanup --fix`, `maestro wiki graph`).
@@ -71,6 +73,8 @@ If not `--json`: offer to view an entry by number selection.
 ### Step 1: Scan Issues
 
 Gather baseline via `maestro wiki health`, `orphans --json`, `graph`.
+
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: graph operations (`orphans --json`, `graph`) — use the `maestro wiki` CLI to compute orphans and graph topology.
 
 ### Step 2: Categorize Issues
 

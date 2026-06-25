@@ -59,7 +59,7 @@ Extract `--scope`, `--uid`, `--category <category>` and remaining text (keyword 
 maestro spec load --scope <scope> [--uid <uid>] [--category <category>] [--keyword <word>]
 ```
 
-If `maestro spec load` CLI is unavailable, read files directly from the resolved directory.
+If `maestro spec load` CLI is unavailable, read files directly from the resolved directory; flag loaded specs as [LOW CONFIDENCE] (CLI unavailable, direct file read).
 
 ### Step 3: Keyword Filter (optional)
 

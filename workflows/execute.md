@@ -193,6 +193,7 @@ Build execution_queue from plan.json.waves, including only waves with pending (n
 ## E1.5: Load Project Specs
 
 ```
+# MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep
 specs_content = maestro spec load --category coding
 ```
 
@@ -316,7 +317,7 @@ Each task = one independent dispatch (never merge tasks into one delegate prompt
 ```
 Max 3 auto-fix attempts per task:
   Agent path: handled internally by workflow-executor agent
-  CLI path: 1) --resume ${fixedId} → 2) simplified prompt → 3) fallback to agent
+  CLI path: 1) --resume ${fixedId} → 2) simplified prompt → 3) fallback to agent; flag task as [LOW CONFIDENCE] (agent fallback used)
 
 If all 3 fail: mark "blocked" with checkpoint in .task/${task_id}.json.meta.checkpoint
   { attempt: 3, last_error, partial_files, executor, delegate_id: fixedId }
@@ -528,7 +529,7 @@ If config.json.codebase.auto_sync_after_execute == true:
     3. Update affected entries
     4. Refresh tech-registry and feature-maps as needed
 Else:
-  Log "Auto-sync disabled. Run /workflow:sync manually if needed."
+  Log "Auto-sync disabled. MUST run /workflow:sync manually."
 ```
 
 ---
@@ -608,8 +609,8 @@ Mark artifact.harvested = true; write state.json (atomic)
 | Plan directory not found | Abort: "Plan dir not found." |
 | Task file missing | Skip task, log error, continue wave |
 | Agent spawn fails | Retry once, then mark task as "blocked" |
-| Delegate fails | Resume with `--resume ${fixedId}`, then fallback to agent |
-| Git commit fails | Log warning, continue (task still marked completed) |
+| Delegate fails | Resume with `--resume ${fixedId}`, then fallback to agent; flag task as [LOW CONFIDENCE] (fallback agent) |
+| Git commit fails | Log W0xx, mark task [LOW CONFIDENCE] (commit failed); do NOT mark fully completed until commit succeeds |
 | All tasks in wave blocked | Stop execution, report blocked wave |
 
 ---

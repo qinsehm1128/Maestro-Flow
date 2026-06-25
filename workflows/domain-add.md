@@ -56,6 +56,7 @@ Auto-derive from the definition and codebase context:
 Write via `maestro domain add`:
 
 ```bash
+# MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep
 maestro domain add "<canonical>" "<definition>" --tier <tier>
 ```
 
@@ -67,11 +68,14 @@ maestro domain update "<canonical>" --aliases "alias1,alias2" --keywords "kw1,kw
 
 Records `source.kind = 'manual'`, `source.registered_at = now`.
 
+**GATE Step 4→5**: REQUIRED term written via `maestro domain add` (exit 0); BLOCKED if write failed or term missing from glossary.
+
 ### Step 5: Verify Injection
 
 Confirm the term is injectable by checking:
 
 ```bash
+# MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep
 maestro domain show "<canonical>"
 ```
 
@@ -79,6 +83,8 @@ Display: canonical name, definition, aliases, tier, relationships, and verify co
 ```
 maestro domain list
 ```
+
+**GATE Step 5→6**: REQUIRED term verified injectable via `maestro domain show`; BLOCKED if not injectable.
 
 ### Step 6: Report
 

@@ -41,7 +41,7 @@ AskUserQuestion options:
 
 ## Phase 3 — Mini Grill
 
-Delegate (run_in_background, STOP, wait):
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Delegate (run_in_background, STOP, wait):
 
 ```
 maestro delegate "PURPOSE: 评估目标变更影响
@@ -75,6 +75,8 @@ CONSTRAINTS:
 --role analyze --mode analysis
 ```
 
+**GATE Phase 3→4**: REQUIRED impact_assessment complete; BLOCKED if delegate output missing
+
 ## Phase 4 — 确认
 
 Display: 影响摘要（risk_level, affected, invalidated, new_gaps）。AskUserQuestion:
@@ -99,13 +101,15 @@ Append to `session.goal_changelog[]`：
   "timestamp": "{ISO}",
   "change_type": "{CHANGE_TYPE}",
   "reason": "{change_request}",
-  "impact_assessment": { "risk_level": "...", "invalidated_steps": [...], "new_steps_inserted": 0 },
+  "impact_assessment": { "risk_level": "...", "invalidated_steps": [...], "new_steps_inserted": 0, "evidence_source": "delegate impact assessment output" },
   "before": { "goals": [{"id":"...","goal":"...","done_when":"..."}] },
   "after":  { "goals": [{"id":"...","goal":"...","done_when":"..."}] }
 }
 ```
 
 `NNN` = `(goal_changelog.length + 1).toString().padStart(3, '0')`
+
+**GATE 5.1→5.2**: REQUIRED goal_changelog written; BLOCKED if changelog entry missing
 
 ### 5.2 归档
 

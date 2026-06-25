@@ -47,7 +47,7 @@ Read project artifacts to understand what has already been built:
 ## Codebase Exploration (conditional)
 
 - Detect if project has source files
-- If yes: spawn `cli-explore-agent` for context discovery
+- MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: If yes: spawn `cli-explore-agent` for context discovery
   - If `project_context.already_shipped` exists: include as "feature audit" directive — agent should verify which shipped features are present in code and identify integration points for new work
 - Output: relevant files, patterns, tech stack, feature_audit
 
@@ -55,7 +55,7 @@ Read project artifacts to understand what has already been built:
 
 ## External Research — API & Technology Details (Optional)
 
-Spawn `workflow-external-researcher` agent when requirement mentions specific technologies, APIs, or external services.
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Spawn `workflow-external-researcher` agent when requirement mentions specific technologies, APIs, or external services.
 
 **Trigger**: Technology keywords detected in requirement or codebase exploration found external dependencies. Auto-trigger in auto mode (`-y`). Skip if requirement is purely organizational/conceptual.
 
@@ -66,7 +66,7 @@ If topics found → spawn `workflow-external-researcher` agent for API research:
 - Focus on details affecting phase decomposition and dependency ordering
 - Output → `apiResearchContext` (in-memory)
 
-If no topics or research fails → `apiResearchContext = null`, continue.
+If no topics or research fails → `apiResearchContext = null`, continue; flag roadmap as [LOW CONFIDENCE] (no external research).
 
 ---
 

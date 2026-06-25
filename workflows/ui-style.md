@@ -94,6 +94,8 @@ Save variants to `${PHASE_DIR}/design-ref/prototypes/variant-{N}-system.md`.
 Display each variant summary (pattern, colors, typography, effects, anti-patterns).
 User selects: [1-N | "redo" | "all"]. Auto mode selects variant 1.
 
+GATE Step 3→4: selected variant confirmed BEFORE solidification; BLOCKED if no variant selected
+
 ---
 
 ### Step 4: Solidify Selected Design
@@ -109,7 +111,7 @@ python3 "${SKILL_PATH}" "${selected_variant_keywords}" --design-system --persist
 
 #### 4b. Generate design-tokens.json
 
-Spawn agent to extract structured tokens from MASTER.md into `${PHASE_DIR}/design-ref/design-tokens.json`.
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Spawn agent to extract structured tokens from MASTER.md into `${PHASE_DIR}/design-ref/design-tokens.json`.
 
 **Token schema keys:** colors (brand/surface/semantic/text/border in OKLCH), typography (family/size/weight/line_height/combinations), spacing, border_radius, shadows, component_styles (button/card/input), breakpoints.
 
@@ -117,7 +119,7 @@ Spawn agent to extract structured tokens from MASTER.md into `${PHASE_DIR}/desig
 
 #### 4c. Generate animation-tokens.json
 
-Spawn agent to generate `${PHASE_DIR}/design-ref/animation-tokens.json` from design-tokens + MASTER.md.
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Spawn agent to generate `${PHASE_DIR}/design-ref/animation-tokens.json` from design-tokens + MASTER.md.
 
 **Token schema keys:** duration (instant-slower), easing (ease-out/ease-in-out/spring), transitions, keyframes, interactions (hover states), reduced_motion (prefers-reduced-motion strategy).
 
@@ -140,7 +142,7 @@ Copy `design-system/MASTER.md` and `design-system/pages/*.md` (if generated) to 
 
 #### 4f. Optional: Generate HTML prototype
 
-For each target, spawn agent to create `${PHASE_DIR}/design-ref/prototypes/${target}.html` from design-tokens + animation-tokens + MASTER.md.
+For each target, MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: spawn agent to create `${PHASE_DIR}/design-ref/prototypes/${target}.html` from design-tokens + animation-tokens + MASTER.md.
 
 **Rules:** standalone HTML with embedded CSS, realistic content (not lorem ipsum), SVG icons (Heroicons/Lucide CDN), cursor-pointer on clickables, responsive (375/768/1024px), WCAG AA, prefers-reduced-motion.
 
@@ -185,7 +187,7 @@ Same as ui-design.md — plan.md Step 4b detects `design-ref/MASTER.md` and incl
 | Error | Action |
 |-------|--------|
 | ui-ux-pro-max returns empty | Retry with broader keywords, then abort |
-| Token extraction agent fails | Retry once, warn if still fails |
+| Token extraction agent fails | Retry once, warn if still fails; if still fails, mark design-tokens.json as [LOW CONFIDENCE] (token extraction agent failed) |
 | User cancels selection | Save all variants, exit without solidification |
 
 ---

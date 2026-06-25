@@ -79,6 +79,8 @@ Run full test suite. Record final state in reflection-log.md.
 
 ### Step 7: Complete
 
+Glob plan.json AND .summaries/ MUST exist before marking completed; BLOCKED if missing.
+
 Update index.json: `status="completed"`.
 
 Present: tasks completed/blocked, reflection rounds, strategy adjustments, test status, key learnings. If regressions: list affected tests, suggest quality-debug.

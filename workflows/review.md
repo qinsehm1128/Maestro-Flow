@@ -161,7 +161,7 @@ Each finding: { id: "{PREFIX}-{NNN}", dimension, severity, title, file, line, sn
 ### Standard Level — Parallel Agent Review
 
 ```
-Per dimension → spawn workflow-reviewer agent (all parallel):
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Per dimension → spawn workflow-reviewer agent (all parallel):
   Context: dimension, phase_name, phase_goal, review_files, success_criteria,
            tech_stack, specs_content, verification_gaps
   Instructions:
@@ -172,7 +172,7 @@ Per dimension → spawn workflow-reviewer agent (all parallel):
     - Top 20 findings by severity, each with file:line evidence
 ```
 
-Launch ALL dimension agents in a single message. Collect dimension_results (JSON findings array). Log W001 on agent failure, continue with partial results.
+Launch ALL dimension agents in a single message. Collect dimension_results (JSON findings array). Log W001 on agent failure, continue with partial results; flag review as [LOW CONFIDENCE] (partial results).
 
 ### Deep Level — Enhanced Agent Review
 
@@ -234,6 +234,7 @@ IF cli_targets.length == 0: skip to Step 7
 # Build concise review prompt from findings
 finding_summary = cli_targets.map(f => "${f.id}: [${f.severity}] ${f.file}:${f.line} — ${f.title}").join("\n")
 
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep:
 Bash({
   command: 'maestro delegate "PURPOSE: Cross-verify code review findings and identify missed issues
 TASK: For each finding, verify severity is accurate | Check for false positives | Identify any critical issues missed by initial review in the same files
@@ -286,7 +287,7 @@ deep_dive_targets:
 ```
 Iterate up to max_iterations (deep=3, standard=1) over unresolved targets:
 
-  Per target → spawn workflow-reviewer agent:
+  MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Per target → spawn workflow-reviewer agent:
     Context: original finding JSON, previous analysis (if iteration > 1)
     Tasks: read affected file, find callers/imports, check test coverage
     Analyze: root cause, impact radius, remediation (with code example), risk if unfixed
@@ -369,6 +370,7 @@ Write ${PHASE_DIR}/review.json:
 
 ```
 Update index.json.updated_at = now()
+Glob review.json MUST exist before Step 10 complete; BLOCKED if missing.
 Set index.json.review = { level, verdict, reviewed_at, severity_distribution,
                           findings_count, issues_created count }
 ```
@@ -433,7 +435,7 @@ Next steps:
 | No changed files | Abort: "No changed files detected in this phase." |
 | Reviewer agent fails | Log W001, continue with available dimension results |
 | All agents fail | Abort: "Review could not complete — all dimension agents failed." |
-| Deep-dive agent fails | Log finding as unresolved, skip enrichment |
+| Deep-dive agent fails | Log finding as unresolved, skip enrichment; flag finding as [LOW CONFIDENCE] (enrichment skipped) |
 
 ---
 

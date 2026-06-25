@@ -124,7 +124,7 @@ python3 "${SKILL_PATH}" "accessibility animation interaction" --domain ux
 #### 3b. Generate design direction options via ui-design-agent
 
 ```
-Agent(ui-design-agent): [DESIGN_DIRECTION_GENERATION]
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Agent(ui-design-agent): [DESIGN_DIRECTION_GENERATION]
 
 Generate ${styleCount} maximally contrasting design directions (min 6D distance: 0.7).
 
@@ -152,7 +152,7 @@ Update `analysis-options.json` with `user_selection` field.
 For each selected direction, spawn ui-design-agent:
 
 ```
-Agent(ui-design-agent): [DESIGN_SYSTEM_GENERATION #${variant_index}]
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Agent(ui-design-agent): [DESIGN_SYSTEM_GENERATION #${variant_index}]
 
 Generate production-ready design tokens from selected direction.
 Map 6D attributes to token values:
@@ -200,7 +200,7 @@ Requirements: ALL colors OKLCH, WCAG AA (4.5:1 text, 3:1 UI), complete combinati
 **Purpose:** Generate animation system complementing the selected styles.
 
 ```
-Agent(ui-design-agent): [ANIMATION_SYSTEM_GENERATION]
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Agent(ui-design-agent): [ANIMATION_SYSTEM_GENERATION]
 
 Input: selected variant's design-tokens.json (mood/weight context) + ui-ux-pro-max UX data.
 Output: ${PHASE_DIR}/design-ref/animation-tokens.json
@@ -227,7 +227,7 @@ Requirements: CSS custom properties, prefers-reduced-motion mandatory, var() ref
 #### 5a. Generate layout concept options
 
 ```
-Agent(ui-design-agent): [LAYOUT_CONCEPT_GENERATION]
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Agent(ui-design-agent): [LAYOUT_CONCEPT_GENERATION]
 
 Generate ${layoutCount} structurally distinct layout concepts per target.
 Concepts must differ in: grid structure, component arrangement, visual hierarchy, navigation pattern.
@@ -249,7 +249,7 @@ Update analysis-options.json with `user_selection.selected_variants`.
 For each selected concept × target:
 
 ```
-Agent(ui-design-agent): [LAYOUT_TEMPLATE_GENERATION -- ${target} variant ${variant_id}]
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Agent(ui-design-agent): [LAYOUT_TEMPLATE_GENERATION -- ${target} variant ${variant_id}]
 
 Structure ONLY, no visual style. Output: ${PHASE_DIR}/design-ref/layout-templates/layout-${target}-${variant_id}.json
 
@@ -267,6 +267,8 @@ Schema:
 Rules: semantic HTML5, ARIA roles, var() refs only (no hard-coded values), mobile-first responsive. NO colors/fonts/shadows.
 ```
 
+GATE Step 5→6: design-tokens.json + animation-tokens.json + layout-templates exist BEFORE assembly; BLOCKED if any missing
+
 ---
 
 ### Step 6: Assemble HTML Prototypes (Layer 4 — Assembly)
@@ -276,7 +278,7 @@ Rules: semantic HTML5, ARIA roles, var() refs only (no hard-coded values), mobil
 For each `style × layout × target` combination, spawn ui-design-agent:
 
 ```
-Agent(ui-design-agent): [PROTOTYPE_ASSEMBLY -- ${target}-style-${s}-layout-${l}]
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Agent(ui-design-agent): [PROTOTYPE_ASSEMBLY -- ${target}-style-${s}-layout-${l}]
 
 Pure assembly: combine pre-extracted structure + tokens. NO design decisions.
 
@@ -375,7 +377,7 @@ Spacing & Layout, Effects & Interactions, Component Styles, Animation System, An
 | Python not found | Abort with install instructions per OS |
 | ui-ux-pro-max not found | Abort, suggest skill installation |
 | Design system returns empty | Retry with broader keywords, then abort |
-| Prototype agent fails | Log error, continue with other variants |
+| Prototype agent fails | Log error, continue with other variants; flag variants as [LOW CONFIDENCE] (prototype agent failed) |
 | User cancels selection | Save all variants as-is, exit without MASTER.md |
 | --refine without existing design-ref | Error E004 |
 

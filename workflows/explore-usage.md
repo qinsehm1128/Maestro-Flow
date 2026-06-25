@@ -67,7 +67,7 @@ Endpoint B:  [job4] → [job5]              (serial)
                                            ↑ parallel ↑
 ```
 
-Raise per-endpoint parallelism with `--ep-concurrency 2` when the API allows it.
+Raise per-endpoint parallelism with `--ep-concurrency 2` when the API rate limit permits (verify via test request).
 
 ## Multi-Prompt Input
 
@@ -126,7 +126,7 @@ Multi-prompt — **background**:
 Bash({ command: "maestro explore \"p1\" \"p2\" --json", run_in_background: true })
 ```
 
-Single quick lookup — foreground is fine:
+Single quick lookup — run in foreground:
 
 ```
 Bash({ command: "maestro explore \"Where is X defined?\"" })

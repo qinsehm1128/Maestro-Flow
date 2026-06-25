@@ -12,7 +12,7 @@ Tests expose bugs -- fixing is for quality-debug or maestro-execute.
 specs_content = maestro spec load --category test
 ```
 
-Follow project test conventions in Step 4 (Generate Test Plan) and Step 5 (Write Tests).
+Apply project test conventions (from Step 0 specs) when generating the plan (Step 4) and writing tests (Step 5); REQUIRED: tests conform to loaded spec conventions.
 
 ---
 

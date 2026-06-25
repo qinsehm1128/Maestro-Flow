@@ -217,11 +217,11 @@ Fragments extracted: 8 (filtered from 12 by confidence ≥ 0.5)
 
 ### 6a. Wiki routing
 
-`maestro wiki create --type <wiki_type> --slug harvest-<source_type>-<short_id>`. Fallback: write `.workflow/harvest/wiki-pending-{id}.md`.
+`maestro wiki create --type <wiki_type> --slug harvest-<source_type>-<short_id>`. Fallback: write `.workflow/harvest/wiki-pending-{id}.md`; flag wiki entry as [LOW CONFIDENCE] (pending offline).
 
 ### 6b. Spec routing
 
-`Skill({ skill: "spec-add", args: "<spec_type> <content>" })`. Mapping: pattern→pattern, decision→decision, bug→bug, knowhow→rule.
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: `Skill({ skill: "spec-add", args: "<spec_type> <content>" })`. Mapping: pattern→pattern, decision→decision, bug→bug, knowhow→rule.
 
 ### 6c. Issue routing
 

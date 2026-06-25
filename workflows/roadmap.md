@@ -1,6 +1,6 @@
 # Workflow: Roadmap (Light Mode)
 
-Lightweight requirements-to-roadmap path. Shared logic: `@roadmap-common.md`.
+Lightweight requirements-to-roadmap path. Shared logic: `@~/.maestro/workflows/roadmap-common.md`.
 
 ---
 
@@ -27,9 +27,9 @@ Parse flags from `$ARGUMENTS`:
    - `--from`: enrich from context-package (`requirements`, `constraints[locked]`, `domain`, `non_goals`, `insights`, `open_questions`)
    - `project_context`: cross-reference `already_shipped`, promote `deferred` items, apply `locked_decisions`
 
-2. **Codebase Exploration** — follow roadmap-common.md
+2. **Codebase Exploration** — MANDATORY: execute ~/.maestro/workflows/roadmap-common.md Codebase Exploration logic; REQUIRED produce: codebase context summary; BLOCKED if missing
 
-3. **External Research** — follow roadmap-common.md
+3. **External Research** — MANDATORY: execute ~/.maestro/workflows/roadmap-common.md External Research logic; REQUIRED produce: apiResearchContext (or [LOW CONFIDENCE] if none)
 
    `apiResearchContext` is passed into:
    - Step 3 (Decomposition): technology complexity informs phase sizing and ordering
@@ -43,7 +43,7 @@ Parse flags from `$ARGUMENTS`:
 
 ## Step 3: Decomposition
 
-Spawn `cli-roadmap-plan-agent` (include `apiResearchContext` if set). Apply **Minimum-Phase Principle** from roadmap-common.md.
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Spawn `cli-roadmap-plan-agent` (include `apiResearchContext` if set). Apply **Minimum-Phase Principle** from ~/.maestro/workflows/roadmap-common.md.
 
 ---
 
@@ -58,9 +58,12 @@ Spawn `cli-roadmap-plan-agent` (include `apiResearchContext` if set). Apply **Mi
 
 ## Step 5: Write Outputs
 
-Follow roadmap-common.md **Roadmap Write Logic** (overwrite vs edit rules, state.json update, scratch directory).
+MANDATORY: apply ~/.maestro/workflows/roadmap-common.md **Roadmap Write Logic** (overwrite vs edit rules, state.json update, scratch directory); REQUIRED produce: .workflow/roadmap.md; BLOCKED if missing
 
 ---
+
+**GATE Step 5→6**: REQUIRED roadmap.md written BEFORE handoff.
+Glob .workflow/roadmap.md MUST exist before Step 6 handoff; BLOCKED if missing.
 
 ## Step 6: Handoff
 

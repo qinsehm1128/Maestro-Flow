@@ -110,6 +110,7 @@ If resuming: load understanding.md + evidence.ndjson, spawn continuation agent.
 ### Step 1.5: Load Project Specs
 
 ```
+# MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep
 specs_content = maestro spec load --category debug
 → Pass to debug agents as prior knowledge
 ```
@@ -175,7 +176,7 @@ Create the directory.
 
 ---
 
-### Step 5: Spawn Parallel Debug Agents
+### Step 5: Spawn Parallel Debug Agents — MANDATORY, NOT SUBSTITUTABLE
 
 For each cluster, spawn concurrently (`run_in_background: false`):
 
@@ -219,7 +220,7 @@ Pass cli_evidence as supplementary_context to debug agent prompts in Step 5/6
 
 ---
 
-### Step 6: Spawn Single Debug Agent (sequential mode)
+### Step 6: Spawn Single Debug Agent (sequential mode) — MANDATORY, NOT SUBSTITUTABLE
 
 Spawn agent (`run_in_background: false`):
 
@@ -329,6 +330,8 @@ Display what was checked/eliminated. Offer: 1) Continue (fresh agent with prior 
 Load prior state (understanding.md + evidence.ndjson) + user checkpoint response. Handle return same as Step 6.
 
 ---
+
+**GATE Step 12→13**: Glob `{$DEBUG_DIR}/understanding.md` AND `{$DEBUG_DIR}/evidence.ndjson` MUST exist before Step 13 report; BLOCKED if missing.
 
 ### Step 13: Report
 

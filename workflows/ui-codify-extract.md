@@ -350,6 +350,7 @@ Task(subagent_type="ui-design-agent",
 ```bash
 # Agents run in parallel and write separate output files
 # Each agent generates its own JSON directly
+Glob ${temp_dir}/style-extraction/style-1/design-tokens.json, ${temp_dir}/animation-extraction/animation-tokens.json, ${temp_dir}/layout-extraction/layout-templates.json MUST exist before Phase 2 complete; BLOCKED if missing
 echo "[Phase 2] Parallel agent analysis complete"
 ```
 

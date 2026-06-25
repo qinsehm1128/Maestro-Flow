@@ -39,6 +39,8 @@ Knowledge graph link discovery and health improvement. Analyzes the unified wiki
 
 Gather baseline in parallel via `maestro wiki list --json`, `health`, `orphans`, `hubs --top 10`.
 
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: graph operations (`orphans`, `hubs --top 10`) — use the `maestro wiki` CLI to compute in-degree and orphan sets.
+
 Working state: entry count by type, baseline health score, orphan IDs, hub in-degree counts.
 
 Apply `--scope` filter if provided — restrict all subsequent analysis to matching type.

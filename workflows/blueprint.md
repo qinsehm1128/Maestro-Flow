@@ -14,6 +14,9 @@ brainstorm (parallel) → blueprint → analyze → plan
 P0: Spec Study → P1: Discovery → P1.5: Req Expansion → P2: Product Brief → P3: PRD → P4: Architecture → P5: Epics → P6: Readiness Check
 
 P6 gate: Pass (>=80%) → Handoff | Review (60-79%) → Handoff w/caveats | Fail (<60%) → P6.5 Auto-Fix (max 2 iter) → re-check
+
+GATE P2→P3: REQUIRED `product-brief.md` written with ≥5 glossary terms in `glossary.json`; BLOCKED if `product-brief.md` missing or glossary < 5 terms.
+GATE P3→P4: REQUIRED `requirements/_index.md` written with MoSCoW priority table; BLOCKED if `_index.md` missing or MoSCoW table absent.
 ```
 
 ## Arguments
@@ -103,7 +106,7 @@ Session ID: BLP-{slug}-{YYYY-MM-DD}
 Output dir: .workflow/blueprint/{session_id}/
 ```
 
-**Step 2.3: Seed Analysis via CLI**
+**Step 2.3: Seed Analysis via CLI** — MANDATORY, NOT SUBSTITUTABLE
 - Spawn CLI analysis to extract: problem_statement, target_users, domain, constraints, dimensions (3-5)
 - Assess complexity: simple (1-2 components) / moderate (3-5) / complex (6+)
 - For context-package input: enrich with feature decomposition data
@@ -160,7 +163,7 @@ Generate product brief through multi-perspective CLI analysis.
 - Read discovery-context.json (if codebase detected)
 - For context-package input: read context-package.json domain and requirements sections
 
-**Step 4.2: Multi-CLI Parallel Analysis (3 perspectives)**
+**Step 4.2: Multi-CLI Parallel Analysis (3 perspectives)** — MANDATORY, NOT SUBSTITUTABLE
 
 | Perspective | Role | Focus |
 |-------------|------|-------|
@@ -189,7 +192,7 @@ Generate product brief through multi-perspective CLI analysis.
 
 Generate detailed PRD with functional/non-functional requirements.
 
-**Step 5.1: Requirement Expansion via CLI**
+**Step 5.1: Requirement Expansion via CLI** — MANDATORY, NOT SUBSTITUTABLE
 - For each product brief goal, generate 3-7 functional requirements
 - Each requirement: REQ-NNN ID, title, description, user story, 2-4 acceptance criteria
 - Generate non-functional requirements: performance, security, scalability, usability
@@ -214,12 +217,12 @@ Generate detailed PRD with functional/non-functional requirements.
 
 Generate architecture decisions, component design, and technology selections.
 
-**Step 6.1: Architecture Analysis via CLI (role: review)**
+**Step 6.1: Architecture Analysis via CLI (role: review)** — MANDATORY, NOT SUBSTITUTABLE
 - System architecture style with justification
 - Core components and responsibilities
 - Component interaction diagram (Mermaid graph TD)
 - Technology stack: languages, frameworks, databases, infrastructure
-- 2-4 Architecture Decision Records (ADRs): context, decision, alternatives, consequences
+- 2-4 Architecture Decision Records (ADRs): context, decision, alternatives, consequences, evidence_source
 - Data model: entities and relationships (Mermaid erDiagram)
 - Security architecture: auth, authorization, data protection
 - **State machine**: ASCII diagram + transition table for lifecycle entities (service/platform type)
@@ -230,7 +233,7 @@ Generate architecture decisions, component design, and technology selections.
 - Glossary injection for terminology consistency
 - If `apiResearchContext` is set: inject as "External API Research" context
 
-**Step 6.2: Architecture Review via CLI (role: review)**
+**Step 6.2: Architecture Review via CLI (role: review)** — MANDATORY, NOT SUBSTITUTABLE
 - Challenge each ADR, identify scalability bottlenecks
 - Assess security gaps, evaluate technology choices
 - Rate overall quality 1-5
@@ -252,7 +255,7 @@ Generate architecture decisions, component design, and technology selections.
 
 Decompose specification into executable Epics and Stories.
 
-**Step 7.1: Epic Decomposition via CLI**
+**Step 7.1: Epic Decomposition via CLI** — MANDATORY, NOT SUBSTITUTABLE
 - Group requirements into logical Epics (EPIC-NNN IDs). Epic count is unconstrained — downstream workflows will merge Epics into minimal phases via the minimum-phase principle.
 - Tag MVP subset
 - For each Epic: 2-5 Stories in "As a...I want...So that..." format
@@ -280,7 +283,7 @@ Decompose specification into executable Epics and Stories.
 
 Validate specification package and provide execution handoff.
 
-**Step 8.1: Cross-Document Validation via CLI**
+**Step 8.1: Cross-Document Validation via CLI** — MANDATORY, NOT SUBSTITUTABLE
 Score on 4 dimensions (25% each):
 1. **Completeness**: all required sections present with substantive content
 2. **Consistency**: terminology uniform (glossary compliance), scope containment, non-goals respected
@@ -390,14 +393,14 @@ Resume: `-c` reads blueprint-config.json, resumes from first incomplete phase.
 | Phase | Error | Blocking? | Action |
 |-------|-------|-----------|--------|
 | Phase 1 | Empty input | Yes | Error and exit |
-| Phase 1 | CLI analysis fails | No | Basic parsing fallback |
-| Phase 1.5 | Gap analysis fails | No | Skip to basic prompts |
-| Phase 2 | Single CLI fails | No | Continue with available |
-| Phase 3 | Gemini fails | No | Codex fallback |
-| Phase 4 | Review fails | No | Skip review |
-| Phase 5 | Story generation fails | No | Generate epics only |
-| Phase 6 | Validation fails | No | Partial report |
-| Phase 6.5 | Max iterations (2) | No | Force handoff |
-| Step 2.5 | External research fails | No | apiResearchContext = null, continue |
+| Phase 1 | CLI analysis fails | No | Basic parsing fallback; flag seed_analysis as [LOW CONFIDENCE] (CLI analysis unavailable) |
+| Phase 1.5 | Gap analysis fails | No | Skip to basic prompts; flag refined-requirements.json as [LOW CONFIDENCE] (no gap analysis) |
+| Phase 2 | Single CLI fails | No | Continue with available; flag product-brief.md as [LOW CONFIDENCE] (missing perspective) |
+| Phase 3 | Gemini fails | No | Codex fallback; flag affected REQ-NNN.md as [LOW CONFIDENCE] (model fallback) |
+| Phase 4 | Review fails | No | Skip review; flag ADR-NNN.md as [LOW CONFIDENCE] (no peer review) |
+| Phase 5 | Story generation fails | No | Generate epics only; flag EPIC-NNN.md stories as [LOW CONFIDENCE] (stories incomplete) |
+| Phase 6 | Validation fails | No | Partial report; flag readiness-report.md as [LOW CONFIDENCE] (validation incomplete) |
+| Phase 6.5 | Max iterations (2) | No | Force handoff; flag readiness-report.md as [LOW CONFIDENCE] (auto-fix exhausted) |
+| Step 2.5 | External research fails | No | apiResearchContext = null, continue; flag apiResearchContext as [LOW CONFIDENCE] (no external research) |
 
-CLI Fallback Chain: Role-based resolution → degraded mode (local only)
+CLI Fallback Chain: Role-based resolution → degraded mode (local only); flag affected phase artifacts as [LOW CONFIDENCE] (CLI unavailable, local-only analysis)

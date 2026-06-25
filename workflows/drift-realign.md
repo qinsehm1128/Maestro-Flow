@@ -7,7 +7,7 @@
 - `.workflow/` 已初始化（`.workflow/state.json` 存在）
 - Git 仓库可访问（`git log` 可执行）
 - 至少一个 `.workflow/` artifact 存在
-- 推荐：wiki 已索引（`maestro wiki rebuild`）以支持 session 关联
+- REQUIRED: wiki indexed via `maestro wiki rebuild` (supports session association)
 
 
 ---
@@ -52,7 +52,7 @@
 
 互斥校验：
   --report → 强制覆盖 mode 为 read-only
-  --auto-archive 覆盖 --interactive（非错误，静默降级）
+  --auto-archive 覆盖 --interactive（非错误，静默降级）; flag session as [LOW CONFIDENCE] (interactive skipped)
 
 检查 git 可用性（E003）。
 初始化 .workflow/.drift-realign/ 目录。
@@ -149,7 +149,7 @@ scope_weight 映射：
 
 ## Stage 4: parallel_drift_scan
 
-**在单条消息中并行派发 4 个 agent。每个 agent 接收 timeline.json + 相关 scope 文件 + git diff 摘要。**
+**MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: 在单条消息中并行派发 4 个 agent。每个 agent 接收 timeline.json + 相关 scope 文件 + git diff 摘要。**
 
 ### 4a. roadmap-scanner
 
@@ -231,7 +231,7 @@ DriftFinding {
 按 scope 和 severity 统计计数。
 
 Conflict-marker 集成：
-  运行 maestro spec conflict list → 已标记的冲突条目
+  MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: 运行 maestro spec conflict list → 已标记的冲突条目
   对于已有 conflict-marker 的 spec 条目，若 drift scanner 也检测到同一文件：
     合并为同一 finding（提升 severity 到 P0，来源标注 "drift + conflict-marker"）
   对于 drift scanner 发现但无 conflict-marker 的条目：保持 scanner 原始 severity
@@ -295,7 +295,7 @@ for each actionable finding:
 | `rebuild` | 收集 rebuild 目标；全部其他 action 完成后：通过 `Skill()` 自动调用 `/quality-sync --full` |
 
 rebuild 后处理：
-- 若 `/quality-sync` 报告 W001（无变更）或重大结构变更 → 建议 `/manage-codebase-rebuild`
+- 若 W001 或重大结构变更 → MUST run `/manage-codebase-rebuild`
 
 Conflict-marker 清除：
 - 对于 update/archive 的 spec 目标文件，若存在 conflict-marker：
@@ -379,7 +379,7 @@ Next:
   → 处理 TODO 标记:           grep -r "DRIFT-TODO" .workflow/
   → 内部矛盾审查:             /manage-knowledge-audit --scope all
   → 全量 codebase 重建:       /manage-codebase-rebuild
-  → 周期巡检 (建议):          milestone 结束时跑 --scope all --report
+  → 周期巡检 (REQUIRED at milestone end): run --scope all --report
 ```
 
 ---
@@ -391,6 +391,6 @@ Next:
 3. **No auto-delete** — drift-realign 绝不物理删除文件；archive 仅移动到 `.trash/`
 4. **Rebuild is scoped** — 自动重建仅对 codebase scope 触发，绝不对 spec/roadmap 触发
 5. **Idempotent** — 相同输入产生相同 findings（git 状态 + 文件状态确定性）
-6. **Graceful degradation** — wiki/session 不可用时（W001），以 git-only timeline 继续
+6. **Graceful degradation** — wiki/session 不可用时（W001），以 git-only timeline 继续; flag timeline as [LOW CONFIDENCE] (wiki/session unavailable)
 7. **Preserve user work** — TODO 标记是注释，绝不覆盖文件内容
 8. **State.json atomic** — 所有 state.json 变更遵循 备份 → 写新 → 验证 模式
