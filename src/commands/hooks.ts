@@ -38,6 +38,7 @@ export interface ClaudeSettings {
     PostToolUse?: HookGroup[];
     UserPromptSubmit?: HookGroup[];
     Notification?: HookGroup[];
+    SessionStart?: HookGroup[];
     [key: string]: unknown;
   };
   statusLine?: { type: string; command: string };
@@ -49,7 +50,7 @@ export interface ClaudeSettings {
 // ---------------------------------------------------------------------------
 
 interface HookDef {
-  event: 'PreToolUse' | 'PostToolUse' | 'UserPromptSubmit' | 'Notification' | 'Stop';
+  event: 'PreToolUse' | 'PostToolUse' | 'UserPromptSubmit' | 'Notification' | 'SessionStart' | 'Stop';
   matcher?: string;
   /** Minimum level required to install this hook */
   level: HookLevel;
@@ -71,7 +72,7 @@ export const HOOK_LEVELS: readonly HookLevel[] = ['none', 'minimal', 'standard',
 export const HOOK_LEVEL_DESCRIPTIONS: Record<HookLevel, string> = {
   none: 'No hooks',
   minimal: 'Statusline + spec-injector',
-  standard: '+ delegate-monitor + team/telemetry/coordinator(Stop) + session-context + skill-context + kg-sync + kg-auto-init + kg-context-injector + kg-unified-injector (opt-in) + search-cache-invalidator',
+  standard: '+ session-context + search-daemon + kg-auto-init (SessionStart) + delegate-monitor + team/telemetry/coordinator(Stop) + skill-context + kg-sync + kg-context-injector + kg-unified-injector (opt-in) + search-cache-invalidator',
   full: '+ workflow-guard (PreToolUse) + prompt-guard (UserPromptSubmit)',
 };
 
@@ -80,19 +81,19 @@ export const HOOK_DEFS: Record<string, HookDef> = {
   'delegate-monitor': { event: 'PostToolUse', matcher: 'Bash|Agent', level: 'standard' },
   'team-monitor': { event: 'Stop', level: 'standard' },
   'telemetry': { event: 'Stop', level: 'standard' },
-  'session-context': { event: 'Notification', level: 'standard' },
+  'session-context': { event: 'SessionStart', matcher: 'startup|resume', level: 'standard', requiresWorkspace: true },
   'skill-context': { event: 'UserPromptSubmit', level: 'standard', requiresWorkspace: true },
   'coordinator-tracker': { event: 'Stop', level: 'standard', requiresWorkspace: true },
   'preflight-guard': { event: 'PreToolUse', matcher: 'Bash|Write|Edit|Agent', level: 'standard', requiresWorkspace: true },
   'spec-validator': { event: 'PreToolUse', matcher: 'Write|Edit', level: 'standard', requiresWorkspace: true },
   'keyword-spec-injector': { event: 'UserPromptSubmit', level: 'standard', requiresWorkspace: true },
   'kg-sync': { event: 'UserPromptSubmit', level: 'standard', requiresWorkspace: true },
-  'kg-auto-init': { event: 'UserPromptSubmit', level: 'standard', requiresWorkspace: true },
+  'kg-auto-init': { event: 'SessionStart', matcher: 'startup', level: 'standard', requiresWorkspace: true },
   'kg-context-injector': { event: 'PreToolUse', matcher: 'Agent', level: 'standard', requiresWorkspace: true },
   'kg-unified-injector': { event: 'UserPromptSubmit', level: 'standard', requiresWorkspace: true },
   'kg-unified-injector-agent': { event: 'PreToolUse', matcher: 'Agent', level: 'standard', requiresWorkspace: true },
   'search-cache-invalidator': { event: 'PostToolUse', matcher: 'Write|Edit', level: 'standard', requiresWorkspace: true },
-  'search-daemon-start': { event: 'Notification', level: 'standard', requiresWorkspace: true },
+  'search-daemon-start': { event: 'SessionStart', matcher: 'startup', level: 'standard', requiresWorkspace: true },
   'workflow-guard': { event: 'PreToolUse', matcher: 'Bash|Write|Edit', level: 'full', requiresWorkspace: true },
   'prompt-guard': { event: 'UserPromptSubmit', level: 'full', requiresWorkspace: false },
 };
@@ -216,7 +217,7 @@ export function removeMaestroHooks(settings: ClaudeSettings, hookNames?: string[
     ? new Set(hookNames.map((n) => `hooks run ${n}`))
     : null;
 
-  for (const eventKey of ['PreToolUse', 'PostToolUse', 'UserPromptSubmit', 'Notification', 'Stop'] as const) {
+  for (const eventKey of ['PreToolUse', 'PostToolUse', 'UserPromptSubmit', 'Notification', 'SessionStart', 'Stop'] as const) {
     const groups = settings.hooks[eventKey] as HookGroup[] | undefined;
     if (!groups) continue;
     for (const group of groups) {
@@ -283,7 +284,7 @@ function countHookEntries(hooks: Record<string, HookGroup[]> | undefined): numbe
 
 function findHookInSettings(settings: ClaudeSettings, hookName: string): boolean {
   if (!settings.hooks) return false;
-  for (const eventKey of ['PreToolUse', 'PostToolUse', 'UserPromptSubmit', 'Notification', 'Stop'] as const) {
+  for (const eventKey of ['PreToolUse', 'PostToolUse', 'UserPromptSubmit', 'Notification', 'SessionStart', 'Stop'] as const) {
     const groups = settings.hooks[eventKey] as HookGroup[] | undefined;
     if (!groups) continue;
     if (groups.some((g) => g.hooks.some((h) => h.command.includes(`hooks run ${hookName}`) || h.command.includes(`hook-runner.js") ${hookName}`) || h.command.includes(`hook-runner.js" ${hookName}`)))) {
