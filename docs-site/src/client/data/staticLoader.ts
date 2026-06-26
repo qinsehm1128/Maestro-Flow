@@ -278,6 +278,24 @@ export const guideRegistry: Array<{
     description_zh: '全局 CLI 安装与项目初始化 — 前置要求、安装流程、验证步骤',
     icon: 'download',
   },
+  {
+    slug: 'explore',
+    file: 'explore-guide.md',
+    title: 'Explore Lightweight Search Guide',
+    description: 'API-driven lightweight code exploration with multi-prompt parallel, multi-endpoint routing',
+    title_zh: 'Explore 轻量搜索指南',
+    description_zh: '通过 API 端点驱动的轻量代码探索，支持多 prompt 并行、多端点路由',
+    icon: 'search',
+  },
+  {
+    slug: 'team-lite',
+    file: 'team-lite-guide.md',
+    title: 'Team Lite Collaboration Guide',
+    description: 'Git-native collaboration extension for small teams (2-8 people)',
+    title_zh: 'Team Lite 协作指南',
+    description_zh: '面向 2-8 人小团队的 Git-native 协作扩展',
+    icon: 'users',
+  },
 ];
 
 // Use import.meta.glob to load all markdown files
@@ -500,11 +518,11 @@ export async function loadGuide(slug: string, locale: string = 'zh-CN'): Promise
   const isEn = locale === 'en';
   const targetFile = isEn && entry.file_en ? entry.file_en : entry.file;
 
-  const modulePath = `/guides/${targetFile}`;
+  const modulePath = `/src/content/docs/guides/${targetFile}`;
   const loader = guideModules[modulePath] || guideModules[modulePath.replace(/^\//, '')];
 
   // If English file not found, fall back to Chinese
-  const fallbackPath = `/guides/${entry.file}`;
+  const fallbackPath = `/src/content/docs/guides/${entry.file}`;
   const finalLoader = loader || guideModules[fallbackPath] || guideModules[fallbackPath.replace(/^\//, '')];
 
   if (!finalLoader) return null;
