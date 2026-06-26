@@ -1,13 +1,15 @@
 ---
 name: odyssey-ui
 description: "Long-running UI optimization cycle — visual survey, multi-dimensional audit, divergent exploration, fix, verify, generalize, and design knowledge persistence"
-argument-hint: '"<target>" [--dimensions <list>] [--skip-fix] [--skip-generalize] [--auto] [-y] [-c]'
+argument-hint: '"<target>" [--dimensions <list>] [--skip-fix] [--skip-generalize] [--auto] [-y] [-c] [--heartbeat]'
 allowed-tools: spawn_agents_on_csv, Read, Write, Edit, Bash, Glob, Grep, request_user_input
 ---
 
+<base>@~/.maestro/workflows/odyssey-base.md</base>
+
 <purpose>
-Deep UI polish cycle: survey (design tokens + pattern inventory) -> audit (6 dimensions) ->
-diverge (creative exploration) -> fix -> verify -> generalize -> discover -> record.
+Deep UI polish cycle: survey → 6-dimension audit → divergent creative exploration →
+fix → verify → generalize → discover → persist. Every pixel is a learning opportunity.
 
 Core philosophy:
 - **Every pixel tells a story** — subtle details create the experience
@@ -22,407 +24,264 @@ Core philosophy:
 </purpose>
 
 <boundary>
-**范围内:** 目标组件/页面的视觉体验优化 — 6 维度审查 → 发散探索 → 修复 → 泛化兄弟组件
-**范围外:** 后端逻辑 / 数据模型 / API → `$odyssey-planex` | 深度 bug → `$odyssey-debug` | 代码质量 → `$odyssey-review-test-fix`
-**探索自由度:** 边界内最大自由 — S_DIVERGE 鼓励发散思维，不设创意上限。在约束下尽可能完善每个像素。
-
+**范围内:** 目标组件/页面的视觉体验优化 — 审查 6 维度 → 发散探索 → 修复 → 泛化到兄弟组件
+**范围外:** 后端逻辑 / 数据模型 / API 设计 / 业务规则 → `$odyssey-planex` | 深度 bug 调查 → `$odyssey-debug` | 代码质量审查 → `$odyssey-review-test-fix`
+**探索自由度:** 边界内最大自由 — S_DIVERGE 阶段鼓励发散思维，不设创意上限。审查 + 发散可发现任何视觉/交互/可访问性细节。在约束下尽可能完善每个像素。
 **Zero-residual principle:** Every finding/idea MUST have a concrete action (fix / issue / decision). "Report and shelve" is not allowed. "Pre-existing design debt" is not a valid skip reason — if discovered within scope, it must be addressed.
+⚠️ **Decision gate** — ONLY these qualify as decisions (not fixes):
+  - Brand/style direction requiring human creative judgment
+  - Layout restructuring that changes user flow significantly
+  - Requires new design tokens or breaking component API
+❌ "Unsure how to fix", "Large scope", "Pre-existing issue" are NOT valid decision reasons — either fix it, or explain specifically why it's unfixable
 </boundary>
-
-<execution_discipline>
-**三条铁律（所有阶段适用）:**
-1. **Phase auto-commit** — 阶段完成后**自动** `git commit`，无需用户确认（session.json/evidence.ndjson 不纳入）
-2. **Confident edits only, but must attempt** — only modify what you're confident about; record decisions only when genuinely requiring human judgment
-   - High visual certainty (missing hover state, insufficient contrast, etc.) → fix directly
-   - Design direction uncertain (color choices, layout restructure, etc.) → record decision for user judgment
-   - No speculative changes, especially brand/style-level modifications
-   - ⚠️ **Decision gate** — ONLY these qualify as decisions (not fixes):
-     - Brand/style direction requiring human creative judgment
-     - Layout restructuring that changes user flow significantly
-     - Requires new design tokens or breaking component API
-   - ❌ "Unsure how to fix", "Large scope", "Pre-existing issue" are NOT valid decision reasons — either fix it, or explain specifically why it's unfixable
-3. **多 CLI 辅助** — survey 用 `--role explore`，audit/diverge 用 `--role analyze`，fix 前后用 `--role review`
-</execution_discipline>
 
 <context>
 $ARGUMENTS — target and optional flags.
 
-**Target resolution:**
-| Input | Resolution |
-|-------|-----------|
-| Component path | Review those component files |
-| Page/route | Resolve route to component tree |
-| `HEAD` / `staged` | `git diff HEAD` / `git diff --staged` (UI files only) |
-| Feature area | Grep for feature keyword, collect UI files |
+**Target resolution:** Component path → audit component | Page/route → audit page | `staged`/`HEAD` → diff UI changes | Feature area → resolve to components/pages
 
 **Flags:**
-| Flag | Effect |
-|------|--------|
-| `--dimensions <list>` | Comma-separated subset (default: all 6) |
-| `--skip-fix` | Audit-only — skip S_FIX and S_VERIFY |
-| `--skip-generalize` | Skip S_GENERALIZE and S_DISCOVER |
-| `--auto` | CLI delegates without confirmation |
-| `-y` | Auto-confirm at all decision points (see appendix) |
-| `-c` | Resume most recent session |
-
-**Dimensions (6):** visual-hierarchy, interaction-states, accessibility, responsiveness, micro-interactions, edge-cases
+| Flag | Effect | Default |
+|------|--------|---------|
+| `--dimensions <list>` | Comma-separated subset of 6 dimensions | all 6 |
+| `--fix-threshold <severity>` | 修复到哪个 severity 为止 | all |
+| `--skip-fix` | Audit + diverge only, no code changes | false |
+| `--skip-generalize` | Skip S_GENERALIZE and S_DISCOVER | false |
+| `--auto` | CLI delegates without confirmation | false |
+| `-y` | Auto-confirm all decisions (see appendix) | false |
+| `-c` | Resume most recent session | — |
+| `--heartbeat` | Enable heartbeat progress reporting | false |
 
 **Session**: `SESSION_DIR = .workflow/scratch/{YYYYMMDD}-ui-odyssey-{slug}/`
 
-**Output — 3 files:**
-```
-SESSION_DIR/
-  ├── session.json       # state + audit_result + diverge_result + patterns + phase_goals
-  ├── evidence.ndjson    # ALL evidence (phase: survey|audit|diverge|fix|discovery|decision|self-iteration)
-  └── understanding.md   # 8-section evolving narrative (§1-§8, one per major phase)
-```
+**Output — 3 files:** `session.json` (state + audit/diverge results + patterns + phase_goals) | `evidence.ndjson` (phases: survey, audit, diverge, fix, discovery, decision, self-iteration) | `understanding.md` (8-section narrative)
 
-**session.json schema:**
-```json
-{ "session_id": "ui-odyssey-{YYYYMMDD-HHmmss}", "target": "", "dimensions": [],
-  "flags": { "skip_fix": false, "skip_generalize": false, "auto": false, "auto_confirm": false },
-  "current_state": "S_INTAKE",
-  "audit_result": { "dimensions_audited": [], "finding_count": 0, "severity_distribution": {} },
-  "diverge_result": { "improvements_proposed": 0, "creative_ideas": 0 },
-  "patterns": [], "generalization_stats": null,
-  "phase_goals": [], "phase_goals_all_done": false, "self_iteration_log": [],
-  "cross_phase_loops": 0, "max_loops": 5,
-  "created_at": "", "updated_at": "" }
-```
+**session.json unique fields:** `target`, `dimensions`, `audit_result` {dimensions_audited, finding_count, severity_distribution}, `diverge_result` {improvements_proposed, creative_ideas}, `patterns[]` {id, source_finding, layer, signature, description, risk, fix_template, confidence}, `confirmation` {test_result, cli_review, overall}, `generalization_stats` {patterns_extracted, total_hits, cross_layer_confirmed, regression_risks, by_layer, deepening_triggered}
 
-**evidence.ndjson:** `{"ts":"","phase":"survey|audit|diverge|fix|discovery|decision|self-iteration","type":"","dimension":"","title":"","severity":"","file":"","line":0,"description":"","suggestion":""}`
-
-**phase_goals[] — auto-derived from flags:**
-
+**phase_goals[]:**
 | ID | Goal | Phase | skip_when |
 |----|------|-------|-----------|
 | G1 | Survey completed | S_SURVEY | — |
 | G2 | Audit completed | S_AUDIT | — |
 | G3 | Divergent exploration done | S_DIVERGE | — |
-| G4 | Fix applied and verified | S_VERIFY | skip_fix |
+| G4 | Zero remaining: all findings/ideas fixed and verified | S_VERIFY | skip_fix |
 | G5 | Pattern generalized | S_GENERALIZE | skip_generalize |
 | G6 | Discoveries triaged | S_DISCOVER | skip_generalize |
 | G7 | Learnings persisted | S_RECORD | — |
 
-Lifecycle: `pending -> done | skipped | failed` (all set `completion_confirmed`)
+**understanding.md:** §1 Target & Design Context | §2 Survey | §3 Audit | §4 Diverge | §5 Verify | §6 Generalize | §7 Discover | §8 Learnings
 
-**understanding.md — 8 sections:** SS1 Target & Context (S_INTAKE) | SS2 Visual Survey (S_SURVEY) | SS3 Audit Findings (S_AUDIT) | SS4 Divergent Exploration (S_DIVERGE) | SS5 Fix & Verification (S_FIX+S_VERIFY) | SS6 Generalization (S_GENERALIZE) | SS7 Discoveries (S_DISCOVER) | SS8 Design Learnings (S_RECORD)
+### Pre-load（可选，缺失不阻塞）
+ARCHITECTURE.md | `maestro search "<target>" --json` (top 5) | `maestro load --type spec --category ui` | `maestro load --type spec --category coding` | `maestro search --category ui` → load knowhow | Glob prior sessions
 
-### Pre-load
-
-| Layer | Command | Purpose |
-|-------|---------|---------|
-| Codebase docs | Read `.workflow/codebase/ARCHITECTURE.md` | Module boundaries |
-| Wiki search | `maestro search "<target keywords>" --json` | Prior UI decisions (top 5) |
-| UI specs | `maestro load --type spec --category ui` | Design tokens, standards |
-| Coding specs | `maestro load --type spec --category coding` | Coding conventions |
-| Role knowledge | `maestro search --category ui` -> select -> `maestro load --type knowhow --id <id>` | Domain knowledge |
-| Prior sessions | `Glob(".workflow/scratch/*-ui-odyssey-*")` | Related sessions |
-
-### Knowledge Persistence (two-step model)
-
-Write to understanding.md SS8 during execution (temporary). Completion summary suggests follow-up commands.
-
-| Category | Content | Follow-up |
-|----------|---------|-----------|
-| Design pattern | Component pattern + scenarios | `$spec-add ui "..."` |
-| Interaction spec | State defs + transition rules | `$spec-add ui "..."` |
-| Accessibility rule | WCAG req + implementation | `$spec-add ui "..."` |
-| Reusable generalization | Pattern signature + scope | `$spec-add coding "..."` |
+### Knowledge Persistence（S_RECORD 写入 understanding.md §8）
+| 分类 | 写入内容 | 后续建议命令 |
+|------|---------|-------------|
+| 设计 pattern | 组件模式 + 适用场景 + token 引用 | `/spec-add ui "..."` |
+| 交互规范 | 状态定义 + 转场规则 + 反馈模式 | `/spec-add ui "..."` |
+| 可访问性规则 | WCAG 要求 + 实现方案 | `/spec-add ui "..."` |
+| 可复用泛化 pattern | pattern 签名 + 应用范围 | `/spec-add coding "..."` |
 </context>
 
 <self_iteration>
-**Quality Gate** — auto-evaluate after each analytical phase. Insufficient -> re-enter (max **3 rounds**).
-
-| Dimension | Sufficient | Insufficient |
-|-----------|-----------|-------------|
-| Coverage | All known related files/components analyzed | Missed targets discoverable via grep/glob |
-| Depth | >=80% findings have file:line evidence | Most findings lack specifics |
-| Actionability | Each conclusion has concrete next action | "Consider reviewing" without action |
-
-**Expansion:** Round 1 = widen scope (more directories, more components, deeper token scan). Round 2 = shift perspective (different audit angle, CLI delegate second opinion). Round 3 = combine both + targeted deep-dive on remaining gaps.
-
-**Applicable stages:** S_SURVEY, S_AUDIT, S_DIVERGE, S_GENERALIZE
-
-**Exit:** All sufficient -> advance | 3-round cap -> record gap, continue. Logged to `evidence.ndjson` + `session.json.self_iteration_log[]`.
+适用阶段: S_SURVEY, S_AUDIT, S_DIVERGE, S_GENERALIZE
 </self_iteration>
 
-<csv_schema>
+<state_machine>
 
-### Shared Output Schema (all waves)
-```json
-{
-  "type": "object",
-  "properties": {
-    "id": { "type": "string" },
-    "result_status": { "type": "string", "enum": ["completed", "failed"] },
-    "findings": { "type": "string", "maxLength": 500 },
-    "evidence": { "type": "string" },
-    "error": { "type": "string" }
-  },
-  "required": ["id", "result_status", "findings"]
-}
-```
+<states>
+S_INTAKE     — Parse target, load design context, resume session           PERSIST: session.json + understanding.md §1
+S_SURVEY     — Visual landscape: design tokens, pattern inventory          PERSIST: evidence.ndjson (survey) + understanding.md §2
+S_AUDIT      — 6-dimension parallel review                                 PERSIST: evidence.ndjson (audit) + understanding.md §3
+S_DIVERGE    — Divergent creative exploration: polish + delight            PERSIST: evidence.ndjson (diverge) + understanding.md §4
+S_FIX        — Implement improvements (skip if --skip-fix)                 PERSIST: code changes + evidence.ndjson (fix)
+S_VERIFY     — Visual verification + test (skip if --skip-fix)             PERSIST: session.json.confirmation + understanding.md §5
+S_GENERALIZE — Pattern extraction + 4-agent scan (skip if --skip-gen)      PERSIST: session.json.patterns + understanding.md §6
+S_DISCOVER   — Classify hits, create issues (skip if --skip-gen)           PERSIST: evidence.ndjson (discovery|decision) + understanding.md §7
+S_RECORD     — Design knowledge persistence + final report                 PERSIST: understanding.md §8 + spec entries
+</states>
 
-**Termination contract:** Call `report_agent_job_result` EXACTLY ONCE. Read-only. Do NOT modify source files, tasks.csv, wave-*.csv, results.csv, or call spawn_agents_on_csv.
+<transitions>
+S_INTAKE:
+  → S_INTAKE      WHEN -c + session found        DO A_RESUME
+  → S_SURVEY      WHEN target resolved            DO A_INTAKE
+  → S_INTAKE      WHEN no target                  DO request_user_input
 
-### tasks.csv
-```csv
-id,title,description,task_type,dimension,deps,wave,status,findings,evidence,error
-```
+S_SURVEY       → S_AUDIT        DO A_SURVEY
+S_AUDIT        → S_DIVERGE      DO A_AUDIT
 
-**Waves:**
-| Wave | Tasks | Parallelism |
-|------|-------|-------------|
-| 1 | Survey (design-tokens-audit, pattern-inventory) | 2 agents |
-| 2 | Audit (visual-hierarchy, interaction-states, accessibility, responsiveness, micro-interactions, edge-cases) | 6 agents |
-| 3 | Diverge (polish-agent, delight-agent) | 2 agents |
-| 4 | Generalization (syntax-grep, semantic-scan, structural-match, historical-grep) | 4 agents |
-</csv_schema>
+S_DIVERGE:
+  → S_FIX          WHEN !skip_fix AND actionable findings/ideas           DO A_DIVERGE
+  → S_GENERALIZE   WHEN (skip_fix OR no actionable) AND !skip_gen        DO A_DIVERGE
+  → S_RECORD       WHEN (skip_fix OR no actionable) AND skip_gen         DO A_DIVERGE
 
-<invariants>
-1. **Browser is truth** — code changes must be visually verifiable
-2. **Diverge before converge** — S_DIVERGE runs before S_FIX, never skip
-3. **Evidence append-only** — evidence.ndjson is never overwritten
-4. **Session is source of truth** — session.json holds all state
-5. **Phase goal tracking** — each stage MUST mark its goal on completion
-6. **`-y` defers, never drops** — auto-confirm records `deferred`, never silently skips
-7. **CLI delegate is background** — all `maestro delegate` calls use run_in_background
-8. **Goal is outcome-oriented** — odyssey outputs prompt then continues
-9. **Invariant violation = BLOCK** — violating any invariant blocks the operation
-</invariants>
+S_FIX          → S_VERIFY       DO A_FIX
+S_VERIFY:
+  → S_GENERALIZE   WHEN verified AND !skip_gen    DO A_VERIFY
+  → S_RECORD       WHEN verified AND skip_gen     DO A_VERIFY
+  → S_FIX          WHEN needs_rework              DO A_VERIFY
 
-<execution>
+S_GENERALIZE:
+  → S_DISCOVER     WHEN hits found                DO A_GENERALIZE
+  → S_RECORD       WHEN no hits                   DO A_GENERALIZE
 
-**States:** S_INTAKE -> S_SURVEY -> S_AUDIT -> S_DIVERGE -> S_FIX -> S_VERIFY -> S_GENERALIZE -> S_DISCOVER -> S_RECORD
-- S_FIX/S_VERIFY skip when `--skip-fix`
-- S_GENERALIZE/S_DISCOVER skip when `--skip-generalize`
+S_DISCOVER → S_AUDIT  : new component to audit → cross_phase_loops++
+S_DISCOVER → S_FIX    : fixable sibling, !skip_fix → cross_phase_loops++
+S_DISCOVER → S_RECORD : remaining_actionable == 0 OR loops >= max_loops (MUST log each unfixed item)
 
-### S_INTAKE
-1. Parse target + flags -> resolve file list (filter to UI-relevant: `.tsx`, `.vue`, `.svelte`, `.css`, `.scss`, style files)
+S_RECORD   → END      DO A_RECORD
+</transitions>
+
+<actions>
+
+### A_INTAKE
+1. Parse arguments: target, flags, `--dimensions` subset
 2. Generate slug, create `SESSION_DIR`
-3. Search prior knowledge: `maestro search "<keywords>"` + Glob prior sessions + ARCHITECTURE.md + spec load (ui, coding)
+3. Pre-load: `maestro search` + Glob prior sessions + ARCHITECTURE.md + spec load ui/coding
 4. Derive `phase_goals[]` from flags (apply `skip_when`)
-5. Write `session.json` + `understanding.md` SS1
-6. Display Goal Prompt (appendix), continue without blocking
+5. Write `session.json` + `understanding.md` §1
+6. Emit Goal Prompt (see Appendix)
+📌 `git commit -m "odyssey-ui({slug}): INTAKE — 目标解析"`
 
-**Resume (`-c`):** Glob latest session -> read `session.json` -> restore `current_state` -> jump.
+### A_RESUME
+Find latest session via Glob → read `session.json` → display summary → jump to `current_state`.
 
-📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-ui({slug}): S_INTAKE — 目标解析"`
+### A_SURVEY
+1. **Design system inventory**: Scan for design tokens, CSS variables, theme imports
+2. **Current state analysis**: Styling patterns, layout strategy, component hierarchy
+3. **spawn_agents_on_csv (Wave 1)** — 2 agents: design-tokens-audit, pattern-inventory
+4. Append evidence (phase: "survey"). Update §2. Mark G1 done.
+📌 `git commit -m "odyssey-ui({slug}): SURVEY — 视觉调查"`
 
-### S_SURVEY
-**spawn_agents_on_csv (Wave 1):**
+### A_AUDIT
+**spawn_agents_on_csv (Wave 2)** — 6 parallel agents (one per dimension, or `--dimensions` subset):
 
-Write `tasks.csv` with Wave 1 rows:
-```csv
-"survey-tokens","Design Token Audit","Scan {target_files} for CSS variables, design tokens, theme values. Return [{token,usage_count,consistency,file,line}].","survey","","","1","pending","","",""
-"survey-patterns","Pattern Inventory","Catalog component patterns, layout, spacing, typography in {target_files}. Return [{pattern,files,consistency}].","survey","","","1","pending","","",""
-```
-`spawn_agents_on_csv({ csv_path:"tasks.csv", max_concurrency:2, max_runtime_seconds:300, output_csv_path:"wave-1-results.csv", output_schema:SHARED_OUTPUT_SCHEMA })`
+| Dimension | Focus |
+|-----------|-------|
+| visual_hierarchy | Spacing, typography scale, color contrast, alignment, whitespace, visual weight |
+| interaction_states | Hover, focus, active, disabled, loading, error, empty, selected states |
+| accessibility | WCAG AA contrast, focus management, aria labels, keyboard nav, screen reader |
+| responsiveness | Breakpoints, overflow, touch targets, fluid typography, container queries |
+| micro_interactions | Transitions, animations, feedback indicators, loading states, progress |
+| edge_cases | Long text truncation, empty data, error states, extreme values, i18n, RTL |
 
-Merge -> evidence.ndjson (phase: "survey"). Update SS2. Mark G1 done.
+Each returns `[{title, severity, file, line, description, suggestion, dimension}]`.
+Merge → evidence (phase: "audit"). Write `audit_result`. Update §3 (severity matrix). Mark G2 done.
+📌 `git commit -m "odyssey-ui({slug}): AUDIT — 多维审查"`
 
-📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-ui({slug}): S_SURVEY — 调查"`
+### A_DIVERGE
+Goes beyond defect fixing — "what would make this delightful?"
 
-### S_AUDIT
-**spawn_agents_on_csv (Wave 2)** — 6 agents:
+**Step 1 — spawn_agents_on_csv (Wave 3)** — 2 parallel agents:
+- **Polish Agent**: Shadows, borders, transitions, hover states, feedback, empty states, skeleton loading, scroll behavior
+- **Delight Agent**: Motion design, progressive disclosure, smart defaults, contextual hints, celebratory feedback, personality in copy
 
-Append Wave 2 rows to `tasks.csv`:
-```csv
-"audit-hierarchy","Visual Hierarchy","Spacing, typography scale, contrast, alignment, whitespace, visual weight","audit","visual-hierarchy","","2","pending","","",""
-"audit-interaction","Interaction States","hover/focus/active/disabled/loading/error/empty/selected states","audit","interaction-states","","2","pending","","",""
-"audit-a11y","Accessibility","WCAG AA contrast, focus mgmt, aria, keyboard nav, screen reader","audit","accessibility","","2","pending","","",""
-"audit-responsive","Responsiveness","Breakpoints, overflow, touch targets >=44px, fluid typography","audit","responsiveness","","2","pending","","",""
-"audit-motion","Micro-interactions","Transitions, animations, feedback, loading states, scroll behavior","audit","micro-interactions","","2","pending","","",""
-"audit-edge","Edge Cases","Long text, empty data, error states, extreme values, i18n, RTL","audit","edge-cases","","2","pending","","",""
-```
-`spawn_agents_on_csv({ csv_path:"tasks.csv", max_concurrency:6, max_runtime_seconds:600, output_csv_path:"wave-2-results.csv", output_schema:SHARED_OUTPUT_SCHEMA })`
+Each returns `[{idea, category (polish|delight), impact, effort, description, inspiration}]`
 
-Merge -> evidence.ndjson (phase: "audit"). Write `audit_result` with dimensions, finding count, severity distribution. Update SS3. Mark G2 done.
+**Step 2 — CLI-assisted** (optional): `maestro delegate` with `--role analyze` — polish opportunities, micro-interactions, visual rhythm, delight moments
 
-📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-ui({slug}): S_AUDIT — 审查"`
+**Step 3 — Consolidate**: Merge audit findings + divergent ideas → prioritized list (severity x impact x effort).
+Append evidence (phase: "diverge"). Update §4. Mark G3 done.
+📌 `git commit -m "odyssey-ui({slug}): DIVERGE — 发散探索"`
 
-### S_DIVERGE
-**spawn_agents_on_csv (Wave 3)** — 2 agents:
-
-Append Wave 3 rows to `tasks.csv`:
-```csv
-"diverge-polish","Polish Agent","Missing subtle details: shadows, borders, transitions, hover feedback, empty states, skeleton loading, scroll behavior. Return [{idea,category:'polish',impact,effort,description}].","diverge","","","3","pending","","",""
-"diverge-delight","Delight Agent","What makes this memorable: motion design, progressive disclosure, smart defaults, celebratory feedback, personality. Return [{idea,category:'delight',impact,effort,description}].","diverge","","","3","pending","","",""
-```
-`spawn_agents_on_csv({ csv_path:"tasks.csv", max_concurrency:2, max_runtime_seconds:300, output_csv_path:"wave-3-results.csv", output_schema:SHARED_OUTPUT_SCHEMA })`
-
-**Optional CLI delegate** for creative review:
-```bash
-maestro delegate "PURPOSE: Creative UI review for: {target}
-TASK: Identify polish opportunities | Suggest delight moments | Evaluate visual rhythm
-MODE: analysis  CONTEXT: @{target_files} | Survey: {token_summary} | Audit: {top_findings}
-EXPECTED: JSON [{idea, category, impact, effort, description}]
-CONSTRAINTS: User-perceptible improvements only
-" --role analyze --mode analysis
-```
-Execute with `run_in_background: true`, then wait for callback (do NOT halt the Odyssey flow).
-
-Consolidate: audit findings + divergent ideas -> prioritized improvement list (impact/effort matrix). Write `diverge_result`. Update SS4. Mark G3 done.
-
-📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-ui({slug}): S_DIVERGE — 发散"`
-
-### S_FIX
-Skip if `--skip-fix`. **穷尽修复** ALL audit findings + divergent ideas（按 impact×severity 递降），不限于 high severity。每轮修复后 re-review，新发现追加。
-**Normal**: `request_user_input` to confirm. **`-y`**: auto-fix, record `deferred`.
-Implement highest impact first. Record evidence (phase: "fix").
-
-📌 **Auto-commit**: `git add -A && git commit -m "odyssey-ui({slug}): S_FIX — 修复"`
-
-### S_VERIFY
+### A_FIX
 Skip if `--skip-fix`.
+1. **穷尽修复**: ALL findings/ideas by priority tier (critical→high→medium→low + high-impact ideas). After each tier, re-review — new findings append.
+2. Each fix → evidence (phase: "fix")
+3. **Normal**: request_user_input per-fix. **`-y`**: auto-proceed, record `deferred`.
+📌 `git commit -m "odyssey-ui({slug}): FIX — 优化实现"`
 
-1. **Tests**: run covering tests on modified files
-2. **CLI visual review**: delegate `--role review --mode analysis` for visual correctness + regression check (execute with `run_in_background: true`, then wait for callback — do NOT halt the Odyssey flow)
-3. `needs_rework` -> S_FIX (loop). `confirmed` -> mark G4 done, advance
-4. Update SS5
+### A_VERIFY
+1. Run tests (lint, unit, visual regression)
+2. **CLI-assisted**: `maestro delegate` with `--role review` — visual correctness, interaction states, accessibility, responsive
+3. `needs_rework` → S_FIX. `verified` → mark G4 done. Update §5, write `confirmation`.
+📌 `git commit -m "odyssey-ui({slug}): VERIFY — 验证"`
 
-📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-ui({slug}): S_VERIFY — 验证"`
+### A_GENERALIZE
+按 base A_GENERALIZE 执行。Pattern 来源: audit findings + diverge ideas (severity >= medium OR impact = high)。
+**spawn_agents_on_csv (Wave 4)** — 4 agents: syntax-grep, semantic-scan, structural-match, historical-grep.
+Mark G5 done.
+📌 `git commit -m "odyssey-ui({slug}): GENERALIZE — 泛化扫描"`
 
-### S_GENERALIZE
-Skip if `--skip-generalize`.
+### A_DISCOVER
+按 base A_DISCOVER 执行。Mark G6 done.
+📌 `git commit -m "odyssey-ui({slug}): DISCOVER — 发现分类"`
 
-**Step 1 — Multi-layer pattern extraction** from audit + diverge findings:
-
-| Layer | Method | Example |
-|-------|--------|---------|
-| Syntax | Regex patterns (direct Grep) | Missing `focus-visible`, hardcoded colors, `!important` |
-| Semantic | Agent anti-pattern scan | Missing hover state on interactive element, no empty state |
-| Structural | File/module similarity | Same component structure missing accessibility attrs |
-
-Write `session.json.patterns[]`: `[{id, source_finding, layer, signature, description, risk, fix_template}]`
-
-**Step 2 — 4-agent scan (spawn_agents_on_csv, Wave 4):**
-
-Append Wave 4 rows to `tasks.csv`:
-```csv
-"gen-syntax","Syntax Grep","Grep CSS/style patterns matching '${signatures}' across project","generalization","syntax","","4","pending","","",""
-"gen-semantic","Semantic Scan","Find components with same interaction pattern but missing states","generalization","semantic","","4","pending","","",""
-"gen-structural","Structural Match","Find structurally similar components, check for same issues","generalization","structural","","4","pending","","",""
-"gen-historical","Historical Grep","git log -S '${signature}' for UI pattern history","generalization","historical","","4","pending","","",""
-```
-`spawn_agents_on_csv({ csv_path:"tasks.csv", max_concurrency:4, max_runtime_seconds:600, output_csv_path:"wave-4-results.csv", output_schema:SHARED_OUTPUT_SCHEMA })`
-
-**Step 3 — Cross-layer dedup**: Multi-layer hit -> boost confidence. Single -> `needs_review`. Historical fix -> `regression_risk`.
-
-**Step 4 — Iterative deepening**: module >= 3 hits -> targeted deep scan. Max 1 round.
-
-**Step 5 — Quality Gate** (self-iteration).
-
-**Step 6:** Write `generalization_stats`. Update SS6. Mark G5 done.
-
-📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-ui({slug}): S_GENERALIZE — 泛化"`
-
-### S_DISCOVER
-Skip if no generalization hits.
-
-1. **Triage** each hit: read +-10 lines -> classify `needs_treatment` / `low_risk` / `already_handled`
-2. **Route**:
-   - `needs_treatment` + directly fixable → **fix immediately** → back to S_FIX
-   - `needs_treatment` + requires design direction decision → create issue (with fix suggestion)
-   - `low_risk` → evaluate if a quick guard/improvement is feasible; if yes, fix it
-   - `already_handled` → mark skip
-   See appendix `-y` behavior. Append evidence (phase: "discovery" + "decision")
-3. **Cross-phase loop**:
-   - `S_DISCOVER → S_RECORD` : triage complete AND remaining_actionable == 0
-   - `S_DISCOVER → S_RECORD` : loops >= max_loops → MUST log each unfixed item with specific reason (blanket "pre-existing" is forbidden)
-   - new component to audit → S_AUDIT (cross_phase_loops++)
-   - fixable sibling → S_FIX (!skip_fix, cross_phase_loops++)
-4. Update SS7. Mark G6 done.
-
-📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-ui({slug}): S_DISCOVER — 发现"`
-
-### S_RECORD
-1. Finalize SS8: structured by Knowledge Persistence table (temporary)
-2. Mark G7 done. Pending decisions: **Normal** -> `request_user_input`. **`-y`** -> skip, show deferred count
-3. **Goal audit**: all confirmed -> `phase_goals_all_done = true`. Any false: **Normal** -> `request_user_input`. **`-y`** -> auto accept
-4. **Completion**: `current_state = "COMPLETED"`, emit summary:
+### A_RECORD
+1. Finalize §8: 按 Knowledge Persistence 表分类记录，completion summary 列出建议的 `/spec-add` 命令
+2. Pending decisions: **Normal** → request_user_input. **`-y`** → skip, show deferred count
+3. Goal audit: all confirmed → `phase_goals_all_done = true`. **Normal** → request_user_input | **`-y`** → auto accept
+4. Mark G7 done. Emit completion summary:
 ```
 --- UI ODYSSEY COMPLETE ---
-Target: {target}  Dimensions: {audited}
-Survey: {token_count} tokens, {pattern_count} patterns
-Audit: {C}C {H}H {M}M {L}L  Diverge: {improvements} + {ideas} creative
-Fix: {F} applied, {S} skipped  Patterns: {N} ({by_layer})
-Scan: {total} hits ({cross_layer} cross-layer)  Issues: {N}
-Decisions: {resolved}/{pending}/{deferred}  Self-iter: {R} rounds / {P} phases
-Goals: {done}/{total} ({skipped} skipped)
+Target: {target} | Dimensions: {dimensions_audited}
+Findings: {C}C {H}H {M}M {L}L | Diverge: {improvements} polish + {creative} delight
+Fix: {fixed_count} applied, verified={yes|skipped}
+Patterns: {extracted} ({by_layer}) | Scan hits: {total} ({cross_layer} cross-layer)
+Issues: {N} | Decisions: {N} resolved, {M} pending, {K} deferred
+Learnings: {N} entries | Self-iter: {N} rounds | Goals: {done}/{total} ({skipped} skipped)
 ---
 ```
-**Next steps:** `$odyssey-review-test-fix`, `$manage-issue list --source ui-odyssey`, `$maestro-impeccable`, `$maestro-plan --gaps`
+📌 `git commit -m "odyssey-ui({slug}): RECORD — 会话总结"`
 
-📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-ui({slug}): S_RECORD — 总结"`
-</execution>
+</actions>
 
 <appendix>
 
 ### Goal Prompt Template
-
-**Time guard: display ONCE after S_INTAKE completes (session created, before survey). NEVER redisplay at S_RECORD completion.**
+**⚠️ 仅在 A_INTAKE 完成后显示一次。A_RECORD 完成时禁止重新显示。**
 
 ```
-UI Odyssey session created. Copy the following /goal to set termination conditions at any time:
+📋 UI Odyssey 会话已创建。可随时复制以下 /goal 设定终止条件：
 
-/goal 穷尽迭代：直到所有 audit + diverge findings 均已处理（fix/issue/decision）
+/goal 完成以下目标：
+{for each G in phase_goals where status != "skipped":}
+- {G.id}: {G.goal} — 完成条件: {G.done_when}
+{end for}
+穷尽迭代：直到 audit + diverge findings 均已处理（fix/issue/decision）
 且 phase_goals_all_done=true 才停。修复按 impact×severity 逐轮迭代。
-每轮修复后重审修改区域，新发现追加继续。
-phase=decision pending 必须 request_user_input。不允许遗留。
+每轮修复后重审修改区域，新发现追加继续修。
+遇到 phase=decision 的 pending 必须 request_user_input。不允许"只报告不处理"。
 ```
 
-Odyssey outputs prompt then continues without blocking. `/goal` entered by user at any time.
+### `-y` Auto-Confirm (5 decision points)
+| Decision Point | Normal | `-y` |
+|----------------|--------|------|
+| A_FIX improvement confirmation | request_user_input | auto-proceed, `deferred` |
+| A_DISCOVER hit routing | request_user_input | auto create issue, `deferred` |
+| A_DISCOVER ambiguous items | request_user_input | all `deferred` |
+| A_RECORD pending decisions | request_user_input | skip, show deferred count |
+| A_RECORD goal audit | request_user_input | auto accept |
 
-### `-y` Auto-Confirm Behavior
-
-| Decision Point | Normal | `-y` mode |
-|----------------|--------|-----------|
-| S_DIVERGE consolidation | request_user_input for priority | auto-rank by impact/effort |
-| S_FIX fix candidates | request_user_input to confirm | auto-fix high-impact, `deferred` |
-| S_DISCOVER bug routing | request_user_input per hit | auto create issue, `deferred` |
-| S_DISCOVER ambiguous | request_user_input batch | all `deferred` |
-| S_RECORD pending decisions | request_user_input per-item | skip, show deferred count |
-| S_RECORD goal audit | request_user_input 3-way | auto accept current state |
-
-`deferred` items shown in summary; recoverable via `-c`.
-
-### Phase Goal Lifecycle
-
-`pending -> done (confirmed=true)` normal | `pending -> skipped (confirmed=true)` flags/manual | `pending -> failed (confirmed=false)` incomplete
-
-`phase_goals_all_done = true` only when ALL goals have `completion_confirmed == true`.
+`deferred` → "待决策" in completion summary; recoverable via `-c`.
 
 </appendix>
+
+</state_machine>
 
 <error_codes>
 | Code | Severity | Condition | Recovery |
 |------|----------|-----------|----------|
-| E001 | error | No target and no session to resume | Provide target or use -c |
-| E002 | error | Target not found or no UI files | Check path, ensure UI files exist |
-| E003 | error | Resume but no session found | Start new session |
-| W001 | warning | No relevant git history | Proceed with limited context |
-| W002 | warning | Audit dimension agent failed | Partial coverage, note gap |
-| W003 | warning | Generalization scan 0 hits | Skip discovery |
-| W004 | warning | Delegate parse failed | Use raw output |
+| E001 | error | No target specified | Provide target |
+| E002 | error | Target path not found | Check path |
+| W001 | warning | No design system detected | Proceed with defaults |
+| W002 | warning | Some dimension agents failed | Partial coverage |
 </error_codes>
 
 <success_criteria>
-- [ ] Target resolved to UI files, session created with 3 output files
-- [ ] Prior knowledge searched (maestro search + sessions + architecture + ui specs)
-- [ ] Survey via spawn Wave 1, evidence phase=survey
-- [ ] All 6 dimensions audited via spawn Wave 2, severity matrix produced
-- [ ] Divergent exploration via spawn Wave 3, prioritized improvement list
-- [ ] Fixes applied highest-impact-first and verified (unless --skip-fix)
-- [ ] `--skip-fix`: no source code modifications
-- [ ] Generalization via spawn Wave 4 + cross-layer dedup (unless --skip-generalize)
-- [ ] Discoveries classified and routed
-- [ ] understanding.md tracks all 8 sections progressively
-- [ ] phase_goals G1-G7 derived from flags, each phase marks its goal
-- [ ] Goal Prompt displayed once; `-y` auto-resolves/defers
-- [ ] State saved at each transition (resumable via -c)
-- [ ] Quality Gate self-iteration logged in self_iteration_log
-- [ ] Completion summary with all stats
-- [ ] **Every unfixed finding has individual classification and reason** — blanket "pre-existing" labels are forbidden
+- [ ] 6-dimension audit with severity matrix + divergent exploration (polish + delight)
+- [ ] Improvements implemented and verified (unless --skip-fix)
+- [ ] Multi-layer generalization + discoveries classified (unless --skip-generalize)
+- [ ] Every unfixed finding has individual classification and reason
+- [ ] understanding.md §8 finalized; phase_goals G1-G7 tracked; `-y` no blocking prompts
 </success_criteria>
+
+<next_step_routing>
+| Condition | Next step |
+|-----------|-----------|
+| Finding needs deeper debug | `$odyssey-debug "<finding>"` |
+| Issues created from discoveries | `/manage-issue list --source ui-odyssey` |
+| Design pattern worth documenting | `/spec-add ui "..."` |
+| Want full review of changes | `$odyssey-review-test-fix <changed-files>` |
+| Sibling components to polish | `$odyssey-ui "<sibling>"` |
+</next_step_routing>
