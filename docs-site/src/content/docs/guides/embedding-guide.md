@@ -111,7 +111,8 @@ maestro embedding status
   "apiKey": "sk-your-api-key",
   "model": "BAAI/bge-m3",
   "dimensions": 1024,
-  "batchSize": 64
+  "contextLength": 8192,
+  "concurrency": 4
 }
 ```
 
@@ -121,7 +122,9 @@ maestro embedding status
 | `apiKey` | ✅ | — | API 密钥 |
 | `model` | ✅ | — | 模型名称（如 `BAAI/bge-m3`、`text-embedding-3-small`） |
 | `dimensions` | ❌ | — | 向量维度（部分 API 支持指定输出维度） |
-| `batchSize` | ❌ | `100` | 每次 API 请求的最大文本数 |
+| `contextLength` | ❌ | `8192` | 模型上下文窗口（token 数）。用于动态分批：每批总 token 不超过 `contextLength × 0.9` |
+| `batchSize` | ❌ | — | 每次 API 请求的固定文本数。设置后覆盖 `contextLength` 动态分批 |
+| `concurrency` | ❌ | `4` | 并行 API 请求数上限，控制多批次并发 |
 
 ### 兼容的 API 服务
 
@@ -145,7 +148,9 @@ maestro embedding status
 # Endpoint: https://api.siliconflow.cn/v1
 # Model: BAAI/bge-m3
 # Dimensions: 1024
-# Batch size: 64
+# Context length: 8192
+# Batch mode: dynamic (contextLength × 0.9)
+# Concurrency: 4
 # Active model: BAAI/bge-m3
 
 # 测试 API 连通性
@@ -172,6 +177,17 @@ API 模式自动读取代理设置，优先级：
 
 1. 环境变量 `HTTPS_PROXY` / `HTTP_PROXY` / `ALL_PROXY`
 2. `~/.maestro/cli-tools.json` 中的 `proxy` 配置
+
+### 分批策略
+
+API 模式支持两种分批方式：
+
+| 策略 | 触发条件 | 行为 |
+|------|---------|------|
+| **动态分批** | 未设置 `batchSize` | 按 token 估算，每批总 token ≤ `contextLength × 0.9`，单批上限 256 条 |
+| **固定分批** | 设置了 `batchSize` | 每批固定 N 条文本，忽略 `contextLength` |
+
+> **建议**：大多数场景使用动态分批即可（只需配置 `contextLength`）。如果遇到 API 限制或需要精确控制请求大小，再设置 `batchSize`。
 
 ### 容错机制
 
