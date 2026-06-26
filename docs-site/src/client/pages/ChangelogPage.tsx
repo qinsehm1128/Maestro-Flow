@@ -17,6 +17,18 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '0.5.39',
+    date: '2026-06',
+    changes: [
+      { type: 'feat', text_en: 'Embedding supports KG node hierarchical indexing + dynamic token batching', text_zh: 'embedding 支持 KG 节点分层索引 + 动态 token 分批' },
+      { type: 'feat', text_en: 'Embedding supports external API configuration (~/.maestro/api-embedding.json)', text_zh: 'embedding 支持外部 API 配置 (~/.maestro/api-embedding.json)' },
+      { type: 'feat', text_en: 'Session-context hook injects project summary, source file tree and recent sessions', text_zh: 'session-context hook 注入项目摘要、源码文件树和最近 session' },
+      { type: 'fix', text_en: 'Embedding system review fixes — daemon notification resilience, race protection, partial failure retention', text_zh: 'embedding 系统 review 修复——daemon 通知容错、竞态防护、部分失败保留' },
+      { type: 'refactor', text_en: 'Odyssey commands extract shared base + inject anti-stagnation mechanism', text_zh: 'Odyssey 命令提取共享基座 + 注入防停滞机制' },
+      { type: 'refactor', text_en: 'Codex Odyssey command sync refactor', text_zh: 'codex 版本 Odyssey 命令同步重构' },
+    ],
+  },
+  {
     version: '0.5.38',
     date: '2026-06',
     changes: [
