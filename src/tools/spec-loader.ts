@@ -8,7 +8,7 @@
 
 import { readFileSync, existsSync, readdirSync, mkdirSync, writeFileSync, appendFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseSpecEntries, formatSpecEntries, type SpecEntryParsed } from './spec-entry-parser.js';
+import { parseSpecEntries, formatSpecEntries, VALID_CATEGORIES, type SpecEntryParsed } from './spec-entry-parser.js';
 import { paths } from '../config/paths.js';
 import {
   SPEC_SEED_DOCS,
@@ -16,7 +16,7 @@ import {
   hasFrontmatter,
   renderSeedContent,
 } from './spec-seeds.js';
-import { stripFrontmatter } from '../utils/frontmatter.js';
+import { stripFrontmatter, parseFrontmatter } from '../utils/frontmatter.js';
 
 // ============================================================================
 // Types
@@ -247,9 +247,10 @@ function loadFromDir(
   const matched: string[] = [];
 
   for (const file of files) {
-    if (!shouldInclude(file, category, options?.extraSpecFiles)) continue;
-
     const filePath = join(specsDir, file);
+    const resolvedCat = resolveFileCategory(file, filePath);
+    if (!shouldInclude(file, category, resolvedCat, options?.extraSpecFiles)) continue;
+
     let raw: string;
     try {
       raw = readFileSync(filePath, 'utf-8');
@@ -260,9 +261,7 @@ function loadFromDir(
     const body = stripFrontmatter(raw).trim();
     if (!body) continue;
 
-    // Primary category doc → full load; other files → keyword-filtered only
-    const fileCategory = CATEGORY_MAP[file];
-    const isPrimaryDoc = category && (fileCategory === category || options?.extraSpecFiles?.includes(file));
+    const isPrimaryDoc = category && (resolvedCat === category || options?.extraSpecFiles?.includes(file));
 
     const workflowRoot = join(specsDir, '..');
     const formatted = formatFileContent(body, keyword, isPrimaryDoc ? undefined : category, workflowRoot, options);
@@ -279,23 +278,31 @@ function loadFromDir(
 // Internal
 // ============================================================================
 
-function shouldInclude(filename: string, category?: SpecCategory, extraSpecFiles?: string[]): boolean {
-  if (!category) return true; // No filter → load all
+/** Resolve category for a file: static CATEGORY_MAP first, frontmatter fallback. */
+function resolveFileCategory(filename: string, filePath: string): SpecCategory | undefined {
+  const mapped = CATEGORY_MAP[filename];
+  if (mapped) return mapped;
 
-  // Extra spec files for this category → always include as primary
+  try {
+    const raw = readFileSync(filePath, 'utf-8');
+    const { data } = parseFrontmatter(raw);
+    const cat = data.category;
+    if (cat && (VALID_CATEGORIES as readonly string[]).includes(cat)) {
+      return cat as SpecCategory;
+    }
+  } catch {
+    // fall through
+  }
+  return undefined;
+}
+
+function shouldInclude(filename: string, category?: SpecCategory, resolvedCat?: SpecCategory, extraSpecFiles?: string[]): boolean {
+  if (!category) return true;
+
   if (extraSpecFiles?.includes(filename)) return true;
 
-  // Category filter: include primary doc + all other files (for keyword cross-matching)
-  const cat = CATEGORY_MAP[filename];
-  if (!cat) {
-    console.warn(`[spec] file not in category map, skipped: ${filename}`);
-    return false;
-  }
+  if (!resolvedCat) return false;
 
-  // Primary category doc → always include (full load)
-  if (cat === category) return true;
-
-  // Other category files → include for keyword-based cross-category matching
   return true;
 }
 
