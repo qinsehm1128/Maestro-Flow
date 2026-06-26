@@ -1,7 +1,7 @@
 ---
 name: odyssey-planex
 description: Requirement-driven iterative cycle — plan, execute, strict verify, fix loop until acceptance criteria met
-argument-hint: "<requirement> [--max-iterations N] [--skip-generalize] [--auto] [--method agent|cli|auto] [--executor <tool>] [--skip-verify] [-y] [-c]"
+argument-hint: "<requirement> [--max-iterations N] [--skip-generalize] [--auto] [--method agent|cli|auto] [--executor <tool>] [--skip-verify] [--heartbeat] [-y] [-c]"
 allowed-tools:
   - Read
   - Write
@@ -12,6 +12,8 @@ allowed-tools:
   - Agent
   - AskUserQuestion
 ---
+<base>@~/.maestro/workflows/odyssey-base.md</base>
+
 <purpose>
 Requirement-to-delivery closed loop: parse requirement → define acceptance criteria →
 plan → execute → verify → fix gaps → iterate until ALL criteria pass.
@@ -21,7 +23,6 @@ plan → execute → verify → fix gaps → iterate until ALL criteria pass.
 **范围内:** 单一需求的实现闭环 — 从需求解析到验收标准全部通过 + 泛化同类场景
 **范围外:** 多需求编排 → `/maestro-roadmap` | 深度 debugging → `/odyssey-debug` | 代码审查 → `/odyssey-review-test-fix` | UI 优化 → `/odyssey-ui`
 **探索自由度:** 边界内自由探索 — 可自主分解任务、选择实现策略、迭代修复。verify→fix 循环内可尝试不同方案。
-**Zero-residual principle:** Every failing criterion MUST be fixed or explicitly escalated with specific reason. "Close enough" is not passing. "Pre-existing gap" is not a valid skip reason — if within scope, address it.
 **模板支持:** `--template <name>` 从预定义需求模板启动，自动生成匹配的验收标准和任务分解：
 
 | Template | 预设 criteria 模式 | 适用场景 |
@@ -32,31 +33,6 @@ plan → execute → verify → fix gaps → iterate until ALL criteria pass.
 | `migration` | 数据一致性 + 回滚验证 + 性能对比 | 数据/API 迁移 |
 | `api-endpoint` | 请求/响应契约 + 错误处理 + 权限校验 | API 开发 |
 </boundary>
-
-<execution_discipline>
-**三条铁律（所有阶段适用）:**
-
-1. **Phase auto-commit** — 每个阶段完成后**自动** `git commit`，无需用户确认
-   - 代码变更 + understanding.md → `git add` → `git commit -m "odyssey-planex({slug}): {phase} — {摘要}"`
-   - session.json / evidence.ndjson 为运行时状态，不纳入 commit
-
-2. **Confident edits only, but must attempt** — only modify what you're confident about; record decisions only when genuinely requiring human judgment
-   - Confident → edit code directly, commit
-   - Needs decision → record `evidence.ndjson {"phase":"decision","status":"pending"}`, don't touch code
-   - No speculative changes
-   - ⚠️ **Decision gate** — ONLY these qualify as decisions (not fixes):
-     - Cross-module architectural tradeoffs requiring human direction
-     - Ambiguous business semantics where the fix could alter intended behavior
-     - Requires new dependency or breaking API change
-   - ❌ "Unsure how to fix", "Large scope", "Pre-existing issue" are NOT valid decision reasons — either fix it, or explain specifically why it's unfixable
-
-3. **多 CLI 辅助** — 利用 `maestro delegate` 调用多个 CLI 工具交叉验证
-   - 计划阶段: `--role analyze` 获取任务分解建议
-   - 修复前后: `--role review` 确认无回归
-   - verify 阶段: cli-review 类型标准自动 delegate
-
-4. **禁止以上下文消耗为由中断** — harness 自动处理 context compression，以"上下文不足"或"已执行 N 个阶段"为由中断属于纪律违反；必须完整走完状态机直到 S_RECORD → END
-</execution_discipline>
 
 <context>
 $ARGUMENTS — requirement description and optional flags.
@@ -71,6 +47,7 @@ $ARGUMENTS — requirement description and optional flags.
 | `--method agent\|cli\|auto` | Execution method: Agent tool, CLI delegate, or auto-select | `auto` |
 | `--executor <tool>` | Explicit executor tool for CLI delegate mode | First enabled in config |
 | `--skip-verify` | Skip execution post-validation gate | false |
+| `--heartbeat` | Enable periodic progress heartbeat | false |
 | `-y` | Auto-confirm — decisions recorded as `deferred` | false |
 | `-c` | Resume most recent session | — |
 
@@ -114,6 +91,8 @@ SESSION_DIR/
   "phase_goals": [],
   "phase_goals_all_done": false,
   "self_iteration_log": [],
+  "progress_metrics": "→ base",
+  "directions_tried": "→ base",
   "cross_phase_loops": 0, "max_loops": 5,
   "created_at": "", "updated_at": ""
 }
@@ -155,24 +134,10 @@ S_RECORD 阶段将可沉淀知识 **写入 understanding.md §8 Learnings**，�
 | 可复用实现模式 | 模式描述 + 适用场景 + 代码模板 | `/spec-add coding "..."` |
 | 验收标准模板 | 标准模板 + verify_method 建议 | `/spec-add review "..."` |
 | 泛化 pattern | pattern 签名 + 风险说明 + fix 模板 | `/spec-add coding "..."` |
-
-**两步模式：** 执行中写入产出文件（临时记录）→ 任务完成后用户通过 next_step_routing 沉淀为永久知识。执行过程中不调用外部 Skill。
 </context>
 
 <self_iteration>
-**Quality Gate** — auto-evaluate after each analytical stage. Insufficient → re-enter with expanded strategy.
-
-| Dimension | Sufficient | Insufficient |
-|-----------|-----------|-------------|
-| Coverage | All known files/modules analyzed | Missed targets discoverable via grep/git log |
-| Depth | ≥80% findings have file:line evidence | Most findings lack specifics |
-| Actionability | Each conclusion has concrete next action | Only vague "consider" recommendations |
-
-**Rules:** stage complete → evaluate 3 dims → any insufficient → re-enter (max **3 rounds** per stage). Record to evidence.ndjson `{"phase":"self-iteration","type":"quality-gate","stage":"S_XXX","round":N,"assessment":{...},"expansion":"strategy"}`.
-
-**Expansion:** Round 1 = broaden scope (more dirs, more delegate angles). Round 2 = shift perspective (different CLI tool, reverse-trace from expected result). Round 3 = combine both + targeted deep-dive on remaining gaps.
-
-**Applies to:** S_PLAN, S_VERIFY, S_GENERALIZE
+适用阶段: S_PLAN, S_VERIFY, S_GENERALIZE
 </self_iteration>
 
 <state_machine>
@@ -261,7 +226,6 @@ AskUserQuestion({
       options: [
         { label: "Auto (Recommended)", description: "域路由: frontend→{frontendTool}, backend→{backendTool}, general→agent" },
         { label: "Agent", description: "Claude Code Agent 执行所有任务（最快）" },
-        // 每个 enabled CLI tool 一个选项
         ...availableTools.map(t => ({ label: t, description: `${t} CLI 执行所有任务` }))
       ]
     },
@@ -301,13 +265,6 @@ Per-task domain routing (when method == "auto"):
 | general | mixed, config, tests, unclear | .ts/.js/other |
 
 Resolution: `execution_config.domain_routing[domain]` → fallback `domain_routing.default` ("agent").
-
-Log routing per task:
-```
-T1 [frontend] → agy
-T2 [backend]  → codex
-T3 [general]  → agent
-```
 
 #### Step 3: Task Execution
 
@@ -440,50 +397,20 @@ Update understanding.md §4 with pass/fail table.
 
 ### A_GENERALIZE
 
-Extract reusable patterns from implementation, scan codebase for similar sites.
-
-**Pattern extraction (3 layers):**
-| Layer | Method | Example |
-|-------|--------|---------|
-| Syntax | Code regex patterns | validation/error handling patterns |
-| Semantic | Logic pattern description | missing similar checks at other entry points |
-| Structural | File/module structure match | sibling modules lacking same treatment |
-
-**4-agent parallel scan** (spawn 4 Agents):
-| Agent | Strategy | Scope |
-|-------|----------|-------|
-| Syntax grep | Grep syntax-layer signatures | full project |
-| Semantic scan | Check for same anti-pattern in related modules | related modules |
-| Structural match | Find structurally similar files | full project |
-| Historical grep | `git log -S "{pattern}"` | full git history |
-
-Each returns: `[{pattern_id, file, line, context, risk_level, layer, confidence}]`
-
-**Cross-layer dedup:** multi-layer hit on same file:line → boost confidence. Historical hit with existing fix → `already_handled`. Single layer only → `needs_review`.
-
-**Quality Gate** (self-iteration) → evaluate coverage/depth/actionability.
-
-Write understanding.md §6, generalization_stats. Mark G5 done.
+按 base A_GENERALIZE 执行。Pattern 来源: implementation patterns。Mark G5 done.
 
 📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-planex({slug}): GENERALIZE — 泛化扫描"`
 
 ### A_DISCOVER
 
-1. **Triage:** per hit, read context (+-10 lines), classify as `already_handled` | `needs_treatment` | `low_risk`
-2. **Route:**
-   | Classification | Normal | `-y` |
-   |---------------|--------|------|
-   | needs_treatment | AskUserQuestion: create issue / plan next iter | auto create issue, `deferred` |
-   | low_risk | Record only | Record only |
-   | already_handled | Skip | Skip |
-3. Append evidence (discovery + decision), update understanding.md §7. Mark G6 done.
+按 base A_DISCOVER 执行。Mark G6 done.
 
 📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-planex({slug}): DISCOVER — 发现分类"`
 
 ### A_RECORD
 
 1. Finalize understanding.md §8 — iteration summary, what worked, what needed rework
-2. Write learnings to understanding.md §8: 按 Knowledge Persistence 表分类记录（临时），completion summary 列出建议的 `/spec-add` 命令
+2. Write learnings to understanding.md §8: 按 Knowledge Persistence 表分类记录
 3. Pending decisions: **Normal** → AskUserQuestion. **`-y`** → display deferred count.
 4. Goal audit: check all phase_goals[*].completion_confirmed. Mark G7 done.
 5. Output completion summary:
@@ -501,6 +428,7 @@ Write understanding.md §6, generalization_stats. Mark G5 done.
    Status:      {ALL_PASSED|PARTIAL|ESCALATED}
    ---
    ```
+6. 其余按 base A_RECORD 执行。
 
 📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-planex({slug}): RECORD — 会话总结"`
 
@@ -566,35 +494,23 @@ Max iterations (default 3) prevents infinite loops. Each iteration records crite
 | Code | Severity | Condition | Recovery |
 |------|----------|-----------|----------|
 | E001 | error | No requirement provided | Provide requirement |
-| E003 | error | Resume but no session found | Start new |
-| E004 | error | Delegate failed | Retry or proceed without |
 | W001 | warning | No acceptance criteria derived | Manual definition needed |
 | W002 | warning | Max iterations reached, criteria still failing | Escalate to user |
 | W003 | warning | CLI review regression concern | Review before next iteration |
-| W004 | warning | Delegate parse failed | Use raw output |
 </error_codes>
 
 <success_criteria>
-- [ ] Requirement parsed and ≥1 acceptance criterion defined with verify_method
-- [ ] Plan created with tasks mapped to criteria
-- [ ] Execution options confirmed (executor/review/verify) before task dispatch
-- [ ] Tasks dispatched via resolved executor (agent/cli/auto domain routing)
-- [ ] Per-task deviation rule enforced (max 3 retries, fallback chain)
+- [ ] Requirement parsed with ≥1 acceptance criterion (verify_method assigned)
+- [ ] Plan tasks mapped to criteria; execution options confirmed
+- [ ] Tasks dispatched via resolved executor with deviation rule (max 3 retries)
 - [ ] Post-execution validation gate run (unless --skip-verify)
-- [ ] Tasks executed with evidence logged (executor, attempt count, files_modified)
-- [ ] Every criterion verified by its method after each iteration
-- [ ] Failing criteria trigger targeted fix (not full re-implementation)
-- [ ] Iteration count tracked, max respected
-- [ ] **Every unfixed criterion has individual classification and reason** — blanket "pre-existing" labels are forbidden
-- [ ] understanding.md updated per phase (§1-§8)
-- [ ] Multi-layer generalization + 4-agent scan (unless --skip-generalize)
-- [ ] Discoveries classified and routed (unless --skip-generalize)
-- [ ] Quality Gate self-iteration triggered when insufficient, logged in self_iteration_log
-- [ ] phase_goals G1-G7 tracked and audited
-- [ ] Goal Prompt displayed once after intake
-- [ ] `-y` mode: no blocking prompts, deferred counted
-- [ ] Session resumable via -c
-- [ ] Completion summary with iteration stats
+- [ ] Every criterion verified per method; failing → targeted fix (not re-implementation)
+- [ ] Iteration count tracked and max respected; unfixed criteria individually classified
+- [ ] understanding.md §1-§8 updated per phase; phase_goals G1-G7 audited
+- [ ] Generalization + discovery completed (unless --skip-generalize)
+- [ ] Quality Gate self-iteration triggered when insufficient
+- [ ] Goal Prompt displayed once after intake; `-y` mode: no blocking prompts
+- [ ] Session resumable via -c; completion summary output
 </success_criteria>
 
 <next_step_routing>
