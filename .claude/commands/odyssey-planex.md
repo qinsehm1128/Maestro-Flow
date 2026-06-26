@@ -20,180 +20,119 @@ plan → execute → verify → fix gaps → iterate until ALL criteria pass.
 </purpose>
 
 <boundary>
-**范围内:** 单一需求的实现闭环 — 从需求解析到验收标准全部通过 + 泛化同类场景
-**范围外:** 多需求编排 → `/maestro-roadmap` | 深度 debugging → `/odyssey-debug` | 代码审查 → `/odyssey-review-test-fix` | UI 优化 → `/odyssey-ui`
-**探索自由度:** 边界内自由探索 — 可自主分解任务、选择实现策略、迭代修复。verify→fix 循环内可尝试不同方案。
-**模板支持:** `--template <name>` 从预定义需求模板启动，自动生成匹配的验收标准和任务分解：
+**In scope:** Single requirement delivery loop — from requirement parsing to all acceptance criteria passing + generalization.
+**Out of scope:** Multi-requirement orchestration → `/maestro-roadmap` | Deep debugging → `/odyssey-debug` | Code review → `/odyssey-review-test-fix` | UI optimization → `/odyssey-ui`
 
-| Template | 预设 criteria 模式 | 适用场景 |
-|----------|-------------------|---------|
-| `feature` | 用户故事验收 + 边界测试 + UI 验证 | 新功能开发 |
-| `bugfix` | 回归测试 + 根因确认 + 边界覆盖 | Bug 修复 |
-| `refactor` | 行为不变验证 + 性能基准 + API 兼容 | 重构 |
-| `migration` | 数据一致性 + 回滚验证 + 性能对比 | 数据/API 迁移 |
-| `api-endpoint` | 请求/响应契约 + 错误处理 + 权限校验 | API 开发 |
+**`--template <name>`:**
+
+| Template | Criteria pattern | Use case |
+|----------|-----------------|----------|
+| `feature` | User story acceptance + boundary tests + UI verification | New feature |
+| `bugfix` | Regression tests + root cause confirmation + boundary coverage | Bug fix |
+| `refactor` | Behavior preservation + performance baseline + API compatibility | Refactoring |
+| `migration` | Data consistency + rollback verification + performance comparison | Data/API migration |
+| `api-endpoint` | Request/response contract + error handling + permission checks | API development |
 </boundary>
 
 <context>
-$ARGUMENTS — requirement description and optional flags.
+$ARGUMENTS
 
 **Flags:**
+
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--template <name>` | 预定义需求模板 | — |
-| `--max-iterations N` | Max verify→fix cycles before escalation | 3 |
+| `--template <name>` | Predefined requirement template | — |
+| `--max-iterations N` | Max verify-fix cycles before escalation | 3 |
 | `--skip-generalize` | Skip S_GENERALIZE + S_DISCOVER | false |
 | `--auto` | CLI delegate calls without confirmation | false |
-| `--method agent\|cli\|auto` | Execution method: Agent tool, CLI delegate, or auto-select | `auto` |
-| `--executor <tool>` | Explicit executor tool for CLI delegate mode | First enabled in config |
-| `--skip-verify` | Skip execution post-validation gate | false |
+| `--method agent\|cli\|auto` | Execution method | `auto` |
+| `--executor <tool>` | Explicit executor tool for CLI delegate | First enabled |
+| `--skip-verify` | Skip post-execution validation gate | false |
 | `--heartbeat` | Enable periodic progress heartbeat | false |
 | `-y` | Auto-confirm — decisions recorded as `deferred` | false |
 | `-c` | Resume most recent session | — |
 
-**Session**: `SESSION_DIR = .workflow/scratch/{YYYYMMDD}-planex-odyssey-{slug}/`
+**Session**: `.workflow/scratch/{YYYYMMDD}-planex-odyssey-{slug}/`
+**Output**: `session.json` | `evidence.ndjson` | `understanding.md`
 
-**Output — 3 files:**
-```
-SESSION_DIR/
-  ├── session.json       # state + criteria + iterations + plan
-  ├── evidence.ndjson    # append-only log (phase distinguishes origin)
-  └── understanding.md   # evolving narrative (8 sections, one per phase)
-```
-
-**session.json schema:**
+**session.json — planex-specific fields:**
 ```json
-{
-  "session_id": "planex-odyssey-{YYYYMMDD-HHmmss}",
-  "requirement": "",
-  "flags": { "max_iterations": 3, "skip_generalize": false, "auto": false, "auto_confirm": false },
-  "current_state": "S_INTAKE",
-  "acceptance_criteria": [
-    {"id":"AC1","criterion":"","verify_method":"test|grep|cli-review|manual","status":"pending","evidence":"","passed_at":null}
-  ],
-  "plan": { "tasks": [{"id":"T1","title":"","description":"","criteria_refs":["AC1"],"status":"pending","files_modified":[],"domain":"general","executor":"agent"}], "created_at":"" },
-  "execution_config": {
-    "method": "auto",
-    "default_executor": "",
-    "domain_routing": { "frontend": "", "backend": "", "default": "agent" },
-    "code_review_tool": "Skip",
-    "verification_tool": "Auto",
-    "confirmed": false
-  },
-  "iterations": [
-    {"iteration":1,"started_at":"","completed_at":"","criteria_before":{"passed":0,"total":0},"criteria_after":{"passed":0,"total":0},"gaps_fixed":[],"files_modified":[]}
-  ],
+{ "requirement": "",
+  "acceptance_criteria": [{"id":"AC1","criterion":"","verify_method":"test|grep|cli-review|manual","status":"pending","evidence":"","passed_at":null}],
+  "plan": {"tasks":[{"id":"T1","title":"","description":"","criteria_refs":["AC1"],"status":"pending","files_modified":[],"domain":"general","executor":"agent"}],"created_at":""},
+  "execution_config": {"method":"auto","default_executor":"","domain_routing":{"frontend":"","backend":"","default":"agent"},"code_review_tool":"Skip","verification_tool":"Auto","confirmed":false},
+  "iterations": [{"iteration":1,"started_at":"","completed_at":"","criteria_before":{"passed":0,"total":0},"criteria_after":{"passed":0,"total":0},"gaps_fixed":[],"files_modified":[]}],
   "current_iteration": 0,
-  "patterns": [
-    {"id":"P1","source":"AC1 fix","layer":"syntax|semantic|structural","signature":"","description":"","risk":"","fix_template":""}
-  ],
-  "generalization_stats": {"patterns_extracted":0,"total_hits":0,"cross_layer_confirmed":0,"by_layer":{"syntax":0,"semantic":0,"structural":0},"deepening_triggered":false},
-  "phase_goals": [],
-  "phase_goals_all_done": false,
-  "self_iteration_log": [],
-  "progress_metrics": "→ base",
-  "directions_tried": "→ base",
-  "cross_phase_loops": 0, "max_loops": 5,
-  "created_at": "", "updated_at": ""
-}
+  "patterns": [{"id":"P1","source":"AC1 fix","layer":"syntax|semantic|structural","signature":"","description":"","risk":"","fix_template":""}],
+  "generalization_stats": "-> base shared_schemas" }
 ```
 
-**evidence.ndjson** — one JSON per line, `phase` field = `planning|execution|verification|fix|decision|generalization|discovery|self-iteration`
+**evidence.ndjson phases:** `planning|execution|verification|fix|decision|generalization|discovery|self-iteration`
 
-**understanding.md sections:** §1 Requirement & Criteria ← S_INTAKE, §2 Plan ← S_PLAN, §3 Execution ← S_EXECUTE, §4 Verification (per iter) ← S_VERIFY, §5 Fix Log (per iter) ← S_FIX, §6 Generalization ← S_GENERALIZE, §7 Discoveries ← S_DISCOVER, §8 Learnings ← S_RECORD
+**understanding.md — 8 sections:**
+1. Requirement & Criteria <- S_INTAKE | 2. Plan <- S_PLAN | 3. Execution <- S_EXECUTE
+4. Verification <- S_VERIFY | 5. Fix Log <- S_FIX | 6. Generalization <- S_GENERALIZE
+7. Discoveries <- S_DISCOVER | 8. Learnings <- S_RECORD
 
 **phase_goals[]:**
-| ID | Goal | Done When | Phase | Skip When |
+
+| ID | Goal | done_when | phase | skip_when |
 |----|------|-----------|-------|-----------|
-| G1 | Acceptance criteria defined | ≥1 criterion in acceptance_criteria[] | S_INTAKE | — |
+| G1 | Acceptance criteria defined | >=1 criterion in acceptance_criteria[] | S_INTAKE | — |
 | G2 | Plan created | session.json.plan populated | S_PLAN | — |
 | G3 | Implementation complete | all plan tasks executed | S_EXECUTE | — |
 | G4 | All criteria pass | all acceptance_criteria[].status == passed | S_VERIFY | — |
-| G5 | Pattern generalized | patterns[] populated ≥1 entry | S_GENERALIZE | skip_generalize |
+| G5 | Pattern generalized | patterns[] >=1 entry | S_GENERALIZE | skip_generalize |
 | G6 | Discoveries triaged | all scan hits classified | S_DISCOVER | skip_generalize |
 | G7 | Learnings persisted | spec entries created OR no actionable | S_RECORD | — |
 
-### Pre-load（可选，缺失不阻塞）
+**Knowledge Persistence (written to understanding.md section 8):**
 
-| 层级 | 命令 | 作用 |
-|------|------|------|
-| Codebase docs | Read `.workflow/codebase/ARCHITECTURE.md` | 模块边界，架构约束 |
-| Wiki search | `maestro search "<requirement keywords>" --json` | 先前实现、相关决策（取 top 5） |
-| Coding specs | `maestro load --type spec --category coding` | 编码规范 + 可发现的 knowhow 工具 |
-| UI specs（条件） | 若涉及前端 → `maestro load --type spec --category ui` | UI 规范 |
-| Role knowledge | `maestro search --category coding` → 选相关 → `maestro load --type knowhow --id <id>` | 累积实现领域知识 |
-| Prior sessions | `Glob(".workflow/scratch/*-planex-odyssey-*")` | 相关 odyssey 会话 |
-
-### Knowledge Persistence（S_RECORD 中写入产出文件）
-
-S_RECORD 阶段将可沉淀知识 **写入 understanding.md §8 Learnings**，按以下分类结构化：
-
-| 分类 | 写入内容 | 后续建议命令 |
-|------|---------|-------------|
-| 多轮 fix cycle pattern | 问题场景 + fix 迭代过程 + 最终方案 | `/spec-add debug "..."` |
-| 可复用实现模式 | 模式描述 + 适用场景 + 代码模板 | `/spec-add coding "..."` |
-| 验收标准模板 | 标准模板 + verify_method 建议 | `/spec-add review "..."` |
-| 泛化 pattern | pattern 签名 + 风险说明 + fix 模板 | `/spec-add coding "..."` |
+| Category | Content | Follow-up |
+|----------|---------|-----------|
+| Multi-round fix cycle pattern | Problem scenario + fix iteration + final approach | `/spec-add debug` |
+| Reusable implementation pattern | Pattern + applicable scope + code template | `/spec-add coding` |
+| Acceptance criteria template | Standard template + verify_method suggestion | `/spec-add review` |
+| Generalization pattern | Signature + risk + fix template | `/spec-add coding` |
 </context>
 
 <invariants>
-1. **Evidence append-only** — evidence.ndjson is the single source of truth; never delete or overwrite
-2. **Session is state** — session.json holds current_state, phase_goals, progress_metrics; always update before advancing
-3. **Phase goal tracking** — each phase MUST mark its goal done (or failed) before transition
-4. **Auto-commit per phase** — code changes + understanding.md committed; session.json/evidence.ndjson excluded
-5. **Zero silent drops** — every finding must have an action (fix/issue/decision)
+Base execution_discipline #1-5.
 6. **Acceptance criteria are sacred** — no "close enough", no manual override without explicit escalation
 </invariants>
 
 <self_iteration>
-**Quality Gate — auto-evaluate after each analytical phase (progress-aware):**
-
-| Dimension | Sufficient | Insufficient |
-|-----------|-----------|-------------|
-| Coverage | All known related files/modules analyzed | Missed targets discoverable via grep/git log |
-| Depth | ≥80% findings have file:line evidence | Most findings lack specifics |
-| Actionability | Each conclusion has concrete next action | "Consider reviewing" without action |
-
-**Progress-aware iteration:** evaluate 3 dimensions + progress_metrics → insufficient + stale_count < 3 → re-enter with expansion strategy (scope_widen/perspective_shift/tool_switch/structural_pivot, must pass directions_tried dedup) → stale_count >= 3 → log gaps, advance
-
-Applicable stages: S_PLAN, S_VERIFY, S_GENERALIZE
+Applies to: **S_PLAN, S_VERIFY, S_GENERALIZE**. Logic in base.
 </self_iteration>
 
 <state_machine>
 
 <states>
-S_INTAKE      — parse requirement, define acceptance criteria       PERSIST: session.json + understanding.md §1
-S_PLAN        — decompose tasks, generate execution plan            PERSIST: session.json.plan + evidence (planning) + understanding.md §2
-S_EXECUTE     — implement tasks                                     PERSIST: code + evidence (execution) + understanding.md §3
-S_VERIFY      — iron gate: check every acceptance criterion         PERSIST: evidence (verification) + understanding.md §4
-S_FIX         — targeted fix for failing criteria (loops to VERIFY) PERSIST: code + evidence (fix) + understanding.md §5
-S_GENERALIZE  — extract patterns, 4-agent scan                     PERSIST: session.json.patterns + understanding.md §6
-S_DISCOVER    — triage scan hits, route decisions                   PERSIST: evidence (discovery|decision) + understanding.md §7
-S_RECORD      — persist learnings, final summary                   PERSIST: understanding.md §8 + spec entries
+S_INTAKE → S_PLAN → S_EXECUTE → S_VERIFY → S_GENERALIZE → S_DISCOVER → S_RECORD → END
 </states>
 
 <transitions>
-S_INTAKE → S_INTAKE  WHEN -c + session found (resume)
-S_INTAKE → S_PLAN    WHEN requirement + criteria defined
-S_INTAKE → S_INTAKE  WHEN no requirement → AskUserQuestion
+S_INTAKE → S_INTAKE       : -c + session found (resume)
+S_INTAKE → S_PLAN         : requirement + criteria defined
+S_INTAKE → S_INTAKE       : no requirement → AskUserQuestion
 
-S_PLAN → S_EXECUTE
+S_PLAN    → S_EXECUTE
 S_EXECUTE → S_VERIFY
 
-S_VERIFY → S_GENERALIZE  WHEN all passed AND NOT skip_generalize
-S_VERIFY → S_RECORD      WHEN all passed AND skip_generalize
-S_VERIFY → S_FIX         WHEN some failed AND iteration < max
-S_VERIFY → S_PLAN        WHEN fundamental plan flaw discovered, loops < max_loops → cross_phase_loops++ (重规划)
-S_VERIFY → S_RECORD      WHEN some failed AND iteration >= max (escalate)
+S_VERIFY → S_GENERALIZE   : all passed AND NOT skip_generalize
+S_VERIFY → S_RECORD       : all passed AND skip_generalize
+S_VERIFY → S_FIX          : some failed AND iteration < max
+S_VERIFY → S_PLAN         : fundamental plan flaw → cross_phase_loops++ (replan)
+S_VERIFY → S_RECORD       : some failed AND iteration >= max (escalate)
 
 S_FIX → S_VERIFY (loop)
 
-S_GENERALIZE → S_DISCOVER  WHEN hits found
-S_GENERALIZE → S_RECORD    WHEN no hits
+S_GENERALIZE → S_DISCOVER : hits found
+S_GENERALIZE → S_RECORD   : no hits
 
-S_DISCOVER → S_EXECUTE     : discovery finds area needing same implementation → cross_phase_loops++
-S_DISCOVER → S_RECORD      : triage complete AND remaining_actionable == 0
-S_DISCOVER → S_RECORD      : loops >= max_loops → MUST log each unfixed item with specific reason (blanket "pre-existing" is forbidden)
+S_DISCOVER → S_EXECUTE    : discovery finds area needing same implementation → cross_phase_loops++
+S_DISCOVER → S_RECORD     : triage complete AND remaining_actionable == 0
+S_DISCOVER → S_RECORD     : loops >= max_loops → log per-item reasons
 
 S_RECORD → END
 </transitions>
@@ -204,12 +143,12 @@ S_RECORD → END
 
 1. Parse requirement and flags, generate slug, create SESSION_DIR
 2. **Define acceptance criteria** — analyze requirement → derive testable criteria. Each gets `verify_method`: test | grep | cli-review | manual
-   - **Normal**: AskUserQuestion to confirm/edit
-   - **`-y`**: auto-derive, record `{"phase":"decision","type":"criteria-confirmation","status":"deferred"}`
+   - Normal: AskUserQuestion to confirm/edit
+   - `-y`: auto-derive, record `{"phase":"decision","type":"criteria-confirmation","status":"deferred"}`
 3. Search prior knowledge: `maestro search`, related sessions
-4. Write session.json + understanding.md §1. Mark G1 done. Display Goal Prompt (see Appendix)
+4. Write session.json + understanding.md section 1. Mark G1 done. Emit Goal Prompt.
 
-📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-planex({slug}): INTAKE — 目标解析"`
+Commit: `"odyssey-planex({slug}): INTAKE — parse requirement and define criteria"`
 
 ### A_PLAN
 
@@ -223,10 +162,10 @@ S_RECORD → END
    EXPECTED: JSON [{task_id, title, description, criteria_refs, deps}]
    " --role analyze --mode analysis
    ```
-   Execute with `run_in_background: true`, then wait for callback (do NOT halt the Odyssey flow).
-3. Write session.json.plan, append evidence (planning), update understanding.md §2. Mark G2 done.
+   Run with `run_in_background: true`, wait for callback.
+3. Write session.json.plan, append evidence (planning), update understanding.md section 2. Mark G2 done.
 
-📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-planex({slug}): PLAN — 计划制定"`
+Commit: `"odyssey-planex({slug}): PLAN — create execution plan"`
 
 ### A_EXECUTE
 
@@ -234,51 +173,21 @@ S_RECORD → END
 
 **Skip if** `-y` flag OR `--method` explicitly set OR `execution_config.confirmed == true` (resume).
 
-Load available tools: `maestro delegate-config show --json` → extract enabled tools and domain tags.
+Load available tools: `maestro delegate-config show --json`.
 
-```
-AskUserQuestion({
-  questions: [
-    {
-      question: "任务如何执行？选择一种方式，或 Other 指定域路由规则（如 '前端agy 后端codex 其余agent'）",
-      header: "Executor",
-      options: [
-        { label: "Auto (Recommended)", description: "域路由: frontend→{frontendTool}, backend→{backendTool}, general→agent" },
-        { label: "Agent", description: "Claude Code Agent 执行所有任务（最快）" },
-        ...availableTools.map(t => ({ label: t, description: `${t} CLI 执行所有任务` }))
-      ]
-    },
-    {
-      question: "执行后运行代码审查？",
-      header: "Review",
-      options: [
-        { label: "Skip", description: "不审查" },
-        ...availableTools.map(t => ({ label: `${t} Review`, description: `${t} CLI: git diff 质量审查` }))
-      ]
-    },
-    {
-      question: "验证门控？（外部模型检查收敛 + 结构 + 反模式）",
-      header: "Verify",
-      options: [
-        { label: "Auto (Recommended)", description: `Delegate 到 ${availableTools[0]} 做收敛+结构+反模式检查` },
-        ...availableTools.map(t => ({ label: t, description: `${t}: 验证门控` })),
-        { label: "Skip", description: "不验证" }
-      ]
-    }
-  ]
-})
-```
+Present AskUserQuestion with 3 questions:
+1. **Executor** — Auto (domain routing) | Agent (all tasks) | specific CLI tool | Other (custom domain routing)
+2. **Review** — Skip | {tool} review (git diff quality check)
+3. **Verify** — Auto (delegate convergence + structure + anti-pattern check) | specific tool | Skip
 
-Parse response → write `execution_config` to session.json, set `confirmed: true`.
-
-`--skip-verify` flag overrides verification to `"Skip"`.
+Parse response → write `execution_config` to session.json, set `confirmed: true`. `--skip-verify` overrides verification to `"Skip"`.
 
 #### Step 2: Executor Resolution
 
 Per-task domain routing (when method == "auto"):
 
-| Domain | Keywords / Patterns | File Extensions |
-|--------|-------------------|-----------------|
+| Domain | Keywords / Patterns | Extensions |
+|--------|-------------------|------------|
 | frontend | UI, component, page, style, layout, CSS, view | .tsx/.jsx/.vue/.css/.html/.svelte |
 | backend | API, server, database, service, algorithm, worker | .go/.rs/.java/.py/.sql/.proto |
 | general | mixed, config, tests, unclear | .ts/.js/other |
@@ -287,16 +196,15 @@ Resolution: `execution_config.domain_routing[domain]` → fallback `domain_routi
 
 #### Step 3: Task Execution
 
-Execute tasks per plan order. Independent tasks (no cross-dependency) may run in parallel.
+Execute tasks per plan order. Independent tasks may run in parallel.
 
 **Agent path:**
 ```
-Spawn Agent with:
-  task definition, acceptance criteria refs, prior task summaries, specs_content
-Agent implements → verifies convergence criteria → auto-fix (max 3) → returns result
+Spawn Agent with: task definition, acceptance criteria refs, prior task summaries, specs_content
+Agent implements → verifies convergence → auto-fix (max 3) → returns result
 ```
 
-**CLI path (via maestro delegate):**
+**CLI path:**
 ```bash
 maestro delegate "PURPOSE: Implement task ${task_id}: ${title}; success = criteria ${criteria_refs} satisfied
 TASK: ${description} | Read existing code first | Verify convergence criteria after changes
@@ -319,7 +227,7 @@ ${prior_summaries}
 " --to ${resolved_executor} --mode write --id planex-${slug}-${task_id}
 ```
 
-Run CLI delegate with `run_in_background: true`, then wait for callback (do NOT halt the Odyssey flow).
+Run with `run_in_background: true`, wait for callback.
 
 **Deviation Rule** — max 3 auto-fix attempts per task:
 1. First attempt: normal dispatch
@@ -360,11 +268,11 @@ ${modified_files.join('\n')}
 " --to ${execution_config.verification_tool} --mode analysis
 ```
 
-Execute with `run_in_background: true`, then wait for callback (do NOT halt the Odyssey flow).
+Run with `run_in_background: true`, wait for callback.
 
 On result:
-- `overall == "passed"` → proceed to S_VERIFY (criteria gate) with boosted confidence
-- `overall == "gaps_found"` → log findings, proceed to S_VERIFY (criteria will catch failures)
+- `overall == "passed"` → proceed to S_VERIFY with boosted confidence
+- `overall == "gaps_found"` → log findings, proceed to S_VERIFY
 
 **Check 3: Code Review** (if `execution_config.code_review_tool != "Skip"`):
 ```bash
@@ -373,29 +281,30 @@ maestro delegate "Review git diff for correctness, style, bugs" --to ${code_revi
 
 #### Step 6: Completion
 
-Update understanding.md §3. Mark G3 done.
+Update understanding.md section 3. Mark G3 done.
 
-📌 **Auto-commit**: `git add -A && git commit -m "odyssey-planex({slug}): EXECUTE — 实现执行"`
+Commit: `"odyssey-planex({slug}): EXECUTE — implementation complete"`
 
 ### A_VERIFY
 
 Iron gate — every acceptance criterion checked objectively.
 
 **Verify each criterion by method:**
+
 | Method | Action |
 |--------|--------|
 | `test` | Run relevant tests, check pass/fail |
 | `grep` | Grep for expected pattern |
 | `cli-review` | `maestro delegate --role review --mode analysis` with criterion as focus |
-| `manual` | **Normal**: AskUserQuestion / **`-y`**: record `deferred` |
+| `manual` | Normal: AskUserQuestion / `-y`: record `deferred` |
 
 Record per criterion: `{"phase":"verification","type":"criterion-check","criterion_id":"AC1","method":"","result":"passed|failed","evidence":"","iteration":N}`. Update acceptance_criteria[].status. Append to iterations[].
 
-Update understanding.md §4 with pass/fail table.
+Update understanding.md section 4 with pass/fail table.
 
-**Route:** all passed → mark G4 done → next state. Some failed + iteration < max → S_FIX. Some failed + iteration >= max → **Normal**: AskUserQuestion (continue/lower bar/accept) / **`-y`**: `deferred`, proceed S_RECORD.
+**Route:** all passed → mark G4 done → next state. Some failed + iteration < max → S_FIX. Some failed + iteration >= max → Normal: AskUserQuestion (continue/lower bar/accept) / `-y`: `deferred`, proceed S_RECORD.
 
-📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-planex({slug}): VERIFY — 验收验证"`
+Commit: `"odyssey-planex({slug}): VERIFY — acceptance check"`
 
 ### A_FIX
 
@@ -410,91 +319,68 @@ Update understanding.md §4 with pass/fail table.
    EXPECTED: JSON {verdict, regression_risk, concerns}
    " --role review --mode analysis
    ```
-4. Append evidence (fix), update understanding.md §5 → S_VERIFY
+4. Append evidence (fix), update understanding.md section 5 → S_VERIFY
 
-📌 **Auto-commit**: `git add -A && git commit -m "odyssey-planex({slug}): FIX — 修复"`
+Commit: `"odyssey-planex({slug}): FIX — targeted fix for failing criteria"`
 
 ### A_GENERALIZE
 
-Pattern source: implementation patterns. 3-layer extraction (syntax/semantic/structural) → 4 parallel Agents (syntax grep, semantic scan, structural match, historical grep) → cross-layer dedup (multi-layer → boost | single-layer → `needs_review` | historically fixed → `regression_risk`) → iterative deepening (module ≥3 hits → deep scan, max 1 round). Persist: understanding.md §6 + `session.json.generalization_stats`. Mark G5 done.
+Base shared_actions. Pattern source: implementation patterns.
 
-📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-planex({slug}): GENERALIZE — 泛化扫描"`
+Commit: `"odyssey-planex({slug}): GENERALIZE — pattern scan complete"`
 
 ### A_DISCOVER
 
-1. **Triage** each scan hit with ±10 lines context → classify `bug` / `risk` / `safe`
-2. **Route:** bug + fix_template → immediate fix → S_FIX | bug + no template → create issue | risk → add guard if possible | safe → skip. **Normal**: AskUserQuestion | **`-y`**: auto-fix with template, create issue for rest
-3. `cross_phase_loops++`. At `loops >= max_loops` → MUST record per-item reasons. Update §7.
-Mark G6 done.
+Base shared_actions. Planex override: discovery finding needing same implementation → route back to S_EXECUTE (not S_FIX).
 
-📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-planex({slug}): DISCOVER — 发现分类"`
+Commit: `"odyssey-planex({slug}): DISCOVER — findings classified"`
 
 ### A_RECORD
 
-1. Finalize understanding.md §8 — iteration summary: what worked, what needed rework, fix cycle patterns
-2. Write learnings structured by Knowledge Persistence table categories. For each: problem scenario + fix iteration process + final approach + applicable scope.
-3. Pending decisions: **Normal** → AskUserQuestion per item | **`-y`** → display deferred count
-4. **Goal audit:** all `phase_goals[*].completion_confirmed` → `phase_goals_all_done = true`. Incomplete: **Normal** → AskUserQuestion | **`-y`** → auto accept
-5. Mark G7 done. Set `current_state = "COMPLETED"`.
-6. Output completion summary:
-   ```
-   --- PLANEX ODYSSEY COMPLETE ---
-   Requirement: {requirement}
-   Criteria:    {passed}/{total} passed
-   Iterations:  {N} cycles
-   Patterns:    {patterns_extracted} ({by_layer} distribution)
-   Scan hits:   {total_hits} ({cross_layer_confirmed} cross-layer confirmed)
-   Issues:      {N} created | Decisions: {N} resolved, {M} pending, {K} deferred
-   Learnings:   {N} spec entries
-   Self-iter:   {N} rounds across {M} stages
-   Goals:       {done}/{total} confirmed ({skipped} skipped)
-   Status:      {ALL_PASSED|PARTIAL|ESCALATED}
-   ---
-   ```
+Base shared_actions. Planex additions:
+1. Iteration summary: what worked, what needed rework, fix cycle patterns
+2. Learnings structured per Knowledge Persistence table: problem scenario + fix iteration process + final approach + applicable scope
 
-📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-planex({slug}): RECORD — 会话总结"`
+**Completion summary:**
+```
+--- PLANEX ODYSSEY COMPLETE ---
+Requirement: {requirement}
+Criteria:    {passed}/{total} passed
+Iterations:  {N} cycles
+Patterns:    {patterns_extracted} ({by_layer} distribution)
+Scan hits:   {total_hits} ({cross_layer_confirmed} cross-layer confirmed)
+Issues:      {N} created | Decisions: {N} resolved, {M} pending, {K} deferred
+Learnings:   {N} spec entries
+Self-iter:   {N} rounds across {M} stages
+Goals:       {done}/{total} confirmed ({skipped} skipped)
+Status:      {ALL_PASSED|PARTIAL|ESCALATED}
+---
+```
+
+Commit: `"odyssey-planex({slug}): RECORD — session summary"`
 
 </actions>
 
 <appendix>
 
-### Goal Prompt Template
-
-**⚠️ 时机守卫：仅在 A_INTAKE 完成后显示一次（session 创建后、开始 Plan 前）。A_RECORD 完成时禁止重新显示。**
-
-```
-📋 Planex Odyssey 会话已创建。可随时复制以下 /goal 设定终止条件（执行过程中输入即可）：
-
-/goal 完成以下目标：
-{for each G in phase_goals where status != "skipped":}
-- {G.id}: {G.goal} — 完成条件: {G.done_when}
-{end for}
-验收标准：
-{for each AC in acceptance_criteria:}
-- {AC.id}: {AC.criterion} (验证方式: {AC.verify_method})
-{end for}
-穷尽迭代：直到 acceptance_criteria[*] 全部 status==passed
-且 phase_goals_all_done=true 才停。verify 失败自动 fix→re-verify 循环。
-每轮修复后重新验证，新发现的标准违反继续修，不超过 max_iterations。
-遇到 phase=decision 的 pending 必须 AskUserQuestion，不得自行 resolve。
-不允许"接近通过"，验收标准必须 ALL pass。
-```
-
-完成时仅输出 completion summary，不重复此提示。
-
-### `-y` Auto-Confirm Behavior
+### `-y` planex-specific points
 
 | Decision Point | Normal | `-y` |
-|----------------|--------|------|
+|---------------|--------|------|
 | S_INTAKE criteria confirmation | AskUserQuestion | auto-derive, `deferred` |
-| S_EXECUTE execution options | AskUserQuestion (executor/review/verify) | use defaults (auto/Skip/Auto), `confirmed: true` |
+| S_EXECUTE execution options | AskUserQuestion | use defaults (auto/Skip/Auto), `confirmed: true` |
 | S_EXECUTE task blocked (3 retries) | AskUserQuestion: continue or stop | auto continue, log blocked |
 | S_VERIFY manual criterion | AskUserQuestion | `deferred` |
 | S_VERIFY max iteration reached | AskUserQuestion | auto accept, `deferred` |
-| S_DISCOVER classification routing | AskUserQuestion | auto create issue, `deferred` |
-| S_DISCOVER ambiguous items | AskUserQuestion | all `deferred` |
-| S_RECORD decision list | AskUserQuestion | skip |
-| S_RECORD goal audit | AskUserQuestion | auto accept |
+
+### Goal Prompt convergence rules
+
+```
+Exhaustive iteration: until all acceptance_criteria[*].status==passed
+AND phase_goals_all_done=true. Verify failure auto-triggers fix->re-verify loop.
+Each fix round re-verifies; new criterion violations continue fixing within max_iterations.
+No "close enough" — all criteria must ALL pass.
+```
 
 ### Iteration Model
 
@@ -522,13 +408,13 @@ Max iterations (default 3) prevents infinite loops. Each iteration records crite
 </error_codes>
 
 <success_criteria>
-- [ ] Requirement parsed with ≥1 acceptance criterion (verify_method assigned)
+- [ ] Requirement parsed with >=1 acceptance criterion (verify_method assigned)
 - [ ] Plan tasks mapped to criteria; execution options confirmed
 - [ ] Tasks dispatched via resolved executor with deviation rule (max 3 retries)
 - [ ] Post-execution validation gate run (unless --skip-verify)
 - [ ] Every criterion verified per method; failing → targeted fix (not re-implementation)
 - [ ] Iteration count tracked and max respected; unfixed criteria individually classified
-- [ ] understanding.md §1-§8 updated per phase; phase_goals G1-G7 audited
+- [ ] understanding.md sections 1-8 updated per phase; phase_goals G1-G7 audited
 - [ ] Generalization + discovery completed (unless --skip-generalize)
 - [ ] Quality Gate self-iteration triggered when insufficient
 - [ ] Goal Prompt displayed once after intake; `-y` mode: no blocking prompts
@@ -536,11 +422,12 @@ Max iterations (default 3) prevents infinite loops. Each iteration records crite
 </success_criteria>
 
 <next_step_routing>
-| Condition | Next step |
-|-----------|-----------|
+| Condition | Next |
+|-----------|------|
 | All criteria passed | `/odyssey-review-test-fix <changed-files>` |
 | Max iterations, still failing | `/odyssey-debug "<failing criterion>"` |
-| Want formal review | `/quality-review <phase>` |
+| Formal review | `/quality-review <phase>` |
 | Issues from discoveries | `/manage-issue list --source planex-odyssey` |
 | Pattern worth documenting | `/learn-decompose <module>` |
 </next_step_routing>
+</output>

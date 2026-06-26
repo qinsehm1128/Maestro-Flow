@@ -7,30 +7,18 @@ allowed-tools: spawn_agents_on_csv, Read, Write, Edit, Bash, Glob, Grep, request
 <base>@~/.maestro/workflows/odyssey-base-codex.md</base>
 
 <purpose>
-Deep codebase improvement: survey → 6-dimension audit → diagnose → fix → verify → generalize → discover → persist.
-Baseline-first approach with exhaustive iteration until zero remaining actionable findings.
-
-Core philosophy:
-- **Measure before improving** — baseline first, then optimize
-- **Root cause over symptom** — trace each issue to its origin
-- **Fix one, improve many** — every improvement reveals a class of opportunities
-- **Verify improvement** — measure after fix, compare with baseline
-
-**三句哲学约束（穷尽迭代）:**
-1. **零遗留** — 每个 finding 必须是 action item（修复 / issue / 决策），不允许只报告不处理
-2. **穷尽迭代** — 按 severity 从高到低逐轮修复，直到 0 remaining actionable findings 才退出 fix loop
-3. **改进即标准** — 每次修复后重审同区域，发现新问题继续修，直到该区域无可改善
+survey → 6-dimension audit → diagnose → fix → verify → generalize → discover → persist.
+Baseline-first, exhaustive iteration until zero remaining actionable findings.
 </purpose>
 
 <boundary>
-**范围内:** 目标代码的运行质量提升 — 性能/安全/架构/可靠性/可观测性/可维护性多维度审查 → 诊断 → 修复 → 泛化
-**范围外:** UI 视觉优化 → `$odyssey-ui` | 新功能实现 → `$odyssey-planex` | 单一 bug 调查 → `$odyssey-debug` | 代码风格审查 → `$odyssey-review-test-fix`
-**探索自由度:** 边界内自由探索 — 可 profiling、安全扫描、架构分析、依赖审计。在约束下尽可能发现深层问题。
-**Zero-residual principle:** Every finding MUST have a concrete action (fix / issue / decision). "Report and shelve" is not allowed. "Pre-existing issue" is not a valid skip reason — if discovered within scope, it must be addressed.
+**In scope:** Target code quality — performance/security/architecture/reliability/observability/maintainability audit → diagnose → fix → generalize.
+**Out of scope:** UI → `$odyssey-ui` | Features → `$odyssey-planex` | Single bug → `$odyssey-debug` | Style review → `$odyssey-review-test-fix`
+**Zero-residual:** Every finding MUST have action (fix/issue/decision). "Report and shelve" is forbidden.
 </boundary>
 
 <context>
-$ARGUMENTS — target and optional flags.
+$ARGUMENTS
 
 **Target resolution:**
 | Input | Resolution |
@@ -38,19 +26,9 @@ $ARGUMENTS — target and optional flags.
 | Module/dir path | Audit that module |
 | `HEAD` / `staged` | Review changes in diff |
 | Feature area keyword | Resolve to related files |
-| `--all` | Full project scan (use with caution) |
+| `--all` | Full project scan |
 
-**Flags:**
-| Flag | Effect | Default |
-|------|--------|---------|
-| `--dimensions <list>` | Comma-separated subset of 6 dimensions | all 6 |
-| `--fix-threshold <severity>` | 修复到哪个 severity 为止（all = 全部修复）| all |
-| `--skip-fix` | Audit + diagnose only, no code changes | false |
-| `--skip-generalize` | Skip S_GENERALIZE and S_DISCOVER | false |
-| `--auto` | CLI delegates without confirmation | false |
-| `-y` | Auto-confirm all decisions (see appendix) | false |
-| `-c` | Resume most recent session | — |
-| `--heartbeat` | Enable /loop heartbeat protocol (see base) | false |
+**Flags:** `--dimensions <list>` subset of 6 | `--fix-threshold <severity>` fix cutoff (default: all) | `--skip-fix` audit+diagnose only | `--skip-generalize` skip generalize+discover | `--auto` no delegate confirmation | `-y` auto-confirm | `-c` resume | `--heartbeat` /loop heartbeat
 
 **Dimensions (6):**
 1. **performance** — hot paths, N+1 queries, memory allocation, cache efficiency, bundle size, lazy loading
@@ -58,21 +36,25 @@ $ARGUMENTS — target and optional flags.
 3. **architecture** — layer violations, circular dependencies, coupling metrics, interface contracts, SRP violations
 4. **reliability** — error handling gaps, retry logic, timeout handling, graceful degradation, resource cleanup
 5. **observability** — logging coverage, metric gaps, trace propagation, error reporting, health checks
-6. **maintainability** — code complexity (cyclomatic), dead code, test coverage gaps, documentation debt
+6. **maintainability** — code complexity, dead code, test coverage gaps, documentation debt
 
-**Session**: `SESSION_DIR = .workflow/scratch/{YYYYMMDD}-improve-odyssey-{slug}/`
+**Session**: `.workflow/scratch/{YYYYMMDD}-improve-odyssey-{slug}/`
+**Output**: `session.json` | `evidence.ndjson` | `understanding.md`
 
-**Output:** `session.json` (state + audit + diagnoses + patterns + goals) | `evidence.ndjson` (append-only) | `understanding.md` (9-section narrative)
+**session.json — improve-specific fields:**
+```json
+{ "target": "", "dimensions": [], "baseline_metrics": {},
+  "audit_result": null, "diagnoses": [], "confirmation": null,
+  "generalization_stats": null }
+```
 
-**session.json unique fields:** `target`, `dimensions`, `baseline_metrics`, `audit_result`, `diagnoses`, `confirmation`, `generalization_stats` (`progress_metrics`, `directions_tried` from base)
-
-**evidence.ndjson phase-specific fields:**
+**evidence.ndjson phases:**
 - `survey`: `category` (dependency|complexity|coverage|error_pattern), `detail`
 - `audit`: `dimension`, `severity`, `measurement`
 - `diagnosis`: `finding_ref`, `hypothesis`, `result` (confirmed|disproved|inconclusive), `root_cause`
 - `fix`: `finding_ref`, `change_summary`, `risk`
 - `discovery`: `file`, `line`, `classification` (safe|risk|issue), `action` (fix|issue|decision|skip)
-- `decision`: `question`, `options`, `context`, `status` (pending|resolved|deferred), `resolution`
+- `decision`: `question`, `options`, `context`, `status`, `resolution`
 - `self-iteration`: `stage`, `round`, `assessment`, `expansion`
 
 **phase_goals[]:**
@@ -81,32 +63,25 @@ $ARGUMENTS — target and optional flags.
 | G1 | Survey completed | S_SURVEY | — |
 | G2 | Audit completed | S_AUDIT | — |
 | G3 | Diagnosis completed | S_DIAGNOSE | — |
-| G4 | Zero remaining: all findings fixed and verified | `remaining_actionable == 0` within fix_threshold | S_VERIFY | skip_fix |
+| G4 | Zero remaining: all findings fixed and verified | S_VERIFY | skip_fix |
 | G5 | Pattern generalized | S_GENERALIZE | skip_generalize |
 | G6 | Discoveries triaged | S_DISCOVER | skip_generalize |
 | G7 | Learnings persisted | S_RECORD | — |
 
-**understanding.md — 9 sections (written by owning phase):**
+**understanding.md — 9 sections:**
 1. Target & Baseline ← S_INTAKE | 2. Current State Survey ← S_SURVEY | 3. Audit Findings ← S_AUDIT
 4. Root Cause Diagnosis ← S_DIAGNOSE | 5. Fix & Verification ← S_FIX+S_VERIFY
 6. Generalization ← S_GENERALIZE | 7. Discoveries ← S_DISCOVER
-8. Improvement Metrics ← S_RECORD (before/after) | 9. Engineering Learnings ← S_RECORD
+8. Improvement Metrics ← S_RECORD | 9. Engineering Learnings ← S_RECORD
 
-### Pre-load（可选，缺失不阻塞）
-- ARCHITECTURE.md → 模块边界 | `maestro search "<target>" --json` → 先前优化（top 5）
-- `maestro load --type spec --category coding` + `--category debug` → 编码规范 + 已知模式
-- `maestro search --category coding` → knowhow | `Glob(".workflow/scratch/*-improve-odyssey-*")` → 先前会话
+**Knowledge Persistence categories (written to understanding.md section 9):**
 
-### Knowledge Persistence（S_RECORD 中写入产出文件）
-
-S_RECORD 阶段将可沉淀知识 **写入 understanding.md §9 Learnings**，按以下分类结构化：
-
-| 分类 | 写入内容 | 后续建议命令 |
-|------|---------|-------------|
-| 性能 pattern | 瓶颈类型 + 修复方案 + 度量方法 | `/spec-add coding "..."` |
-| 安全规则 | 漏洞类别 + 修复 + 预防方法 | `/spec-add debug "..."` |
-| 架构约束 | 违反描述 + 正确边界 + 检查方法 | `/spec-add arch "..."` |
-| 可靠性 pattern | 故障模式 + 处理策略 + 验证手段 | `/spec-add coding "..."` |
+| Category | Content | Follow-up |
+|----------|---------|-----------|
+| Performance pattern | Bottleneck type + fix + measurement | `/spec-add coding` |
+| Security rule | Vulnerability class + fix + prevention | `/spec-add debug` |
+| Architecture constraint | Violation + correct boundary + verification | `/spec-add arch` |
+| Reliability pattern | Failure mode + handling strategy + validation | `/spec-add coding` |
 </context>
 
 <csv_schema>
@@ -142,107 +117,67 @@ id,title,description,task_type,dimension,deps,wave,status,findings,evidence,erro
 </csv_schema>
 
 <invariants>
-1. **Evidence append-only** — evidence.ndjson is the single source of truth for all findings; never delete or overwrite entries
-2. **Session is state** — session.json holds current_state, phase_goals, progress_metrics; always update before advancing
-3. **Phase goal tracking** — each phase MUST mark its goal done (or failed) before transition; skipping silently is forbidden
-4. **Auto-commit per phase** — code changes + understanding.md committed after each phase; session.json/evidence.ndjson excluded from commits
-5. **Zero silent drops** — every finding must have an action (fix/issue/decision); "noted for later" is not an action
+Base invariants apply. Additional: baseline metrics captured before any fix; every fix re-verified against baseline.
 </invariants>
 
 <self_iteration>
-**Quality Gate — auto-evaluate after each analytical phase (progress-aware):**
-
-| Dimension | Sufficient | Insufficient |
-|-----------|-----------|-------------|
-| Coverage | All known related files/modules analyzed | Missed targets discoverable via grep/git log |
-| Depth | ≥80% findings have file:line evidence | Most findings lack specifics |
-| Actionability | Each conclusion has concrete next action | "Consider reviewing" without action |
-
-**Progress-aware iteration (replaces fixed 3-round cap):**
-- Phase complete → evaluate 3 dimensions + check `progress_metrics`
-- Any insufficient AND `stale_count < 3` → re-enter with expansion strategy (must pass directions_tried dedup)
-- Follow Stall Escalation Ladder: stale_count 0 = normal | 1 = switch perspective/tool | 2 = structural pivot | 3 = human escalation or INCONCLUSIVE
-
-**Expansion strategies:**
-- `scope_widen`: more directories, deeper git log, additional delegate angles
-- `perspective_shift`: different CLI tool, reverse trace, manual reading
-- `tool_switch`: switch to unused analysis tool
-- `structural_pivot`: redefine problem framework, decompose sub-problems
-
-**Exit:** all sufficient → advance | `stale_count >= 3` → log gaps, advance
-**Log:** `evidence.ndjson {"phase":"self-iteration"}` + `session.json.self_iteration_log[]` + `directions_tried[]`
-
-Applicable stages: S_SURVEY, S_AUDIT, S_DIAGNOSE, S_GENERALIZE
+Applies to: **S_SURVEY, S_AUDIT, S_DIAGNOSE, S_GENERALIZE**. Logic in base.
 </self_iteration>
 
 <state_machine>
 
 <states>
-S_INTAKE     — Parse target, load context, establish baseline metrics       PERSIST: session.json + understanding.md §1
-S_SURVEY     — Current state: dependency audit, complexity scan, coverage   PERSIST: evidence.ndjson (survey) + understanding.md §2
-S_AUDIT      — 6-dimension parallel deep audit                             PERSIST: evidence.ndjson (audit) + understanding.md §3
-S_DIAGNOSE   — Root cause analysis for critical/high findings              PERSIST: evidence.ndjson (diagnosis|decision) + understanding.md §4
-S_FIX        — Implement improvements (skip if --skip-fix)                 PERSIST: code changes + evidence.ndjson (fix)
-S_VERIFY     — Tests + measurement comparison (skip if --skip-fix)         PERSIST: session.json.confirmation + understanding.md §5
-S_GENERALIZE — Pattern extraction + 4-agent scan (skip if --skip-gen)      PERSIST: session.json.patterns + understanding.md §6
-S_DISCOVER   — Classify hits, create issues (skip if --skip-gen)           PERSIST: evidence.ndjson (discovery|decision) + understanding.md §7
-S_RECORD     — Persist metrics + learnings + final report                  PERSIST: understanding.md §8-9 + spec entries
+S_INTAKE → S_SURVEY → S_AUDIT → S_DIAGNOSE → S_FIX → S_VERIFY → S_GENERALIZE → S_DISCOVER → S_RECORD → END
 </states>
 
 <transitions>
-S_INTAKE:
-  → S_INTAKE      WHEN -c + session found        DO A_RESUME
-  → S_SURVEY      WHEN target resolved            DO A_INTAKE
-  → S_INTAKE      WHEN no target                  DO request_user_input
+S_INTAKE → S_INTAKE       : -c + session found → A_RESUME
+S_INTAKE → S_SURVEY       : target resolved → A_INTAKE
+S_INTAKE → S_INTAKE       : no target → request_user_input
 
-S_SURVEY       → S_AUDIT        DO A_SURVEY
+S_SURVEY   → S_AUDIT        : complete
 
-S_AUDIT:
-  → S_DIAGNOSE     WHEN critical/high findings exist       DO A_AUDIT
-  → S_GENERALIZE   WHEN no critical/high AND !skip_gen     DO A_AUDIT
-  → S_RECORD       WHEN no findings OR skip_gen            DO A_AUDIT
+S_AUDIT → S_DIAGNOSE      : critical/high findings exist
+S_AUDIT → S_GENERALIZE    : no critical/high, !skip_generalize
+S_AUDIT → S_RECORD        : no findings OR skip_generalize
 
-S_DIAGNOSE:
-  → S_FIX          WHEN root causes identified AND !skip_fix           DO A_DIAGNOSE
-  → S_GENERALIZE   WHEN root causes identified AND skip_fix AND !skip_gen  DO A_DIAGNOSE
-  → S_RECORD       WHEN root causes identified AND skip_fix AND skip_gen   DO A_DIAGNOSE
-  → S_DIAGNOSE     WHEN hypotheses failed AND retries < 3             DO A_ESCALATE_DIAGNOSIS
-  → S_RECORD       WHEN hypotheses failed AND retries >= 3            DO mark INCONCLUSIVE
+S_DIAGNOSE → S_FIX          : root causes identified, !skip_fix
+S_DIAGNOSE → S_GENERALIZE   : root causes identified, skip_fix, !skip_generalize
+S_DIAGNOSE → S_RECORD       : root causes identified, skip_fix, skip_generalize
+S_DIAGNOSE → S_DIAGNOSE     : hypotheses failed, retries < 3 → A_ESCALATE_DIAGNOSIS
+S_DIAGNOSE → S_RECORD       : retries >= 3 → INCONCLUSIVE
 
-S_FIX          → S_VERIFY       DO A_FIX
+S_FIX    → S_VERIFY       : fix implemented
 
-S_VERIFY:
-  → S_GENERALIZE   WHEN verified AND !skip_gen    DO A_VERIFY
-  → S_RECORD       WHEN verified AND skip_gen     DO A_VERIFY
-  → S_FIX          WHEN needs_rework              DO A_VERIFY
+S_VERIFY → S_GENERALIZE   : verified, !skip_generalize
+S_VERIFY → S_RECORD       : verified, skip_generalize
+S_VERIFY → S_FIX          : needs_rework
 
-S_GENERALIZE:
-  → S_DISCOVER     WHEN hits found                DO A_GENERALIZE
-  → S_RECORD       WHEN no hits                   DO A_GENERALIZE
+S_GENERALIZE → S_DISCOVER : hits found
+S_GENERALIZE → S_RECORD   : no hits
 
-S_DISCOVER → S_DIAGNOSE     : new critical issue found → cross_phase_loops++
-S_DISCOVER → S_FIX          : same-pattern fix, !skip_fix → cross_phase_loops++
-S_DISCOVER → S_RECORD       : triage complete AND remaining_actionable == 0
-S_DISCOVER → S_RECORD       : loops >= max_loops → MUST log each unfixed item with specific reason (blanket "pre-existing" is forbidden)
+S_DISCOVER → S_DIAGNOSE   : new critical issue → cross_phase_loops++
+S_DISCOVER → S_FIX        : same-pattern fix, !skip_fix → cross_phase_loops++
+S_DISCOVER → S_RECORD     : remaining_actionable == 0
+S_DISCOVER → S_RECORD     : loops >= max_loops → log per-item reasons
 
-S_RECORD   → END            DO A_RECORD
+S_RECORD   → END          : complete
 </transitions>
 
 <actions>
 
 ### A_INTAKE
-1. Parse arguments: target description, flags, `--dimensions` subset
-2. Generate slug, create `SESSION_DIR`
-3. Search: `maestro search "<keywords>"` + Glob prior sessions + ARCHITECTURE.md + spec load coding/debug
+1. Parse arguments: target, flags, `--dimensions` subset
+2. Generate slug, create SESSION_DIR
+3. `maestro search "<keywords>"` + Glob prior sessions + ARCHITECTURE.md + spec load coding/debug
 4. **Baseline capture**: Record current metrics (test pass rate, bundle size, dependency count, complexity hotspots) to `session.json.baseline_metrics`
-5. Derive `phase_goals[]` from flags (apply `skip_when`)
-6. Write `session.json` + `understanding.md` §1 (Target & Baseline)
-7. Emit Goal Prompt (see Appendix)
+5. Derive `phase_goals[]` from flags
+6. Write `session.json` + `understanding.md` section 1, emit Goal Prompt
 
-📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-improve({slug}): INTAKE — 目标解析与基线采集"`
+Commit: `"odyssey-improve({slug}): INTAKE — target parsed and baseline captured"`
 
 ### A_RESUME
-Find latest session via Glob → read `session.json` → display summary → jump to `current_state`.
+Glob latest session → read `session.json` → jump to `current_state`.
 
 ### A_SURVEY
 **spawn_agents_on_csv (Wave 1):**
@@ -254,9 +189,9 @@ Write `tasks.csv` with Wave 1 rows:
 ```
 `spawn_agents_on_csv({ csv_path:"tasks.csv", max_concurrency:2, max_runtime_seconds:300, output_csv_path:"wave-1-results.csv", output_schema:SHARED_OUTPUT_SCHEMA })`
 
-Merge → evidence.ndjson (phase: "survey"). Extract `baseline_metrics` from survey results. Update `understanding.md` §2. Mark G1 done.
+Merge → evidence.ndjson (phase: "survey"). Extract `baseline_metrics`. Update section 2. Mark G1.
 
-📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-improve({slug}): SURVEY — 现状调查"`
+Commit: `"odyssey-improve({slug}): SURVEY — current state survey"`
 
 ### A_AUDIT
 **spawn_agents_on_csv (Wave 2)** — 6 agents (one per dimension, or `--dimensions` subset):
@@ -272,56 +207,45 @@ Append Wave 2 rows to `tasks.csv`:
 ```
 `spawn_agents_on_csv({ csv_path:"tasks.csv", max_concurrency:6, max_runtime_seconds:600, output_csv_path:"wave-2-results.csv", output_schema:SHARED_OUTPUT_SCHEMA })`
 
-Merge → evidence.ndjson (phase: "audit"). Write `session.json.audit_result` with dimensions audited, finding count, severity distribution.
-Update `understanding.md` §3 (findings by dimension + severity matrix). Mark G2 done.
+Merge → evidence.ndjson (phase: "audit"). Write `session.json.audit_result` with dimensions, finding count, severity distribution.
+Update section 3. Mark G2.
 
-📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-improve({slug}): AUDIT — 多维审查"`
+Commit: `"odyssey-improve({slug}): AUDIT — multi-dimensional audit"`
 
 ### A_DIAGNOSE
-Root cause analysis for critical/high findings — don't fix symptoms.
+Root cause analysis for critical/high findings.
 
-1. Group by dimension, prioritize by severity. For each: hypothesis → trace code path + git history → evidence.ndjson (phase: "diagnosis")
-2. **Decision journal**: ambiguity → evidence (phase: "decision"); Normal: request_user_input | `-y`: defer
-3. **CLI-assisted** for complex findings: `maestro delegate --role analyze --mode analysis` to trace code path, check systemic pattern, identify fix approach. Execute `run_in_background: true`.
-4. Write `session.json.diagnoses[]`. Update `understanding.md` §4. Mark G3 done.
+1. Group by dimension, prioritize by severity. For each: hypothesis → trace code path + git history → evidence (phase: "diagnosis")
+2. Ambiguity → evidence (phase: "decision"); Normal: request_user_input | `-y`: defer
+3. Complex findings: `maestro delegate --role analyze --mode analysis` (`run_in_background: true`)
+4. Write `session.json.diagnoses[]`. Update section 4. Mark G3.
 
-📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-improve({slug}): DIAGNOSE — 根因诊断"`
+Commit: `"odyssey-improve({slug}): DIAGNOSE — root cause analysis"`
 
 ### A_ESCALATE_DIAGNOSIS
-Increment retries. If < 3: broaden scope via `maestro delegate --role analyze`, form new hypotheses, return to S_DIAGNOSE. If >= 3: Normal → request_user_input (broaden/new/INCONCLUSIVE) | `-y` → auto INCONCLUSIVE, proceed to S_RECORD.
+`retries++`. < 3: `maestro delegate --role analyze`, new hypotheses, → S_DIAGNOSE. >= 3: Normal → request_user_input | `-y` → INCONCLUSIVE → S_RECORD.
 
 ### A_FIX
-Skip if `--skip-fix`. Implement improvements for diagnosed root causes.
+Fix ALL diagnosed issues by severity tier (critical → high → medium → low within fix_threshold), one dimension at a time. After each tier, re-verify modified area — new findings append to current tier.
 
-1. **穷尽修复**: Fix ALL diagnosed issues by severity tier (critical → high → medium → low within fix_threshold), one dimension at a time. After each tier, re-verify modified area — new findings append to current tier.
-2. For each fix: implement → record evidence.ndjson (phase: "fix")
-3. **Normal**: request_user_input per-fix confirmation. **`-y`**: auto-proceed, record `deferred`.
+For each fix: implement → evidence (phase: "fix"). Normal: request_user_input per-fix confirmation | `-y`: auto-proceed.
 
-📌 **Auto-commit**: `git add -A && git commit -m "odyssey-improve({slug}): FIX — 改进实现"`
+Commit: `"odyssey-improve({slug}): FIX — improvements implemented"`
 
 ### A_VERIFY
 1. Run tests covering modified areas
 2. Re-capture metrics, compare with `session.json.baseline_metrics`
-3. **CLI-assisted**: `maestro delegate --role review --mode analysis` to check fix correctness, test regressions, measure impact vs baseline. Execute `run_in_background: true`.
-4. `needs_rework` → S_FIX. `verified` → mark G4 done, advance.
-5. Write `session.json.confirmation`. Update `understanding.md` §5 (before/after metrics table).
+3. `maestro delegate --role review --mode analysis` (`run_in_background: true`) — check fix correctness, regressions, impact vs baseline
+4. `needs_rework` → S_FIX. `verified` → mark G4.
+5. Write `session.json.confirmation`. Update section 5.
 
-📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-improve({slug}): VERIFY — 改进验证"`
+Commit: `"odyssey-improve({slug}): VERIFY — improvements verified"`
 
 ### A_GENERALIZE
-Skip if `--skip-generalize`. Pattern source: diagnoses + fixes.
+Base shared_actions. Improve overrides:
+- Pattern source: diagnoses + fixes
 
-**3-layer pattern extraction** (source = `diagnosis`):
-
-| Layer | Method | Example |
-|-------|--------|---------|
-| Syntax | Regex → Grep | Missing error handling, unchecked returns, resource leaks |
-| Semantic | Agent understands anti-pattern → scan | Incomplete validation, missing retry logic |
-| Structural | File/module structure similarity | Same module pattern missing same safeguard |
-
-Write `session.json.patterns[]`.
-
-**Wave 3 — 4-agent scan (spawn_agents_on_csv):**
+**Wave 3 — spawn_agents_on_csv (4 agents):**
 
 Append Wave 3 rows to `tasks.csv`:
 ```csv
@@ -332,62 +256,56 @@ Append Wave 3 rows to `tasks.csv`:
 ```
 `spawn_agents_on_csv({ csv_path:"tasks.csv", max_concurrency:4, max_runtime_seconds:300, output_csv_path:"wave-3-results.csv", output_schema:SHARED_OUTPUT_SCHEMA })`
 
-**Cross-layer dedup:** multi-layer hits → boost confidence | single-layer → `needs_review` | historically fixed → `regression_risk`
-**Iterative deepening:** module with ≥3 hits → targeted deep scan (max 1 round)
-**Persist:** understanding.md §6 generalization section + `session.json.generalization_stats`
+Update section 6. Mark G5.
 
-Update §6. Mark G5 done.
+Commit: `"odyssey-improve({slug}): GENERALIZE — pattern scan"`
 
-📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-improve({slug}): GENERALIZE — 泛化扫描"`
+### A_DISCOVER, A_RECORD
+Base shared_actions. Improve overrides:
+- **A_RECORD** section 8: before/after comparison table from baseline_metrics vs current measurements
+- **A_RECORD** section 9: learnings per Knowledge Persistence table
 
-### A_DISCOVER
-1. **Triage** each scan hit with ±10 lines context → classify as `bug` / `risk` / `safe`
-2. **Route:**
-   - bug + fix_template directly applicable → **immediate fix** → back to S_FIX
-   - bug + needs cross-module decision or no fix_template → create issue (with fix suggestion + impact analysis)
-   - risk → evaluate if guard can be added directly; if yes → fix; if no → create issue
-   - safe → skip
-   **Normal**: request_user_input for routing. **`-y`**: auto-fix bugs with fix_template, create issue for rest
-3. **Cross-phase loop tracking:** `cross_phase_loops++`. At `loops >= max_loops` → MUST record per-item reasons (blanket "historical legacy" is forbidden)
-4. Append evidence (phase: "discovery" + "decision"). Update understanding.md §7.
-Mark G6 done.
-
-📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-improve({slug}): DISCOVER — 发现分类"`
-
-### A_RECORD
-1. **understanding.md §8**: Improvement metrics — before/after comparison table from baseline_metrics vs current measurements
-2. **understanding.md §9**: Engineering learnings — write structured by Knowledge Persistence table categories. For each category, write: bottleneck/vulnerability type + fix approach + measurement method + detection strategy.
-3. Mark G7 done. Pending decisions: **Normal** → request_user_input per item | **`-y`** → skip, show deferred count
-4. **Goal audit:** check all `phase_goals[*].completion_confirmed`. All confirmed → `phase_goals_all_done = true`. Incomplete: **Normal** → request_user_input (accept/reject/skip each) | **`-y`** → auto accept
-5. Set `current_state = "COMPLETED"`. Emit completion summary: Target, Dimensions, Findings (C/H/M/L), Diagnosed count, Fix count + verified, Metrics (improved/regressed), Patterns (count + layer distribution), Scan hits (cross-layer), Issues created, Decisions (resolved/pending/deferred), Learnings count, Self-iter rounds, Cross-loops used, Goals (done/total/skipped).
-
-📌 **Auto-commit**: `git add understanding.md && git commit -m "odyssey-improve({slug}): RECORD — 指标总结与知识沉淀"`
+**Completion summary:**
+```
+--- IMPROVE ODYSSEY COMPLETE ---
+Target:     {target}
+Dimensions: {dimensions}
+Findings:   {critical}/{high}/{medium}/{low}
+Diagnosed:  {count}
+Fixed:      {count} verified
+Metrics:    {improved}/{regressed}
+Patterns:   {count} ({by_layer})
+Scan hits:  {total} ({cross_layer} confirmed)
+Issues:     {N} created
+Decisions:  {N} resolved, {M} pending, {K} deferred
+Learnings:  {N} persisted
+Self-iter:  {N} rounds across {M} stages
+Cross-loops:{N} used
+Goals:      {done}/{total} ({skipped} skipped)
+---
+```
 
 </actions>
 
 <appendix>
 
-### Goal Prompt Template
-**⚠️ 仅在 A_INTAKE 完成后显示一次，A_RECORD 完成时不重复。**
+### `-y` improve-specific points
 
-列出所有非 skipped 的 phase_goals，附加收敛规则：
-- 穷尽迭代至所有 findings 已处理（fix/issue/decision）且 `phase_goals_all_done=true`
-- 修复按 severity 逐轮迭代，每轮 re-verify
-- Baseline 修复前采集，修复后对比确认改进
-- pending decision 必须 request_user_input，不允许"只报告不处理"
-
-### `-y` Auto-Confirm Behavior
 | Decision Point | Normal | `-y` |
 |---------------|--------|------|
-| A_FIX improvement confirmation | request_user_input | auto-proceed, `deferred` |
-| A_DIAGNOSE ambiguity | request_user_input | best-effort, `deferred` |
-| A_ESCALATE 3-strike | request_user_input 3-way | auto INCONCLUSIVE |
-| A_DISCOVER hit routing | request_user_input | auto-fix 有 fix_template 的，其余 create issue |
-| A_DISCOVER ambiguous items | request_user_input | all `deferred` |
-| A_RECORD pending decisions | request_user_input | skip, show deferred count |
-| A_RECORD goal audit | request_user_input | auto accept |
+| A_FIX improvement confirmation | request_user_input | auto-proceed, deferred |
+| A_DIAGNOSE ambiguity | request_user_input | best-effort, deferred |
+| A_ESCALATE 3-strike | request_user_input | INCONCLUSIVE |
 
-`deferred` items shown as "待决策" in completion summary; recoverable via `-c`.
+### Goal Prompt convergence rules
+
+```
+Exhaust all findings (fix/issue/decision) until remaining_actionable == 0
+and phase_goals_all_done=true.
+Fix by severity tier with re-verify per tier.
+Baseline captured before fix, compared after to confirm improvement.
+Pending decisions must request_user_input — no report-only.
+```
 
 </appendix>
 
@@ -404,24 +322,24 @@ Mark G6 done.
 
 <success_criteria>
 - [ ] Target resolved, baseline metrics captured
-- [ ] Survey + 6-dimension audit with structured findings and severity matrix
+- [ ] Survey + 6-dimension audit with severity matrix
 - [ ] Root causes diagnosed for critical/high findings
 - [ ] Improvements implemented and verified with before/after metrics (unless --skip-fix)
 - [ ] Multi-layer generalization + cross-phase loops (unless --skip-generalize)
-- [ ] Every unfixed finding has individual classification and reason
-- [ ] understanding.md §8 (metrics) and §9 (learnings) completed
+- [ ] Every unfixed finding individually classified with reason
+- [ ] understanding.md sections 8-9 completed
 - [ ] phase_goals G1-G7 tracked and audited
 - [ ] Session resumable via -c
 </success_criteria>
 
 <next_step_routing>
-| Condition | Next step |
-|-----------|-----------|
+| Condition | Next |
+|-----------|------|
 | Security findings need deep investigation | `$odyssey-debug "<finding>"` |
 | UI-related findings | `$odyssey-ui "<component>"` |
 | Issues created from discoveries | `/manage-issue list --source improve-odyssey` |
 | Architecture pattern to document | `/spec-add arch "..."` |
 | Performance pattern to persist | `/spec-add coding "..."` |
-| Want formal review of changes | `$odyssey-review-test-fix <changed-files>` |
-| Decisions still pending | Filter evidence.ndjson phase=decision status=pending |
+| Formal review of changes | `$odyssey-review-test-fix <changed-files>` |
+| Pending decisions | Filter evidence phase=decision status=pending |
 </next_step_routing>
