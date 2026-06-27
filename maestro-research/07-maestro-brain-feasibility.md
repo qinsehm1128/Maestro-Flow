@@ -17,6 +17,7 @@
 1. [一句话结论](#1-一句话结论)
 2. [把"大脑"拆成 7 项能力，逐项对照现状](#2-把大脑拆成-7-项能力逐项对照现状)
 3. [关键发现：内层 ralph 与外层 brain 的"缝隙"在哪](#3-关键发现内层-ralph-与外层-brain-的缝隙在哪)
+   - [3.5 决策模型（用户修正）：A 窗口自决 + 默认推进 + 两异常分支](#35-决策模型用户修正a-窗口自决--默认推进--两异常分支)
 4. [真正的空白 vs 可复用的现成件](#4-真正的空白-vs-可复用的现成件)
 5. [maestro-brain 会不会和 maestro / maestro-next / maestro-ralph 重复？](#5-maestro-brain-会不会和-maestro--maestro-next--maestro-ralph-重复)
 6. [两种实现策略](#6-两种实现策略)
@@ -30,9 +31,14 @@
 ## 1. 一句话结论
 
 **可行，而且不是从零造。** `maestro-brain` 本质是把 maestro 已有的一堆**内层/单次原语，提升一个高度**
-（intra-session → inter-session，single-shot → outer-loop），再补上**一个真正新颖的智能：从 roadmap +
-上一轮结果产出下一个目标**（下文称 **H1**）。约 **65–75% 的零件已存在**（命令目录、状态登记表、委派层、
-决策原语、循环脚手架、蜂群模式），剩下的是**编排黏合 + H1 + 跨会话状态**。
+（intra-session → inter-session，single-shot → outer-loop）。约 **65–75% 的零件已存在**（命令目录、状态
+登记表、委派层、决策原语、循环脚手架、蜂群模式），剩下的主要是**编排黏合 + 跨会话状态**。
+
+> **关于"决策由谁做"的关键澄清（用户修正，见第 3.5 节）：** 每轮的决策**不是委派给一个新的 LLM 判官**，
+> 而是**运行 maestro-brain 的宿主 agent（"A 窗口"）在上下文内自决**——它就是普通的 agent 推理，输入是
+> roadmap 状态 + 子会话结果。这把原先被高估为"零先例新智能"的 H1 缩小为一个**输入装配问题**（把对的
+> 东西喂给 A 窗口），可行性因此**更强**、Phase 0 更自然。决策的**形状**也不是平铺 5 路路由，而是
+> **默认按 roadmap 推进 + 两个异常分支**（结果有问题→插入修复；roadmap 有问题→动态修正），详见第 3.5 节。
 
 > 它必须**重度依赖** maestro 的结构化/工程系统（`state.json` 产物登记表、`catalog.json` 命令目录、
 > `maestro delegate` 适配器层、ralph 的 `status.json` CLI）—— 大脑的全部价值恰恰在于它是这些之上的
@@ -47,7 +53,7 @@
 | C1 | **感知全部可用命令**（知道有哪些命令可选） | ✅ `catalog.json` 存在（63 命令/44 技能/24 代理/21 cli，每条带 `description`+`source`） | [代码-数据]，手工维护 | 命令与技能分两个数组；ACO 蜂群在 `skills[]` 里；无 mode/成本元字段 |
 | C2 | **从状态决定下一步命令** | 🟡 三套并存但**断裂**：`_router.json`(图)、`maestro-next`(评分表)、GraphWalker(引擎) | 引擎[代码]，评分[提示词] | `_router.json` 读的状态字段**代码从未计算**，冷启动塌缩成 `to_analyze` |
 | C3 | **多轮外层循环 + 跨轮持久化** | 🟡 ralph `status.json` / odyssey `session.json` 都只覆盖**单目标** | ralph[代码]，odyssey[提示词] | 无"会话的会话"、无跨轮台账、无等待子会话原语 |
-| C4 | **{推进/修/建issue/改roadmap/蜂群} 分支决策** | 🟡 ralph `{proceed/fix/escalate}` + LLMDecider 存在，但 intra-session、仅 2–4 路 | verdict[提示词]，LLMDecider[代码] | 缺 issue/蜂群/改roadmap 三个一等分支；高度不对 |
+| C4 | **决策：默认按 roadmap 推进 + 异常分支**（结果问题→插入修复；roadmap 问题→修正）。由 A 窗口宿主 agent 在上下文内自决 | 🟡 三模式各有现成件：推进🟡 / 插入修复🟡(最绿) / 修正roadmap🔴-偏黄（见 §3.5） | 决策=宿主 agent 上下文推理[提示词]；底层原语 verdict[提示词]+LLMDecider[代码] | 修复/推进缺**跨会话**高度；修正 roadmap 缺**自主在途改写+下游对账** |
 | C5 | **委派实现给可配置外部 CLI** | 🟢 `maestro delegate --role implement --mode write` 同步直接回传 transcript | [代码] | 实现委派从未被"分析器"触发过——这是大脑的新职责 |
 | C6 | **按情境配置 CLI 优先级**（默认 Claude 写码可改） | 🟢/🟡 `roles.implement.fallbackChain` 配置即可；默认 Claude = 改一个字段 | [代码] | 配置键是 **role**（7 个固定）不是 **situation**；补 situation 约 30 行 |
 | C7 | **复杂度判断 → grill/头脑风暴/蜂群 模式选择** | 🟡 命令都在（grill/brainstorm/analyze/swarm），但"何时用蜂群 vs 普通分析"只有散文 | [提示词] | 无 mode 轴枚举、无编码的选择规则 |
@@ -74,7 +80,7 @@
 
 | 步骤（ralph 运行之间，人在做的） | 现成机制？ | 缺口 |
 |---|---|---|
-| **H1 读 roadmap+上轮结果，决定下一个目标** | **无（任何层都没有）** | 🔴 **唯一真正从零的智能——大脑存在的理由** |
+| **H1 读 roadmap+上轮结果，决定下一个目标** | **由 A 窗口宿主 agent 在上下文内自决**（非委派 LLM、非新代码）。无专用机制，但决策者=普通 agent 推理，输入现成 | 🟡 **不是"发明智能"，是"装配输入"**——把 roadmap 状态+子会话结果喂给 A 窗口（见 §3.5、§4 输入表） |
 | H2 把目标写成 `maestro-ralph -y "<goal>"` 字符串 | 部分（intent→契约转换在 ralph 内部，但产 intent 串没自动化；invariant 14 禁止 ralph 自推 `-y`） | 字符串作者 |
 | H3 开新窗口/起新会话 | 无"会话的会话" | 多会话生命周期 |
 | H4 跑到完成 | ✅ **完全存在**（这就是内层 ralph） | 无 |
@@ -83,8 +89,46 @@
 | H7 决定 推进/修/escalate | 部分：`S_APPLY_VERDICT` + 置信度护栏 + `A_REGROUND_HALT`（不可跳过的漂移熔断）正是分支形状，但 intra-session | 复用，调到 inter-session |
 | H8 把约束带到下一个目标 | 部分：`state.json` 是可行的共享总线 | 无会话→会话契约交接 |
 
-**一句话：缝隙在 H4（内层 ralph 拥有）和 H1（今天人拥有）之间。H1 是唯一零先例的智能；H5–H8 全是
-"高度不对的可复用原语"；H2/H3 是作者/编排黏合。大脑 ≈ 高度提升 + 一个 H1 目标作者。**
+**一句话：缝隙在 H4（内层 ralph 拥有）和 H1（A 窗口宿主 agent 在上下文内自决）之间。H1 不是要发明的新
+智能，而是把对的输入喂给 A 窗口；H5–H8 全是"高度不对的可复用原语"；H2/H3 是作者/编排黏合。
+大脑 ≈ 高度提升 + 跨会话输入装配，而非从零造一个判官。**
+
+---
+
+### 3.5 决策模型（用户修正）：A 窗口自决 + 默认推进 + 两异常分支
+
+> 用户两点修正彻底澄清了 C4/H1：**(1)** 决策不委派给 LLM，而是 **A 窗口（运行 maestro-brain 的宿主
+> agent）在上下文内自决**；**(2)** 决策形状是**默认按 roadmap 顺序推进开发，只在出问题时分支**——返回
+> 结果有问题→**插入修复内容**（roadmap 不动）；roadmap 本身有问题→**动态修正 roadmap**。三模式各自映射
+> 到现有机制如下（详见 `_scratch/r2a`）。
+
+| 模式 | 触发 | 最近的现成机制 | 现状高度 | 可建性 |
+|---|---|---|---|---|
+| **① 推进**（默认） | 子会话结果 OK | 每阶段游标 `deriveCurrentPhase`/`derivePhasesSummary`/`nextArtifactId` **[代码]**（`state-schema.ts:143-225`）+ `maestro-next` 生命周期表 **[提示词]**（`maestro-next.md:100-117`）+ ralph `A_ADVANCE_MILESTONE` 重放 **[提示词]** | 单会话内重放预建列表 | 🟡 阶段游标可算；缺 `latest_artifact_type` 派生 + 跨会话循环 + 跨 milestone 起目标 |
+| **② 插入修复** | 结果有问题 | ralph `A_APPLY_FIX` 把 Fix-Loop 模板**插入 `steps[]` 后重排+写盘** **[提示词]**（`maestro-ralph.md:621-625, 772-834`）；引擎只重放、不插入（`splice/insert` 在 `src/ralph/` 零命中，仅 `writeStatus`）；`quality-loop.json` 同形 | **仅 intra-session** | 🟡 **三者最绿**——若 brain 把修复**下派进 ralph 子会话**即可逐字复用；要在 brain 自身高度插入则需跨会话循环 |
+| **③ 修正 roadmap** | roadmap 本身有问题 | `maestro-roadmap --revise` 就地改写、保完成阶段 **[提示词]**（`roadmap.md:74-82`）；ralph `--amend` 的 `goal_changelog` 是最佳溯源模板（`ralph-amend-goal.md`）；planex `S_VERIFY→S_PLAN` 重规划是在环类比 | 独立手工命令，重护栏 | 🔴-偏黄 **风险最高**——revise 恰恰**在有完成阶段时 E005 警告/拒绝**（`maestro-roadmap.md:147`）；无"在途自主改写+对账"单元 |
+
+**模式③的下游危害（自主改 `milestones[]` 会踩的坑，须显式处理）：**
+- **孤儿产物**：派生器按 `artifacts[].phase/milestone` 匹配（`state-schema.ts:159-166`），改阶段会让旧产物
+  悄悄掉出统计 → 进度错算、"当前阶段"错判（正是 E005 警告的）。
+- **悬空溯源**：需求↔阶段 1:1 可追溯（`roadmap-common.md:130`）被破坏，登记表无 [代码] 引用完整性兜底。
+- **在途 ralph 子会话看不见改动**：`session.milestone` 是 build 期抓的标量、引擎 roadmap-blind（§3），
+  改 roadmap 时正在跑的子会话仍按旧契约执行，**无检测**。
+- → 自主模式③至少需新增 `reviseRoadmap()`：快照 milestones → 仿 ralph `--amend` 打 changelog →
+  重校 产物↔阶段指针 → 信号/静默在途子会话。这四步今天都不存在为一个单元。
+
+**A 窗口每轮自决所需的三类输入（都映射到现成读取面，只差跨会话读取器与轮次台账）：**
+
+| 输入 | 内容 | 现成读取面 | 代码/提示词 |
+|---|---|---|---|
+| **roadmap 游标** | 当前 milestone、阶段完成/待办、下一未完成阶段、需求覆盖 | `deriveCurrentPhase`+`derivePhasesSummary`（`state-schema.ts:143-198`）；`maestro-roadmap --review` 漂移/健康读 | [代码] 派生 + [提示词] review |
+| **子会话结果** | 上一个子 ralph 的完成摘要/caveats/deferred/子目标达成/blocker | `buildSessionAnchor` 形状（`cmd-next.ts:178-273`）+ `ralph session` + 子 `status.json` | [代码]（但今天只读进**同会话**，需 trivial 跨会话读取器） |
+| **裁决信号** | 结果 pass/fail + 置信度 + 漂移 | `maestro delegate --role analyze` 的 `---VERDICT---` 块（`maestro-ralph.md:521-549`）/ `coordinate report` 的 `ctx.result` | [提示词] delegate + [代码] report |
+| （辅）跨轮上下文 | 历轮决策/blocker/deferred | `state.json.accumulated_context`（`state-schema.ts:118-122`）——可行总线，但存的是决策文本非轮次日志 | [代码] schema |
+
+**结论（修正后）：默认推进②插入修复都是"提示词今天就能跑、把修复下派进 ralph 子会话即接近绿灯"；
+模式③修正 roadmap 是唯一高风险项，建议 Phase 0 先做成"brain 暂停 → 调 `maestro-roadmap --revise` 走它
+自带的人确认护栏 → 恢复"，不要一上来就自主在途改写。**
 
 ---
 
@@ -108,18 +152,26 @@
   （真 ACO，Python 控制器）（C7）。
 
 ### 4.2 真正净新增（按工作量排序）
-1. **H1 下一目标作者**（核心智能，零先例）：roadmap + 累积子会话 anchor → 下一个 `maestro-ralph -y "<goal>"`
-   或下一个命令。这是大脑唯一不可借用的部分。
-2. **跨会话状态**：一个 brain 台账（"会话的会话"）记录"第 N 轮选了 X、结果 Y、故第 N+1 轮该…"；
-   `accumulated_context` 存的是决策/blocker 文本而非轮次日志（`r1a` §5.2）。
-3. **等待子会话原语**：ralph 的 `active_step_index` 单持有者模型假设步骤**内联完成**；而 brain 的一步=一整个
-   ralph 子会话，需要"阻塞等子会话完成再 `ralph complete`"——今天 `src/ralph/` 无此原语（`r1c` §5 阻塞点1）。
-   （注：同步 `delegate` 或把子 ralph 当子进程跑可绕过；见第 6 节。）
+
+> 修正后，H1 不再是"净新增的智能"——决策由 A 窗口宿主 agent 在上下文内做（§3.5）。真正净新增的是**让 A
+> 窗口能拿到决策输入、并把决策落地为下一轮**的那层管道：
+
+1. **跨会话输入装配 + 轮次台账**（替代原"H1 作者"为头号项）：让 A 窗口每轮读到 roadmap 游标 + 上一子会话
+   anchor + 裁决信号（三类输入见 §3.5 输入表），并记一个 brain 台账"第 N 轮选了 X、结果 Y、故第 N+1 轮该…"。
+   缺的只是一个**跨会话读取器**（读兄弟会话 `status.json`，复用 `buildSessionAnchor`，trivial）+ 台账结构
+   （`accumulated_context` 是最近的总线但存文本非轮次日志，`r1a` §5.2）。
+2. **等待子会话原语**：ralph 的 `active_step_index` 单持有者模型假设步骤**内联完成**；而 brain 的一步=一整个
+   ralph 子会话，需要"阻塞等子会话完成再推进"——今天 `src/ralph/` 无此原语（`r1c` §5 阻塞点1）。
+   （注：用**同步 `delegate`** 或把子 ralph 当子进程同步跑即可规避；见第 6/8 节，这是 Phase 0 首选。）
+3. **模式③ `reviseRoadmap()` 自主对账单元**（最高风险，见 §3.5）：快照 milestones → 仿 ralph `--amend` 打
+   changelog → 重校产物↔阶段指针 → 信号在途子会话。Phase 0 建议先绕开（暂停→调 `--revise` 走人确认护栏→恢复）。
 4. **状态派生层 `deriveBrainState()`**：若走 ChainGraph 路线，必须先把 `_router.json` 假设却没人算的字段
    （`latest_artifact_type`/`has_pending_plans`/`all_phases_executed`/`milestones_total`）从产物登记表派生出来。
    **这同时修了一个现存潜伏 bug**——`_router.json` 今天对真实项目冷启动是塌缩的（`r1a` §4a）。
-5. **5 路决策路由**作为一等状态（补 issue/蜂群/改roadmap 三臂）。
-6. **per-situation CLI 配置**（约 30 行，镜像 `selectToolByRole`）——或先把情境压到 7 个 role 上（C6）。
+5. **per-situation CLI 配置**（约 30 行，镜像 `selectToolByRole`）——或先把情境压到 7 个 role 上（C6）。
+
+> 注意：模式①推进、②插入修复**不在净新增清单里**——它们今天就能由 A 窗口用提示词跑，且若把修复**下派进
+> ralph 子会话**即可逐字复用现有 `A_APPLY_FIX` 插步原语（§3.5）。这正是可行性比预期更高的原因。
 
 ---
 
@@ -171,14 +223,16 @@
 
 - **Phase 0（现在，1–2 天）— 提示词大脑**：建 `maestro-brain.md`，复用 catalog.json + delegate + maestro-next 表
   + ralph 派发 + odyssey 脚手架。把默认写码 CLI 配成 claude（改 `roles.implement.fallbackChain`）。
-  端到端验证"分析→委派→拿回→5路分支→下一轮"。**H1 先用 LLM 在提示词里做。**
-- **Phase 1（硬化脆弱件）**：把三样东西落进代码——`deriveBrainState()`（顺手修 `_router.json` bug）、
-  跨轮台账、等待子会话原语（或确定用同步 delegate / 子进程 ralph 规避）。
-- **Phase 2（提升健壮性）**：把决策路由提升为 `maestro-brain` ChainGraph，由 GraphWalker + LLMDecider 驱动；
-  若"压到 7 role"不够再补 `situations` 配置。
+  端到端验证"**A 窗口读输入 → 决策(默认推进/插入修复/必要时调 --revise) → 委派实现 → 拿回 → 下一轮**"。
+  **决策由 A 窗口自决，不引入新 LLM 判官；修复下派进 ralph 子会话；roadmap 修正先走 `--revise` 的人确认护栏。**
+- **Phase 1（硬化脆弱件）**：把三样东西落进代码——跨会话读取器 + 轮次台账、等待子会话原语
+  （或确定用同步 delegate / 子进程 ralph 规避）、`deriveBrainState()`（顺手修 `_router.json` bug）。
+- **Phase 2（提升健壮性）**：若需要，把决策落地为 `maestro-brain` ChainGraph（GraphWalker + LLMDecider 驱动）；
+  把模式③做成自主 `reviseRoadmap()` 对账单元；若"压到 7 role"不够再补 `situations` 配置。
 
-**为什么这个顺序**：Phase 0 几乎全用现成件、风险最低、最快拿到反馈；H1 这种模糊智能本来就更适合留在
-LLM 层，不急着代码化；`deriveBrainState()` 有独立价值（修现存 bug），值得最先硬化。
+**为什么这个顺序**：Phase 0 几乎全用现成件、风险最低、最快拿到反馈；决策本就由 A 窗口上下文推理承担、
+不必代码化；模式①②提示词即可跑，模式③高风险故先借 `--revise` 护栏；`deriveBrainState()` 有独立价值
+（修现存 bug）值得最先硬化。
 
 ---
 
@@ -210,14 +264,17 @@ LLM 层，不急着代码化；`deriveBrainState()` 有独立价值（修现存 
 
 - **能大量复用命令组合，但"命令组合"本身不够。** `chains/` 里已有 `full-lifecycle.json`/`quality-loop.json`/
   `issue-lifecycle.json` 等预建链，`_router.json` 已是"状态→下一图"的雏形——但它们是**固定图**或**断裂的路由**，
-  缺的正是你手工在做的那层：**每轮拿子会话结果重新决策、产出下一个目标（H1）、在 5 个分支间选**。
+  缺的正是你手工在做的那层：**每轮由 A 窗口拿子会话结果重新决策（默认推进 / 结果问题→插入修复 / roadmap
+  问题→修正），并把决策落地为下一轮**。
 - **必须重度依赖 maestro 的结构化/工程系统。** 大脑的价值=站在 `state.json` 产物登记表、`catalog.json` 目录、
   `delegate` 适配器、ralph CLI 之上做编排。这些是它的"传感器与执行器"。脱离它们，大脑无物可调度。
-- **所以最佳形态不是"另写一个系统"，而是"一个薄的外层编排命令 + 一个 H1 目标作者 + 跨会话台账"**，其余
-  全部委托给已有命令/引擎。这正是分阶段方案 Phase 0 的样子。
+- **所以最佳形态不是"另写一个系统"，而是"一个薄的外层编排命令 + 跨会话输入装配 + 轮次台账"**，决策交给
+  A 窗口宿主 agent 在上下文内做，实现与各模式动作全部委托给已有命令/引擎。这正是 Phase 0 的样子。
 
-**结论：方案可行、方向正确、且比你预期的更"组装"而非"发明"。** 唯一真正要发明的是 H1（从 roadmap+结果产
-下一目标），其余是高度提升 + 黏合 + 一处 bug 修复。建议先做 Phase 0 提示词版验证价值。
+**结论：方案可行、方向正确、且比你预期的更"组装"而非"发明"。** 决策由 A 窗口自决（非新 LLM 判官），
+形状是"默认按 roadmap 推进 + 结果问题插入修复 + roadmap 问题动态修正"；要补的不是一个智能，而是**跨会话
+输入/台账 + 等待子会话**这层管道，外加一处现存 bug 修复（`_router.json`）和高风险的模式③对账。建议先做
+Phase 0 提示词版验证价值——模式①②今天就能跑，模式③先借 `maestro-roadmap --revise` 的人确认护栏。
 
 ---
 
@@ -241,3 +298,4 @@ LLM 层，不急着代码化；`deriveBrainState()` 有独立价值（修现存 
 - `_scratch/r1c-ralph-outer-seam.md` — 内/外层缝隙、H1–H8 逐步缺口分析
 - `_scratch/r1d-delegation-cli-config.md` — 委派 + CLI 优先级配置（实现半边绿灯）
 - `_scratch/r1e-swarm-and-catalog.md` — 蜂群三态 + `catalog.json` 命令目录
+- `_scratch/r2a-three-decision-modes.md` —（第 2 轮）推进/插入修复/修正 roadmap 三模式 → 现有机制精确映射 + A 窗口每轮输入
