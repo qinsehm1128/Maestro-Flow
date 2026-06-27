@@ -31,6 +31,7 @@ Maestro-Flow 是一个**意图驱动的多智能体编排引擎**。它的设计
 | 06 | [`06-collab.md`](./06-collab.md) | **maestro-collab 跨 CLI 交叉验证** —— 同一问题扇出给多个 CLI、综合 共识/冲突/独有；纠正"两套实现"误解（`collab.ts` 实为人类团队协作，**同名碰撞**） | `.claude/commands/maestro-collab.md`、`.codex/skills/maestro-collab/SKILL.md`、`src/commands/delegate.ts`、`src/commands/collab.ts` |
 | 04 | [`04-engineering-files-cli-design-philosophy.md`](./04-engineering-files-cli-design-philosophy.md) | **工程文件 × CLI 联动设计哲学** —— `.claude`/`.codex`/`.agy` 的投影机制、hooks、`--role` 路由 | `src/core/skill-converter.ts`、`scripts/convert-claude-to-agy.mjs`、`.codex/`、settings |
 | 07 | [`07-maestro-brain-feasibility.md`](./07-maestro-brain-feasibility.md) | **maestro-brain 可行性分析（设计提案）** —— 调度型外层"大脑"循环：7 能力对照、内/外层缝隙(H1–H8)、**决策模型(§3.5：A 窗口自决 + 默认推进 + 结果问题插修复 / roadmap 问题动态修正)**、两策略、分阶段方案 | `chains/_router.json`、`src/coordinator/graph-walker.ts`、`src/ralph/`、`src/commands/delegate.ts`、`state-schema.ts`、`catalog.json` |
+| 08 | [`08-maestro-brain-flow.md`](./08-maestro-brain-flow.md) | **maestro-brain 任务流程（收敛版/canonical）** —— 多轮修正后定稿：既定事实(F1–F9)、已定决策(外部跑/拼接 blob、自适应评审、auto 永不终止)、完整流程、自治铁律、评审三档、投递契约、config 注入、残留验证项 | `r3a–r3f`（命令投递/自治门/goal-loop/swarm/config/防假绿） |
 
 ---
 

@@ -5,7 +5,7 @@
 > 决定 {推进 / 修 bug / 建 issue / 改 roadmap / 蜂群分析} → 下一轮）自动化为一个**只分析调度、
 > 不亲自实现、实现时委派外部 CLI** 的循环大脑。
 >
-> 证据基于第 1 轮 5 个并行子代理的源码级检索（findings 见 `_scratch/r1a–r1e`，已 gitignore）。
+> 证据基于第 1 轮 5 个并行子代理的源码级检索（findings 见 `_scratch/r1a–r1e`，作为工作笔记随仓库提交）。
 > 全文区分 **[代码]**（`src/` 强制）与 **[提示词]**（`.md`/`.json` 由 LLM 执行）—— 这是可行性判断的关键。
 
 研究日期：2026-06-27 · 代码版本：`maestro-flow@0.5.42`
@@ -291,7 +291,7 @@ Phase 0 提示词版验证价值——模式①②今天就能跑，模式③先
 
 ---
 
-## 附：第 1 轮子代理 findings 索引（中间产物，已 gitignore）
+## 附：第 1 轮子代理 findings 索引（工作笔记，随仓库提交）
 
 - `_scratch/r1a-decide-next-machinery.md` — 决策机制（`_router.json`/maestro-next/GraphWalker）
 - `_scratch/r1b-odyssey-family.md` — odyssey 家族 vs 外层循环（~45–55% 覆盖）
