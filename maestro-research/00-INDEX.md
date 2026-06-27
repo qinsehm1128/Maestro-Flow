@@ -16,7 +16,7 @@ Maestro-Flow 是一个**意图驱动的多智能体编排引擎**。它的设计
 2. **投影层（多 harness 渲染）** —— 同一套作者文件被**代码生成**投影到 Agy（Antigravity）、Agent-Skills 标准（`.agents/`），并**手工维护**到 Codex（`.codex/`）。
 3. **运行层（多 CLI 编排）** —— 通过 `maestro delegate` / `maestro coordinate` 把任务派发给外部 CLI（Claude / Codex / Gemini / Qwen / Agy），由适配器层归一化各自的原生协议与权限模型。
 
-而 **ralph** 与**规划链（grill → roadmap → blueprint → plan → execute）**是跑在这套基座之上的两类高层工作流：前者是状态机驱动的自治循环，后者是带门禁的规格生成流水线。
+而 **ralph** 与**规划链（grill → brainstorm → roadmap → blueprint → plan → execute）**是跑在这套基座之上的两类高层工作流：前者是状态机驱动的自治循环，后者是带门禁的「需求→规格」生成流水线。其中 **brainstorm（头脑风暴）**是规划链早期的多视角发散/收敛环节，与后期收敛成正式文档的 blueprint 互补。
 
 ---
 
@@ -25,7 +25,8 @@ Maestro-Flow 是一个**意图驱动的多智能体编排引擎**。它的设计
 | # | 文档 | 主题 | 核心证据锚点 |
 |---|------|------|------------|
 | 01 | [`01-ralph.md`](./01-ralph.md) | **maestro-ralph 自治循环** —— 状态驱动地从命令池中挑选下一步直至目标达成 | `src/ralph/`、`.claude/commands/maestro-ralph{,-execute}.md`、`status.json` |
-| 02 | [`02-planning-grill-roadmap-blueprint.md`](./02-planning-grill-roadmap-blueprint.md) | **规划与规格链** —— grill 压测 / roadmap 里程碑 / blueprint 6 阶段文档链（即用户说的 "boatstrain"） | `.claude/commands/maestro-{grill,roadmap,blueprint}.md`、`workflows/`、`state.json` |
+| 02 | [`02-planning-grill-roadmap-blueprint.md`](./02-planning-grill-roadmap-blueprint.md) | **规划与规格链** —— grill 压测 / roadmap 里程碑 / blueprint 6 阶段文档链 | `.claude/commands/maestro-{grill,roadmap,blueprint}.md`、`workflows/`、`state.json` |
+| 05 | [`05-brainstorm.md`](./05-brainstorm.md) | **maestro-brainstorm 头脑风暴** —— 多角色人格扇出 + 跨角色收敛（Decision Digest），规划链早期发散环节，含可视化子系统 | `.claude/commands/maestro-brainstorm.md`、`.claude/agents/{role-design-author,cross-role-reviewer}.md`、`src/brainstorm-visualize/` |
 | 03 | [`03-external-cli-orchestration.md`](./03-external-cli-orchestration.md) | **外部 CLI 编排** —— delegate / coordinate、适配器层、collab 扇出、tools 注册、Agy 集成 | `src/coordinator/cli-executor.ts`、`src/agents/`、`src/commands/delegate.ts` |
 | 04 | [`04-engineering-files-cli-design-philosophy.md`](./04-engineering-files-cli-design-philosophy.md) | **工程文件 × CLI 联动设计哲学** —— `.claude`/`.codex`/`.agy` 的投影机制、hooks、`--role` 路由 | `src/core/skill-converter.ts`、`scripts/convert-claude-to-agy.mjs`、`.codex/`、settings |
 
@@ -35,7 +36,7 @@ Maestro-Flow 是一个**意图驱动的多智能体编排引擎**。它的设计
 
 - **想先建立全局心智模型** → 先读本索引的「四大支柱」，再读 **04**（设计哲学）→ **03**（运行基座）→ **01/02**（高层工作流）。
 - **想理解"它怎么自动干活"** → **01-ralph**（循环引擎）→ **03**（每一步如何落到外部 CLI）。
-- **想理解"它怎么把需求变成规格"** → **02-planning**（grill→roadmap→blueprint）。
+- **想理解"它怎么把需求变成规格"** → **05-brainstorm**（多视角发散）→ **02-planning**（grill→roadmap→blueprint 收敛）。
 - **想给项目加一个新 CLI 或新 harness** → **04 §6/§7**（投影与 `--role` 路由）+ **03 §3**（适配器层）。
 
 ---
@@ -45,7 +46,7 @@ Maestro-Flow 是一个**意图驱动的多智能体编排引擎**。它的设计
 ### 支柱一：两层架构 —— 作者提示词 vs 确定性引擎
 贯穿全项目的最重要事实：**绝大多数"命令"是纯提示词编排器，没有对应的 `src/commands/*.ts` 处理器**。
 - ralph 的命令文件（`maestro-ralph.md`）是有限状态机的「剧本」，而 `src/ralph/` 的 TypeScript 才是确定性地加载步骤、内联必读、强制 `status.json` 一致性的「引擎」（详见 **01 §2**）。
-- grill / roadmap / blueprint 三个命令**完全是提示词**，其「MANDATORY / BLOCKING」门禁是提示词断言而非代码强制；唯一有代码背书的状态面是 `state.json` 与 `maestro spec/wiki/ralph/delegate` 这些真实 CLI（详见 **02 §1、§8**）。
+- grill / brainstorm / roadmap / blueprint 四个命令**几乎完全是提示词**，其「MANDATORY / BLOCKING」门禁是提示词断言而非代码强制（brainstorm 的 Phase Gate 1/2/2.5/3 同样只是建议性，无代码阻断转移，详见 **05 §3**）；唯一有代码背书的状态面是 `state.json`、brainstorm 产物枚举（`state-schema.ts`）、独立的可视化服务，以及 `maestro spec/wiki/ralph/delegate` 这些真实 CLI（详见 **02 §1/§8**、**05 §3**）。
 - 含义：阅读时务必区分**作者意图**（.md 写了什么）与**引擎保证**（TS 代码强制了什么）。每份文档都贯彻了这一区分。
 
 ### 支柱二：状态即真相 —— `status.json` 与 `state.json`
@@ -84,11 +85,13 @@ Maestro-Flow 是一个**意图驱动的多智能体编排引擎**。它的设计
        └───────────────┬────────────────────────────────┘
             ┌──────────┴───────────┐
             ▼                      ▼
-   ┌─────────────────┐   ┌──────────────────────────────┐
-   │ ralph 自治循环   │   │ 规划链 grill→roadmap→blueprint │  ← 高层工作流 (01 / 02)
-   │ status.json (01)│   │ state.json · context-package  │
-   └─────────────────┘   └──────────────────────────────┘
+   ┌─────────────────┐   ┌─────────────────────────────────────────┐
+   │ ralph 自治循环   │   │ 规划链                                   │  ← 高层工作流 (01 / 02 / 05)
+   │ status.json (01)│   │ grill→brainstorm→roadmap→blueprint→plan  │
+   │                 │   │ state.json · context-package/1.0         │
+   └─────────────────┘   └─────────────────────────────────────────┘
         二者都以 .workflow/ 的状态文件为真相源，都通过 delegate 落到外部 CLI
+        brainstorm(05) 多角色扇出+收敛，产物经 context-package 传给 roadmap/blueprint
 ```
 
 ---
@@ -102,6 +105,8 @@ Maestro-Flow 是一个**意图驱动的多智能体编排引擎**。它的设计
 | `maestro collab`（CLI，`collab.ts` 1343 行）与 `/maestro-collab`（提示词）是**两套实现** | 03 §7 | 行为可能分叉 |
 | odyssey ↔ ralph 是**概念并行**而非代码集成（不同状态文件 `session.json` vs `status.json`） | 01 §10/§12 | 勿误认为同一引擎 |
 | 两套 hook-runner 层、两个转换器实现可能漂移；guide 标注的 hook 事件名与代码不符 | 04 §9 | 文档漂移，以代码为准 |
+| brainstorm 产物前缀代码用 `BST`、guide 用 `BRN-001`；`--review-only` 功能存在但未列入 Flags 表；`--to` 交接方向未实现（仅 `--from`） | 05 | 文档与代码不一致 |
+| brainstorm 是**多角色人格**而非多 CLI：不做 collab 式跨 CLI 扇出，仅 Step 1.7 调一次 Exa 外部检索 | 05 | 常见误解，多 CLI 交叉验证是 `maestro-collab` 的职责 |
 
 ---
 
