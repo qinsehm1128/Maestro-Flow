@@ -27,7 +27,8 @@ Maestro-Flow 是一个**意图驱动的多智能体编排引擎**。它的设计
 | 01 | [`01-ralph.md`](./01-ralph.md) | **maestro-ralph 自治循环** —— 状态驱动地从命令池中挑选下一步直至目标达成 | `src/ralph/`、`.claude/commands/maestro-ralph{,-execute}.md`、`status.json` |
 | 02 | [`02-planning-grill-roadmap-blueprint.md`](./02-planning-grill-roadmap-blueprint.md) | **规划与规格链** —— grill 压测 / roadmap 里程碑 / blueprint 6 阶段文档链 | `.claude/commands/maestro-{grill,roadmap,blueprint}.md`、`workflows/`、`state.json` |
 | 05 | [`05-brainstorm.md`](./05-brainstorm.md) | **maestro-brainstorm 头脑风暴** —— 多角色人格扇出 + 跨角色收敛（Decision Digest），规划链早期发散环节，含可视化子系统 | `.claude/commands/maestro-brainstorm.md`、`.claude/agents/{role-design-author,cross-role-reviewer}.md`、`src/brainstorm-visualize/` |
-| 03 | [`03-external-cli-orchestration.md`](./03-external-cli-orchestration.md) | **外部 CLI 编排** —— delegate / coordinate、适配器层、collab 扇出、tools 注册、Agy 集成 | `src/coordinator/cli-executor.ts`、`src/agents/`、`src/commands/delegate.ts` |
+| 03 | [`03-external-cli-orchestration.md`](./03-external-cli-orchestration.md) | **外部 CLI 编排** —— delegate / coordinate、适配器层、tools 注册、Agy 集成 | `src/coordinator/cli-executor.ts`、`src/agents/`、`src/commands/delegate.ts` |
+| 06 | [`06-collab.md`](./06-collab.md) | **maestro-collab 跨 CLI 交叉验证** —— 同一问题扇出给多个 CLI、综合 共识/冲突/独有；纠正"两套实现"误解（`collab.ts` 实为人类团队协作，**同名碰撞**） | `.claude/commands/maestro-collab.md`、`.codex/skills/maestro-collab/SKILL.md`、`src/commands/delegate.ts`、`src/commands/collab.ts` |
 | 04 | [`04-engineering-files-cli-design-philosophy.md`](./04-engineering-files-cli-design-philosophy.md) | **工程文件 × CLI 联动设计哲学** —— `.claude`/`.codex`/`.agy` 的投影机制、hooks、`--role` 路由 | `src/core/skill-converter.ts`、`scripts/convert-claude-to-agy.mjs`、`.codex/`、settings |
 
 ---
@@ -37,6 +38,7 @@ Maestro-Flow 是一个**意图驱动的多智能体编排引擎**。它的设计
 - **想先建立全局心智模型** → 先读本索引的「四大支柱」，再读 **04**（设计哲学）→ **03**（运行基座）→ **01/02**（高层工作流）。
 - **想理解"它怎么自动干活"** → **01-ralph**（循环引擎）→ **03**（每一步如何落到外部 CLI）。
 - **想理解"它怎么把需求变成规格"** → **05-brainstorm**（多视角发散）→ **02-planning**（grill→roadmap→blueprint 收敛）。
+- **想理解"多个 CLI 怎么交叉验证同一问题"** → **06-collab**（扇出 + 共识/冲突/独有综合）→ **03 §2/§3**（共享的 delegate/适配器层）。
 - **想给项目加一个新 CLI 或新 harness** → **04 §6/§7**（投影与 `--role` 路由）+ **03 §3**（适配器层）。
 
 ---
@@ -63,6 +65,7 @@ Maestro-Flow 是一个**意图驱动的多智能体编排引擎**。它的设计
 - 运行层有两叠编排：`maestro delegate`（驱动单个外部 CLI 到完成）与 `maestro coordinate`（走 `ChainGraph`，每个 command 节点派生一个 delegate）（**03 §1/§2**）。
 - **适配器工厂**（`adapter-factory.ts`）把各 CLI 的原生协议/权限归一化：Claude `--print --output-format=stream-json`、Codex `exec --dangerously-bypass... --json -`、Gemini/Qwen `-o stream-json --approval-mode yolo`、**Agy** 因非 TTY 不输出而需回放 `transcript.jsonl`（**03 §3/§9**）。
 - 命令只声明能力（`--role analyze`）而非具体 CLI，`cli-tools.json` 解析回退链（codex→gemini→claude）（**04 §7**）——**加一个 CLI 不需改命令，加一个 harness 不需改代理体**，与支柱三同构的解耦哲学。
+- **多 CLI 交叉验证 = maestro-collab**（**06**）：把同一问题扇出给前 3 个启用的 CLI（典型 gemini+claude+codex），按「2+ 工具一致→共识(Locked)／分歧→冲突(Deferred，按证据权重投票)／单一→独有(Free)」综合。它是 delegate 层的**纯消费者**（复用 `03 §2/§3` 的 spawn/适配器链），但综合算法**仅为提示词、无代码强制**。注意与 brainstorm 的区别：collab 是**多 CLI**，brainstorm 是**多角色单 CLI**。
 
 ---
 
@@ -102,7 +105,8 @@ Maestro-Flow 是一个**意图驱动的多智能体编排引擎**。它的设计
 |------|------|------|
 | `workflows/roadmap.md:46` 派生 `cli-roadmap-plan-agent`，仓库中**不存在**；实际代理是 `workflow-roadmapper`，且两者 roadmap 格式分叉 | 02 §8 | 悬空引用，roadmap 编排可能与文档不符 |
 | `bin/maestro-context-monitor.js` 导入的 `context-monitor.js` 在 `src/` 与 `dist/` 均缺失 | 03 §12 / 04 §9 | 仅编译产物存在，无法从源码证实 |
-| `maestro collab`（CLI，`collab.ts` 1343 行）与 `/maestro-collab`（提示词）是**两套实现** | 03 §7 | 行为可能分叉 |
+| ~~`maestro collab`（CLI，`collab.ts`）与 `/maestro-collab`（提示词）是两套实现~~ → **已由 06 纠正**：二者是**同名碰撞**，`collab.ts` 实为人类团队协作（`join/whoami/report/sync`），与跨 CLI 验证无关 | 03 §7 → 06 §1/§9 | 误解已澄清 |
+| 跨 CLI 验证的 `maestro-collab` **无任何 TS 代码背书**，共识/冲突分类算法纯靠提示词执行；`.claude` 变体（容忍 1 幸存者/W003/异步）与 `.codex` 变体（要求 2 幸存者/W004/阻塞）行为分叉 | 06 §2/§9 | 综合质量依赖提示词遵从；两 harness 不一致 |
 | odyssey ↔ ralph 是**概念并行**而非代码集成（不同状态文件 `session.json` vs `status.json`） | 01 §10/§12 | 勿误认为同一引擎 |
 | 两套 hook-runner 层、两个转换器实现可能漂移；guide 标注的 hook 事件名与代码不符 | 04 §9 | 文档漂移，以代码为准 |
 | brainstorm 产物前缀代码用 `BST`、guide 用 `BRN-001`；`--review-only` 功能存在但未列入 Flags 表；`--to` 交接方向未实现（仅 `--from`） | 05 | 文档与代码不一致 |
