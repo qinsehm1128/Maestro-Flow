@@ -425,6 +425,33 @@ export const COMPONENT_DEFS: ComponentDef[] = [
   // other .agents/-aware tools.
   // ---------------------------------------------------------------------------
   {
+    id: 'agents-standard-md-chinese',
+    label: 'Chinese Response (Agents Standard)',
+    description: 'Chinese response guidelines → .agents/AGENTS.md',
+    sourcePath: join('workflows', 'chinese-response.md'),
+    target: (mode, projectPath) =>
+      mode === 'global'
+        ? join(homedir(), '.agents', 'AGENTS.md')
+        : join(projectPath, '.agents', 'AGENTS.md'),
+    alwaysGlobal: false,
+    inject: true,
+    section: 'chinese',
+    platform: 'agents-standard',
+  },
+  {
+    id: 'agents-standard-context',
+    label: 'Agent Context (AGENTS.md)',
+    description: 'Open-standard .agents/ project instructions',
+    sourcePath: join('workflows', 'codex-instructions.md'),
+    target: (mode, projectPath) =>
+      mode === 'global'
+        ? join(homedir(), '.agents', 'AGENTS.md')
+        : join(projectPath, '.agents', 'AGENTS.md'),
+    alwaysGlobal: false,
+    inject: true,
+    platform: 'agents-standard',
+  },
+  {
     id: 'agents-standard-skills',
     label: 'Agent Skills — Open Standard',
     description: 'Open-standard .agents/skills/ — portable across all .agents/-aware CLIs and IDEs',
