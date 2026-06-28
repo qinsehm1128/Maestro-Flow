@@ -31,9 +31,24 @@
 | LOW | 用户 `--review L1` 在含码轮被 invariant#7 抬到 L2，但隐式 | 显式说明"L1→含码轮有效 L2" |
 | ✅ 良好 | 裸目录(skill-only+默认 roleMappings+seed state)、零 CLI(Task 回退+诚实 blocker)、缺省 max-rounds(30, 无 off-by-one) | — |
 
-### R1 · 易-推进/干净终止 ……（运行中）
-### R3 · 中-假绿插修复 ……（运行中）
+### R1 · 易-推进/干净终止 — **全 PASS**
+- 2/8 轮（advance→advance→terminate），skill-only 模式，评审者≠实现者全程。
+- ✅ `/goal` 停止条件正确（全 completed + 无 deferred + 无 blocker，不松不紧）；✅ 干净终止（靠 goal 条件非 max_rounds）；✅ brain 零业务码。
+- LOW 建议：ledger 输出机器可校验 `stop_predicate`，无人值守自对账不靠解析 prose → **已采纳（v4）**。
+
+### R3 · 中-假绿插修复 — **全 PASS（4/4 检查）**
+- child 植入 `isinstance` bug + 弱测试并自报"11/11 通过"。
+- ✅ L2-floor 强制独立复验（不信自报绿）；✅ 独立评审揪出假绿(conf 99，定位 `jsoncfg.py:50`)；✅ verdict 路由 insert-fix 重入 S_LOOP_INPUT、`stuck` 计数 0→1；✅ 一轮修复收敛无空转。
+- 命令本身无新缺陷；v3 的 L2-floor + insert-fix + 收敛计数器按设计工作。
+
+### Wave A 修复 → 命令 **v4**（changelog_v4）
+- `AUTONOMOUS := (-y 存在)`（解 `-y`/`--auto` 死锁与歧义）；A_INIT 参数校验层（空 intent/max-rounds/review/executor/未知 flag）；
+  A_REVIEW 可行性降档；ledger `stop_predicate` + A_DECIDE 机器校验终止。
+
+**Wave A 结论**：核心决策/防假绿/终止机制稳（R1/R3 PASS）；鲁棒性短板集中在参数解析，已修。进入 Wave B。
 
 ---
 
-*（Wave B/C/D 与最终裁决待续）*
+## Wave B 结果（命令 v4 → 待修）……（运行中）
+
+*（Wave C/D 与最终裁决待续）*
