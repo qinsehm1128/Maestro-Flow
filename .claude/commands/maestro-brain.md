@@ -12,7 +12,7 @@ allowed-tools:
   - AskUserQuestion
 ---
 
-<!-- v4 — patched after robustness campaign Wave A (R1-R3). Changelogs at bottom. See maestro-research/10-maestro-brain-robustness-campaign.md. -->
+<!-- v5 — patched after robustness campaign Wave B (R4-R6). Changelogs at bottom. See maestro-research/10-maestro-brain-robustness-campaign.md. -->
 
 <purpose>
 maestro-brain 是 maestro 的**外层调度大脑**：站在 roadmap 之上，每轮只做"分析 + 决策 + 派发 + 验收"，
@@ -155,21 +155,27 @@ S_ESCALATE → END              : 用户中止
 
 ## A_DECIDE (S_DECIDE) — ◇核心自决（**按优先级，互斥穷尽 + 收敛护栏**）
 按以下顺序，命中即定：
-1. **终止检查（最先）**：按 `ledger.stop_predicate` **机器校验**（all_milestones_completed && no_open_deferred && no_blocker，
-   以对账后真值，invariant#7；不依赖解析 `/goal` prose，修 R1 advisory）→ 满足则 S_TERMINATE；
-   或 budget_exhausted → S_TERMINATE(PARTIAL)。
+1. **终止检查（最先）**：按 `ledger.stop_predicate` **机器校验**（`all_milestones_completed && no_open_deferred &&
+   no_open_defect_blocker`，以对账后真值，invariant#7；不依赖解析 `/goal` prose）。
+   **blocker 严重度（修 R5 死锁）**：blocker 分 `defect`（未解的代码/功能缺陷，阻断 `completed`）与 `info`
+   （环境降级/评审降档等信息性，**不**阻断终止）。终止只看**未解的 `defect` 级 blocker 与 open deferred**；
+   信息性 blocker（skill-only/`review-tier-capped` 等）不得永久禁止终止。满足 → S_TERMINATE；budget_exhausted → S_TERMINATE(PARTIAL)。
 2. **roadmap 有问题** 且 `revises[issue] < 2`（**防饿死/防 revise-thrash**）→ **修正 roadmap** → S_REVISE_ROADMAP。
-   - `revises[issue] ≥ 2`（同一问题反复改仍未解）→ **降级**：不再改 roadmap，记 blocker，转按"结果问题"处理，
-     让真实结果问题不被 revise 持续抢占（修复 N2 饿死）。
+   - `revises[issue] ≥ 2`（同一问题反复改仍未解）→ **降级(DEMOTE)**：不再改 roadmap，记 `defect` blocker，转按"结果问题"（下条）处理，
+     让真实结果问题不被 revise 持续抢占（修复 N2 饿死）。**DEMOTE 后该单元改用 `stuck[cursor-unit]` 计数（接续不清零、不另起），
+     避免双计数**（修 R4-D2）。
    - 同时存在 roadmap 问题与结果问题：先 roadmap（仅一次），下一轮处理结果问题。
 3. **上轮结果有问题** 且 `stuck[unit] < 3`（**per-unit 提前收敛**）→ **插入修复** → S_SELECT_EXECUTOR。
+   - **快路（修 R6-O1）**：若上轮 L2/L3 裁决为 `UNFIXABLE-EXTERNAL`（外部死依赖，conf≥95）→ **立即 defer**，不必凑满 3 次空转。
    - `stuck[unit] ≥ 3`（同一单元修 3 次仍不过）→ **提前给结论**，不再空转：
-     **auto** → 把该单元标 `deferred` + blocker，**推进过它**（不耗尽全局预算在一个死结上，修复 N1/N6）；
+     **auto** → 把该单元标 `deferred` + `defect` blocker，**推进过它**（不耗尽全局预算在一个死结上，修复 N1/N6）；
      **非 auto** → S_ESCALATE。
 4. **默认 → 推进**：取游标下一单元 → S_SELECT_EXECUTOR。
 
 ## A_REVISE_ROADMAP (S_REVISE_ROADMAP)
 - `maestro-roadmap --revise`（或纯 Skill 模式就地改）；保留已完成阶段、十进制插号。
+- **插号格式（修 R4-D3）**：插入阶段统一用 `phase-{N}.{k}`（如 `phase-2.5`、`phase-2.6`），**数值排序**（不是字典序，
+  避免 `phase-10` 排到 `phase-2.5` 前）；游标按 `(major, minor)` 数值序求 next-incomplete。
 - **非 auto 且撞 E005**（改动废已完成阶段）→ AskUserQuestion 确认；**用户拒** → 回退：改为"加补充阶段"
   的最小增量方案（不动已完成），仍前进（**declined-fallback**，避免死锁）。
 - **auto 且撞 E005** → S_AUTO_FULLCHAIN 的逻辑（全链路分析后自主定增量改法），不停。
@@ -243,7 +249,9 @@ S_ESCALATE → END              : 用户中止
 - **零可用实现 CLI**：A_PREFLIGHT 已降级为 `Task` 子代理（记 blocker）；若也不可行 → S_ESCALATE。
 - **analyze/roadmap 失败**：auto 重试 1 次→带缺失信息继续并记 blocker；非auto 升级。
 - **空 roadmap**：S_ROADMAP 不产单元 → 重做一次→仍空则 S_ESCALATE。
-- **max_rounds 兜底**：任何路径下 `round ≥ max_rounds` 都强制 S_TERMINATE(PARTIAL)，杜绝活锁。
+- **max_rounds 兜底 + 宽限（修 R4-D1）**：`round ≥ max_rounds` 强制 S_TERMINATE(PARTIAL) 杜绝活锁；但若**收敛计数器仍在推进**
+  （上一轮某 `stuck`/`revises` 刚因成功而清零、即仍在产出进展）则给**1 轮宽限**，避免正确的 revise→cap→demote 序列（单硬单元约 4–5 轮）
+  在紧 max_rounds 下被误判 PARTIAL。**默认 max_rounds 估算**：`≳ Σphases + (revises_cap+stuck_cap)·预估硬单元数`（缺省 30 适配中小项目）。
 </error_handling>
 
 <ledger_schema>
@@ -255,8 +263,10 @@ S_ESCALATE → END              : 用户中止
   "mode": "maestro-cli | skill-only", "executor_default": "claude",
   "available_clis": ["claude","codex"], "autonomous": true,
   "stop_condition": "all milestones completed",
-  "stop_predicate": { "all_milestones_completed": true, "no_open_deferred": true, "no_blocker": true },
-  "key_decisions": [], "blockers": [], "deferred": [],
+  "stop_predicate": { "all_milestones_completed": true, "no_open_deferred": true, "no_open_defect_blocker": true },
+  "key_decisions": [],
+  "blockers": [ { "id": "BLK-01", "severity": "defect|info", "open": true, "note": "" } ],
+  "deferred": [],
   "convergence": { "stuck": { "M3/phase-3": 1 }, "revises": { "export-semantics": 0 } },
   "rounds": [
     { "round": 1, "cursor": "M1/phase-1", "decision": "advance|insert-fix|revise-roadmap",
@@ -327,6 +337,17 @@ swarm/roadmap-revise **无对应 role** → 用 `--to <cli>` 显式（手写 `br
 - [R1 LOW] ledger 加机器可校验 `stop_predicate`；A_DECIDE 终止检查改用它（不解析 /goal prose）。
 - R1/R3 确认 v3 核心机制稳：goal 停止控制、干净终止、L2-floor 防假绿、insert-fix 重入、收敛计数器均按设计工作。
 </changelog_v4>
+
+<changelog_v5>
+针对健壮性战役 Wave B（R4 revise冲突-PASS / R5 降级-PASS / R6 不可修复-PASS）修复——核心机制全过，修边角：
+- [R5 MED] **stop_predicate 死锁修复**：blocker 分 `defect`/`info` 严重度；终止只看未解 `defect` blocker + open deferred，
+  信息性 blocker（skill-only/review-tier-capped）不再永久禁止终止。
+- [R4-D2 LOW] DEMOTE 后该单元改用 `stuck[cursor-unit]` 计数（接续不双计）。
+- [R4-D3 LOW] 插号统一 `phase-{N}.{k}` + 数值排序（避免 `phase-10` 字典序错位）。
+- [R4-D1 LOW] max_rounds 加 1 轮宽限（计数器仍推进时）+ 默认估算公式，避免正确 revise→cap→demote 被误判 PARTIAL。
+- [R6-O1 LOW] 结果问题加快路：L2/L3 裁 `UNFIXABLE-EXTERNAL`(conf≥95) → 立即 defer，不必凑满 3 次空转。
+- Wave B 确认核心机制稳：revise/cap/demote、per-unit give-up、降级 preflight、评审者≠实现者、stop_predicate 终止均按设计工作。
+</changelog_v5>
 
 <validation>
 Phase-0 落地前必须实测（来自 doc 08 §8 + round-1/2 评测）：

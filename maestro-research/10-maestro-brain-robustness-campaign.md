@@ -49,6 +49,25 @@
 
 ---
 
-## Wave B 结果（命令 v4 → 待修）……（运行中）
+## Wave B 结果（命令 v4 → 修到 v5）— 三轮全 PASS
 
-*（Wave C/D 与最终裁决待续）*
+| 轮 | 难度 | 目标 | 结果 |
+|---|------|------|------|
+| R4 | 中-硬 | revise-roadmap 冲突 + N2 防饿死 | **4/4 PASS**：冲突正确选 revise（非 fix）、保完成阶段+十进制插号、revises=2 触发 demote（1 字符修复解根因）、reconcile 真码后 `completed` |
+| R5 | 鲁棒 | 零CLI/skill-only 实跑降级 | **4/4 PASS**：preflight 真探测降级、invariant#1 诚实记录、评审者≠实现者保持、L3→L2 降档、stop_predicate 干净终止 |
+| R6 | 硬-对抗 | 不可修复阶段 per-unit 止损 | **4/4 PASS**：stuck 1→2→3 触发 give-up（标 deferred 推进过它）、仅花 3 轮/5 轮收尾、干净 PARTIAL，无 thrash |
+
+**发现的命令缺陷（全 LOW/MED，无 FATAL）→ 已修 v5**：
+- [R5 MED] `stop_predicate.no_blocker` 在信息性环境 blocker 下死锁 → blocker 严重度分类（defect/info），只 defect 阻断终止。
+- [R4-D1] 预算 vs N2 碰撞（正确 revise→cap→demote 约 4–5 轮，紧 max_rounds 误判 PARTIAL）→ 加 1 轮宽限 + 估算公式。
+- [R4-D2] DEMOTE 计数器交接未定 → 改用 `stuck[cursor-unit]` 接续。
+- [R4-D3] 插号格式/排序未定 → `phase-{N}.{k}` + 数值序。
+- [R6-O1] 加快路：确认外部死依赖即立即 defer。
+
+**Wave B 结论**：三种决策模式 + 降级 + 防空转/防饿死/防假绿机制**经中-硬-对抗场景全部验证有效**；缺陷均为边角细化。进入 Wave C（真实代码）。
+
+---
+
+## Wave C 结果（命令 v5 → 待修）……（运行中）
+
+*（Wave D 与最终裁决待续）*
