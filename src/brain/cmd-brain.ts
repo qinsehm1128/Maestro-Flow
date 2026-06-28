@@ -122,6 +122,26 @@ export function runDecide(opts: { sessionId?: string; signal?: string; json?: bo
   return 0;
 }
 
+export interface ReviewPlanOpts {
+  difficulty: 'trivial' | 'normal' | 'hard';
+  selfReported: boolean; codeChanged: boolean; critical: boolean;
+  forcedTier?: 'L1' | 'L2' | 'L3'; implCli: string; clis: string[]; json?: boolean;
+}
+
+/** Enforce the brain-specific review decisions (L2-floor + evaluator!=implementer). */
+export async function runReviewPlan(opts: ReviewPlanOpts): Promise<number> {
+  const { selectTier, selectReviewIsolation } = await import('./brain-review.js');
+  const tier = selectTier({
+    difficulty: opts.difficulty, selfReportedSuccess: opts.selfReported,
+    codeChanged: opts.codeChanged, critical: opts.critical, forcedTier: opts.forcedTier,
+  });
+  const iso = selectReviewIsolation(opts.implCli, opts.clis.length ? opts.clis : [opts.implCli]);
+  const out = { tier, reviewCli: iso.reviewCli, isolation: iso.isolation };
+  if (opts.json) console.log(JSON.stringify(out, null, 2));
+  else console.log(`[review-plan] tier=${out.tier} reviewer=${out.reviewCli} (${out.isolation}, != implementer)`);
+  return 0;
+}
+
 export interface AwaitCliOpts { statusPath: string; kind: 'ralph' | 'odyssey'; timeoutMin?: number; json?: boolean; }
 
 export async function runAwait(opts: AwaitCliOpts): Promise<number> {

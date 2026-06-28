@@ -68,6 +68,20 @@
   从 Claude Workflow 学到的 sandwich 模式仍体现在 A_REVIEW 散文，只是不再有 dead TS 模块。
 - **未追求把命令压到 ~270 行极限**：再压需重写本质 action 散文，风险高、收益小——本身即过度优化。停在 342 行（与 ralph-execute 300 同量级）。
 
+## 5.5 用户质疑后的自我纠正（"brain ≠ ralph，削减真的对吗？"）
+
+用户质疑"减少的引擎/代码真的正确吗？brain 和 ralph 有区别"——**质疑成立**。复查发现两处**过度削减**（错把 brain 往 ralph 极简硬靠），已纠正：
+
+| 过度削减 | 为何错 | 纠正 |
+|---------|--------|------|
+| **删 brain-review 全部** | ralph **零跨会话评审**——tier 下限/隔离/裁决是 **brain 独有**、确定性、曾酿 R7 假绿真实 bug，没有"向 ralph 看齐"的对象 | **恢复精简版**（`selectTier`+`selectReviewIsolation`+`aggregateVerdict`，去多 CLI 死分支与 ReviewStage planner），**接线** `maestro brain review-plan`，A_REVIEW 先调它拿强制 tier/隔离。评审 stage 编排仍提示词所有。 |
+| router-signals 并入 `brain-derive` | 致 coordinator(`graph-walker`) import 自 `brain/`——**层级倒置** | **移到 `src/utils/state-schema.ts`**（与 `deriveCurrentPhase` 等同处），coordinator 与 brain 各自从 state-schema import，**不互相耦合** |
+
+经核对**正确保留**的削减：poll 字段（真未用）、`decide --commit`（修 runRecord 真实 bug）。
+
+**纠正后**：引擎 8 模块（brain-review 回归，确定性核心）+ 派生器归位 state-schema；brain 单测 **60 全过**、coordinator 176、utils 16；`npm run build` 仍 exit 0。
+教训：统一应针对**约定**（命名/原子 store/两层/无 changelog），**不是**把 brain 压成和 ralph 一样小——brain 在它独有处（跨会话 await、跨会话防假绿评审、mandatory/optional）**理应比 ralph 大**。
+
 ## 结论
 
 brain 现与 maestro **两层架构、模块粒度、命令简洁度、评审=作者化 agent** 统一；去掉了 ~250 行死/重复/投机内容；

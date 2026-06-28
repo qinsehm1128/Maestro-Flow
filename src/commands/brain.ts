@@ -55,6 +55,28 @@ export function registerBrainCommand(program: Command): void {
     });
 
   brain
+    .command('review-plan')
+    .description('Enforce review tier (invariant#7 L2-floor) + reviewer!=implementer (invariant#4)')
+    .option('--difficulty <d>', 'trivial | normal | hard', 'normal')
+    .option('--self-reported', 'child self-reported success')
+    .option('--code-changed', 'the round changed code')
+    .option('--critical', 'critical path / low confidence / auto hard-signal')
+    .option('--tier <t>', 'force L1|L2|L3 (still honors the L2 floor)')
+    .option('--impl-cli <c>', 'the implementer CLI', 'claude')
+    .option('--clis <list>', 'comma-separated available CLIs', 'claude')
+    .option('--json', 'Machine-readable output')
+    .action(async (opts: { difficulty?: string; selfReported?: boolean; codeChanged?: boolean; critical?: boolean; tier?: string; implCli?: string; clis?: string; json?: boolean }) => {
+      const { runReviewPlan } = await import('../brain/cmd-brain.js');
+      process.exit(await runReviewPlan({
+        difficulty: (opts.difficulty as 'trivial' | 'normal' | 'hard') ?? 'normal',
+        selfReported: !!opts.selfReported, codeChanged: !!opts.codeChanged, critical: !!opts.critical,
+        forcedTier: opts.tier as ('L1' | 'L2' | 'L3' | undefined),
+        implCli: opts.implCli ?? 'claude', clis: (opts.clis ?? 'claude').split(',').map(s => s.trim()).filter(Boolean),
+        json: !!opts.json,
+      }));
+    });
+
+  brain
     .command('await <statusPath>')
     .description('SUSPEND until a child ralph/odyssey session reaches a terminal state (event-driven)')
     .requiredOption('--kind <kind>', 'ralph | odyssey')

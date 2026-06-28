@@ -14,7 +14,7 @@ import type {
 import type { GraphLoader } from './graph-loader.js';
 import type { ParallelCommandExecutor, BranchResult } from './parallel-executor.js';
 import type { WorkflowHookRegistry } from '../hooks/workflow-hooks.js';
-import { deriveRouterSignals } from '../brain/brain-derive.js';
+import { deriveRouterSignals } from '../utils/state-schema.js';
 
 export interface StartOptions {
   tool: string;
