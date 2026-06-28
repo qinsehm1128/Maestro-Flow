@@ -15,6 +15,7 @@
 
 import { existsSync, readFileSync, watch } from 'node:fs';
 import { dirname } from 'node:path';
+import { DEFAULT_AWAIT_FLOOR_SEC } from './brain-schema.js';
 
 export type ChildKind = 'ralph' | 'odyssey';
 
@@ -64,7 +65,7 @@ export interface AwaitOpts {
   statusPath: string;
   kind: ChildKind;
   timeoutMs: number;          // hard deadline (await_timeout)
-  floorMs?: number;           // safety re-check floor in case fs.watch misses (default 2000)
+  floorSec?: number;          // safety re-check floor (seconds) for missed fs.watch events; default DEFAULT_AWAIT_FLOOR_SEC (2)
   now?: () => number;         // injectable clock for tests
 }
 
@@ -90,7 +91,7 @@ function readChild(statusPath: string): unknown {
  */
 export function awaitChildTerminal(opts: AwaitOpts): Promise<AwaitResult> {
   const clock = opts.now ?? (() => Date.now());
-  const floorMs = opts.floorMs ?? 2000;
+  const floorMs = (opts.floorSec ?? DEFAULT_AWAIT_FLOOR_SEC) * 1000; // human seconds -> engine ms (maestro convention)
   const start = clock();
 
   return new Promise<AwaitResult>((resolve) => {

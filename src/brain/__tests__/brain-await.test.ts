@@ -42,14 +42,14 @@ describe('awaitChildTerminal — event-driven suspend', () => {
 
   it('resolves immediately if already terminal', async () => {
     writeFileSync(statusPath, JSON.stringify({ status: 'completed', task_decomposition_all_done: true }));
-    const r = await awaitChildTerminal({ statusPath, kind: 'ralph', timeoutMs: 1000, floorMs: 20 });
+    const r = await awaitChildTerminal({ statusPath, kind: 'ralph', timeoutMs: 1000, floorSec: 0.02 });
     expect(r.outcome).toBe('completed');
     expect(r.terminal).toBe(true);
   });
 
   it('suspends, then resolves when the child flips to terminal (no busy-poll)', async () => {
     writeFileSync(statusPath, JSON.stringify({ status: 'running' }));
-    const p = awaitChildTerminal({ statusPath, kind: 'ralph', timeoutMs: 2000, floorMs: 25 });
+    const p = awaitChildTerminal({ statusPath, kind: 'ralph', timeoutMs: 2000, floorSec: 0.025 });
     setTimeout(() => writeFileSync(statusPath, JSON.stringify({ status: 'completed', task_decomposition_all_done: true })), 60);
     const r = await p;
     expect(r.outcome).toBe('completed');
@@ -58,7 +58,7 @@ describe('awaitChildTerminal — event-driven suspend', () => {
 
   it('paused child -> hard signal outcome', async () => {
     writeFileSync(statusPath, JSON.stringify({ status: 'running' }));
-    const p = awaitChildTerminal({ statusPath, kind: 'ralph', timeoutMs: 2000, floorMs: 25 });
+    const p = awaitChildTerminal({ statusPath, kind: 'ralph', timeoutMs: 2000, floorSec: 0.025 });
     setTimeout(() => writeFileSync(statusPath, JSON.stringify({ status: 'paused' })), 50);
     const r = await p;
     expect(r.outcome).toBe('paused');
@@ -67,14 +67,14 @@ describe('awaitChildTerminal — event-driven suspend', () => {
 
   it('times out (bounded, not infinite) when never terminal -> hard signal', async () => {
     writeFileSync(statusPath, JSON.stringify({ status: 'running' }));
-    const r = await awaitChildTerminal({ statusPath, kind: 'ralph', timeoutMs: 120, floorMs: 30 });
+    const r = await awaitChildTerminal({ statusPath, kind: 'ralph', timeoutMs: 120, floorSec: 0.03 });
     expect(r.outcome).toBe('timeout');
     expect(r.hardSignal).toBe(true);
     expect(r.terminal).toBe(false);
   });
 
   it('missing status file at deadline -> missing outcome', async () => {
-    const r = await awaitChildTerminal({ statusPath, kind: 'ralph', timeoutMs: 80, floorMs: 30 });
+    const r = await awaitChildTerminal({ statusPath, kind: 'ralph', timeoutMs: 80, floorSec: 0.03 });
     expect(r.outcome).toBe('missing');
     expect(r.hardSignal).toBe(true);
   });

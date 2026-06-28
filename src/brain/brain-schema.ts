@@ -98,7 +98,10 @@ export const REVISES_CAP = 2;       // same roadmap issue revised >= this -> dem
 export const STUCK_CAP = 3;         // same unit insert-fixed >= this -> give up (N1 bounded-thrash)
 export const CRASH_RETRIES_CAP = 2; // crash/timeout retries per unit before defer (R10-D2)
 export const DEFAULT_MAX_ROUNDS = 30;
-export const DEFAULT_AWAIT_TIMEOUT_MIN = 10;
+// Durations follow maestro's convention: human units at the config layer
+// (`_MIN`/`_SEC`, small integers), engine converts to ms internally.
+export const DEFAULT_AWAIT_TIMEOUT_MIN = 10;   // hard deadline (minutes)
+export const DEFAULT_AWAIT_FLOOR_SEC = 2;      // event-driven safety floor (seconds); matches terminal-adapter's 2s
 
 export function newConvergence(): Convergence {
   return { stuck: {}, revises: {}, crash_retries: {} };
