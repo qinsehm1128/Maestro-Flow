@@ -12,7 +12,7 @@ allowed-tools:
   - AskUserQuestion
 ---
 
-<!-- v7 — patched after robustness campaign Wave D (R10-R12, adversarial). Changelogs at bottom. See maestro-research/10-maestro-brain-robustness-campaign.md. -->
+<!-- v8 — A_AWAIT terminal fields validated against real source (V4/V5 resolved). Changelogs at bottom. See maestro-research/10-maestro-brain-robustness-campaign.md. -->
 
 <purpose>
 maestro-brain 是 maestro 的**外层调度大脑**：站在 roadmap 之上，每轮只做"分析 + 决策 + 派发 + 验收"，
@@ -220,19 +220,25 @@ S_ESCALATE → END              : 用户中止
   done_when 须要求子任务**自包含**（沙盒内独立工程或隔离安装）；A_VERDICT 前 brain 检查宿主清单/lock 未被改动，被改则**还原**。
 
 ## A_AWAIT (S_AWAIT) — **等子会话到终态，而非一次 CLI 退出**
-- 子会话 = 一整条 ralph/odyssey 运行，不是单次 delegate 调用。
-- **判定完成**：轮询/读子会话 `status.json`（ralph：`status ∈ {completed, paused}` 且 `task_decomposition_all_done`）
-  或 `session.json`（odyssey：`phase_goals_all_done` 或 `status ∈ {ESCALATED,PARTIAL,INCONCLUSIVE}`）。
-  **未到终态不得进 S_REVIEW**（否则在半成品上验收=结构性假绿，round-1 CRIT）。
-- **字段防御（修复 N5）**：上述 ralph/odyssey 终态字段名是设计期假设，**Phase-0 必须实测确认**（见 §validation）。
-  **缺字段时按"未到终态"处理**，**绝不**把"读不到完成标志"误判成"已完成"——宁可超时也不假绿。
-- **崩溃即终态失败（修 R10-D3）**：子 `status ∈ {crashed, error, killed}` 或返回异常/无可用输出 → **立即**判为硬信号失败，
-  不必等满超时；直接走 S_VERDICT 硬信号分支。
-- **超时参数化（修 R10-D1）**：轮询用具体值——`poll_interval_s`（缺省 20s）× `max_polls`（缺省 30）≈ `await_timeout_min`（缺省 10 分钟），
-  可 `--await-timeout` 覆盖，写入 ledger。到 deadline 仍非终态 → 超时硬信号（**绝不无界轮询**）。
-- 崩溃/超时 → 硬信号走 S_VERDICT（auto→全链路重试/换执行器；非auto→升级）。
-  **崩溃后半成品防 clobber（修 R10-D4）**：重试前 **re-READ 现有文件**，把任何半成品当**未受信**（重验或还原）再起新尝试。
-- 取回：完成态、completion_summary、caveats、deferred、子目标达成、是否 paused/ESCALATED。
+- 子会话 = 一整条 ralph/odyssey 运行，不是单次 delegate 调用。**无引擎级 await-sibling 原语**（`src/ralph/` 已核实无）
+  → brain **轮询子会话状态文件**判定终态（V4 已解：机制=文件轮询，非阻塞 API）。
+- **判定终态（V5 已对真实源码核实，v8 用真名）：**
+  - **ralph** `.workflow/.maestro/ralph-{ts}/status.json` 的 session 级 `status`（`src/ralph/status-schema.ts:13,100`
+    `SessionStatus = 'running' | 'paused' | 'completed' | 'failed'`）：
+    `running`=**非终态**继续轮询；`completed` 且 `task_decomposition_all_done==true`(:132)=**成功终态**；
+    `paused`=**硬信号**（漂移/补救耗尽）；`failed`=**硬信号失败**。step 级 `completion_status ∈ {DONE,DONE_WITH_CONCERNS,NEEDS_RETRY,BLOCKED}`(:12)。
+  - **odyssey** `session.json`（`workflows/odyssey-base.md:33,35,196`）**无 status enum**：终态 = `current_state=="COMPLETED"`
+    或 `phase_goals_all_done==true`；未完/受阻经 completion summary 的 `deferred[]` 体现（`-y` 下 odyssey 不硬停，
+    摘要里的 INCONCLUSIVE/PARTIAL 文本标签 + `deferred>0` 即 brain 端硬信号）。
+- **未到终态不得进 S_REVIEW**（否则在半成品上验收=结构性假绿，round-1 CRIT）。
+- **字段防御**：缺字段/读不到 → 按"未到终态"处理，**绝不**把"读不到完成标志"误判成"已完成"——宁可超时不假绿。
+- **失败即终态硬信号（修 R10-D3，v8 用真名）**：ralph `status=="failed"`，或子进程异常退出/无可用输出 → **立即**判硬信号失败，
+  不等满超时，直接走 S_VERDICT 硬信号分支。
+- **超时参数化（修 R10-D1）**：`poll_interval_s`(缺省20s) × `max_polls`(缺省30) ≈ `await_timeout_min`(缺省10分)，
+  `--await-timeout` 可覆盖、写入 ledger。到 deadline 仍非终态 → 超时硬信号（**绝不无界轮询**）。
+- 失败/超时 → 硬信号走 S_VERDICT（auto→全链路重试/换执行器；非auto→升级）。
+  **失败后半成品防 clobber（修 R10-D4）**：重试前 **re-READ 现有文件**，半成品当**未受信**（重验或还原）再起新尝试。
+- 取回：终态、completion_summary、caveats、deferred、子目标达成、是否 paused/failed。
 
 ## A_REVIEW (S_REVIEW) — 自适应防假绿（评审者≠实现者）
 档位（`--review` 可强制；**invariant#7：子会话自报成功且改了代码 → 下限 L2**）：
@@ -252,7 +258,7 @@ S_ESCALATE → END              : 用户中止
 ## A_VERDICT (S_VERDICT) — ◇
 - 子会话 completed 且无 gap、非假绿 → S_LEDGER。
 - gap/假绿/`confidence<60`/评审解析失败(fail-closed) → 决策插入修复 → **S_LOOP_INPUT**（重装配）。
-- **撞硬信号**（ralph 子 `paused` | odyssey 子 `ESCALATED/PARTIAL/INCONCLUSIVE`/`deferred>0` | revise 撞 E005）：
+- **撞硬信号**（ralph 子 `status=="paused"` 或 `"failed"` | odyssey 子 `current_state≠"COMPLETED"` 且摘要 INCONCLUSIVE/PARTIAL 或 `deferred>0` | revise 撞 E005 | await 超时）：
   非 auto → S_ESCALATE；**--auto -y → S_AUTO_FULLCHAIN**。
 
 ## A_AUTO_FULLCHAIN (S_AUTO_FULLCHAIN) — D3 自治铁律
@@ -416,11 +422,24 @@ swarm/roadmap-revise **无对应 role** → 用 `--to <cli>` 显式（手写 `br
 - Wave D 确认：崩溃/超时恢复、矛盾需求 auto 自主决策不停(D3)、微妙停止条件 goal 正确性均按设计工作（R12 HIGH 已根治）。
 </changelog_v7>
 
+<changelog_v8>
+对真实源码核实 A_AWAIT 命门字段（V4/V5 已解），把假设换成真名：
+- [V5] ralph 终态用真名 `SessionStatus = running|paused|completed|failed`（`status-schema.ts:13`）+ `task_decomposition_all_done`(:132)；
+  **修正 v7 错误假设**：失败真名是 `failed`，不是 `crashed/error/killed`；`running`=非终态。
+- [V5] odyssey **无 status enum**：终态 = `current_state=="COMPLETED"` 或 `phase_goals_all_done==true`（`odyssey-base.md:33,35,196`）；
+  ESCALATED/PARTIAL/INCONCLUSIVE 只是摘要文本标签，不是 session 字段——A_AWAIT 据此改判。
+- [V4] 确认无引擎 await-sibling → 机制=brain 轮询子状态文件（或同步 delegate）。
+- S_VERDICT 硬信号枚举、validation 块同步更新为已核实事实。
+</changelog_v8>
+
 <validation>
-Phase-0 落地前必须实测（来自 doc 08 §8 + round-1/2 评测）：
-- V1: 单 blob 内 `/maestro-ralph` 在 Claude headless 是否展开（v3 已不依赖两 slash，但单 slash 展开仍需确认）。
-- V2: `/goal` 由 host 武装 loop 的实际语义（持久化终止条件如何驱动自调用）。
-- V4: "等子会话到终态"的轮询/阻塞原语（`src/ralph/` 无 await-sibling，需自建轮询或同步 delegate）。
-- V5: ralph `status.json` / odyssey `session.json` 的**终态字段真名**（A_AWAIT 的命门，缺则按未完成处理）。
-- V7(新): 收敛阈值（revises≥2 / stuck≥3 / max_rounds=30）需按真实项目校准。
+进度（v8 已据真实源码核实 V4/V5）：
+- **V5 ✅ 已解（v8）**：ralph session `status ∈ {running,paused,completed,failed}` + `task_decomposition_all_done`
+  （`src/ralph/status-schema.ts:13,100,132`）；step `completion_status ∈ {DONE,DONE_WITH_CONCERNS,NEEDS_RETRY,BLOCKED}`(:12)。
+  odyssey **无 status enum**，终态 = `current_state=="COMPLETED"` 或 `phase_goals_all_done==true`（`workflows/odyssey-base.md:33,35,196`），
+  受阻经 completion summary `deferred[]`。A_AWAIT 已用这些真名（不再用假设的 crashed/ESCALATED 字段）。
+- **V4 ✅ 已解（v8）**：`src/ralph/` 无引擎 await-sibling 原语 → 机制确定为 **brain 轮询子 `status.json`/`session.json` 文件**（或同步 delegate 读 stdout）。
+- V1（待 Claude headless 实测）：单 slash `/maestro-ralph` 在 headless 是否展开。
+- V2（待 host 实测）：`/goal` 持久化终止条件如何驱动自调用链。
+- V7（待真实项目校准）：阈值 revises≥2 / stuck≥3 / crash_retries≤2 / max_rounds=30 / await_timeout=10min。
 </validation>
