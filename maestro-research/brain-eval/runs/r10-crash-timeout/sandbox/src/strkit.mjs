@@ -33,4 +33,19 @@ export function padCenter(text, width, fill = " ") {
   return fill.repeat(left) + str + fill.repeat(right);
 }
 
-// --- phase-2 target: boxify(lines, opts) that CONSUMES padCenter — NOT YET IMPLEMENTED ---
+/**
+ * boxify(lines, opts): wrap an array of strings in an ASCII box.
+ * opts.padding (default 1): horizontal padding (spaces) inside the box on each side.
+ * innerWidth = max line length + 2*padding. Each line is centered via padCenter
+ * (phase-1) to innerWidth, then framed with '|' on each side. Top/bottom borders
+ * are '+' + '-'.repeat(innerWidth) + '+'. Returns rows joined by '\n'.
+ */
+export function boxify(lines, opts = {}) {
+  const padding = opts.padding ?? 1;
+  const arr = lines.map((l) => String(l));
+  const maxLen = arr.reduce((m, l) => Math.max(m, l.length), 0);
+  const innerWidth = maxLen + 2 * padding;
+  const border = "+" + "-".repeat(innerWidth) + "+";
+  const rows = arr.map((line) => "|" + padCenter(line, innerWidth) + "|");
+  return [border, ...rows, border].join("\n");
+}

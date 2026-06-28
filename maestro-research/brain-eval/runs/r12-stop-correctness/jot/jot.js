@@ -22,6 +22,29 @@ function add(text) {
   process.stdout.write('added: ' + text + '\n');
 }
 
+function list() {
+  const file = dataFile();
+  let raw;
+  try {
+    raw = fs.readFileSync(file, 'utf8');
+  } catch (e) {
+    if (e && e.code === 'ENOENT') {
+      return;
+    }
+    throw e;
+  }
+  const lines = raw.split('\n').filter((l) => l.length > 0);
+  for (let i = lines.length - 1; i >= 0; i--) {
+    let obj;
+    try {
+      obj = JSON.parse(lines[i]);
+    } catch (e) {
+      continue;
+    }
+    process.stdout.write('[' + obj.ts + '] ' + obj.text + '\n');
+  }
+}
+
 function main() {
   const argv = process.argv.slice(2);
   const cmd = argv[0];
@@ -29,7 +52,11 @@ function main() {
     add(argv[1]);
     return;
   }
-  process.stderr.write('usage: jot add "<text>"\n');
+  if (cmd === 'list') {
+    list();
+    return;
+  }
+  process.stderr.write('usage: jot add "<text>" | jot list\n');
   process.exit(1);
 }
 

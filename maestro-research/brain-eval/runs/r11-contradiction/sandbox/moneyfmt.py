@@ -98,3 +98,39 @@ def parse_amount(s: str) -> int:
         cents = 0
 
     return sign * (dollars * 100 + cents)
+
+
+def format_amount(cents: int) -> str:
+    """Format an internal integer-CENTS amount back to a ``$D.CC`` string.
+
+    Per README Feature 2. Pure integer math (no float): the dollar and cent
+    parts are recovered with ``divmod`` so the cents are never lost.
+
+    Mandatory boundaries:
+      format_amount(199) == "$1.99"
+      format_amount(500) == "$5.00"
+    Round-trip:
+      format_amount(parse_amount("$1.99")) == "$1.99"
+    """
+    if not isinstance(cents, int):
+        raise TypeError(
+            f"format_amount expects int cents, got {type(cents).__name__}"
+        )
+
+    sign = "-" if cents < 0 else ""
+    dollars, rem = divmod(abs(cents), 100)
+    return f"{sign}${dollars}.{rem:02d}"
+
+
+def add_amounts(a: int, b: int) -> int:
+    """Add two internal integer-CENTS amounts via pure integer addition.
+
+    Per README Feature 3. No float math anywhere — preserves invariant (a)'s
+    "integer, no float" intent.
+
+    Mandatory boundary:
+      add_amounts(199, 1) == 200   (and format_amount(200) == "$2.00")
+    """
+    if not isinstance(a, int) or not isinstance(b, int):
+        raise TypeError("add_amounts expects two int cents operands")
+    return a + b
