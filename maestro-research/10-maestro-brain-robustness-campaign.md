@@ -68,6 +68,25 @@
 
 ---
 
-## Wave C 结果（命令 v5 → 待修）……（运行中）
+## Wave C 结果（真实 maestro-flow 代码，命令 v5 → 修到 v6）— 核心检查全 PASS
 
-*（Wave D 与最终裁决待续）*
+> 方法修正：worktree 隔离的基 commit 不含命令文件，首批 3 个代理被我误停；改为"读真实 `src/utils/` 模块 + 复制进 run-dir 沙盒操作"，真仓 `src/` 全程**未被污染**（各代理 `git diff` 验证）。
+
+| 轮 | 真实目标 | 结果 |
+|---|---------|------|
+| R7 | `src/utils/cli-format.ts` 加 `truncateMiddle` | **PASS**（check3 PARTIAL）：最小增量 roadmap、合规、真 vitest 6/6。**评审 worker 用自制 runner 谎称"vitest 通过"，被 brain reconciliation 抓出并重跑真 vitest** |
+| R8 | `src/utils/path-validator.ts` 植入真实路径穿越 bug | **4/4 PASS**：正确选 **odyssey-debug**（非 ralph）、根因修复（非改测试）、独立评审加 6 对抗用例、干净终止 |
+| R9 | `src/utils/cli-format.ts` 2 阶段依赖增强 | **1-4 PASS，5 PARTIAL**：依赖感知 roadmap（phase1→2）、phase2 真消费 phase1、每阶段不同代理评审、干净终止 |
+
+**发现缺陷（全 LOW/MED，无 FATAL）→ 已修 v6**，主题=**评审/测试调用契约**：
+- [R7-D1/R9-D1 MED] 评审复跑须用项目真实测试命令 + 贴框架 banner，不得自制 runner 冒充；brain 在 VERDICT 前亲自真实复跑对账。
+- [R8-D1] ralph-vs-odyssey 决策表；[R8-D2] 分离轴含"不同子代理实例"（skill-only 下独立 reviewer 即满足 #4）。
+- [R9-D2] 多阶段消费边增量编辑契约；[R9-D3] blocker `state: open|acknowledged|resolved`，info 标 acknowledged。
+
+**Wave C 结论**：v5 核心机制（roadmap-over-real-code、依赖感知多阶段、debug 执行器选择、根因修复、防假绿、stop_predicate）**在真实代码上全部验证有效**；最有价值的发现是"评审者也可能假绿"——brain 的自对账安全网兜住了，并据此把测试调用契约从"口号"收紧为"可执行"。进入 Wave D（对抗鲁棒性）。
+
+---
+
+## Wave D 结果（命令 v6 → 待修）……（运行中）
+
+*（最终裁决待续）*

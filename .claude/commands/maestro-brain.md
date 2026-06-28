@@ -12,7 +12,7 @@ allowed-tools:
   - AskUserQuestion
 ---
 
-<!-- v5 — patched after robustness campaign Wave B (R4-R6). Changelogs at bottom. See maestro-research/10-maestro-brain-robustness-campaign.md. -->
+<!-- v6 — patched after robustness campaign Wave C (R7-R9, real code). Changelogs at bottom. See maestro-research/10-maestro-brain-robustness-campaign.md. -->
 
 <purpose>
 maestro-brain 是 maestro 的**外层调度大脑**：站在 roadmap 之上，每轮只做"分析 + 决策 + 派发 + 验收"，
@@ -159,7 +159,9 @@ S_ESCALATE → END              : 用户中止
    no_open_defect_blocker`，以对账后真值，invariant#7；不依赖解析 `/goal` prose）。
    **blocker 严重度（修 R5 死锁）**：blocker 分 `defect`（未解的代码/功能缺陷，阻断 `completed`）与 `info`
    （环境降级/评审降档等信息性，**不**阻断终止）。终止只看**未解的 `defect` 级 blocker 与 open deferred**；
-   信息性 blocker（skill-only/`review-tier-capped` 等）不得永久禁止终止。满足 → S_TERMINATE；budget_exhausted → S_TERMINATE(PARTIAL)。
+   信息性 blocker（skill-only/`review-tier-capped` 等）应标 `state:"acknowledged"`（非 `open`），终止时不计入；
+   这样审计看到的是"completed + 若干 acknowledged info"，而非"completed 却有 open blocker"（修 R9-D3）。
+   满足 → S_TERMINATE；budget_exhausted → S_TERMINATE(PARTIAL)。
 2. **roadmap 有问题** 且 `revises[issue] < 2`（**防饿死/防 revise-thrash**）→ **修正 roadmap** → S_REVISE_ROADMAP。
    - `revises[issue] ≥ 2`（同一问题反复改仍未解）→ **降级(DEMOTE)**：不再改 roadmap，记 `defect` blocker，转按"结果问题"（下条）处理，
      让真实结果问题不被 revise 持续抢占（修复 N2 饿死）。**DEMOTE 后该单元改用 `stuck[cursor-unit]` 计数（接续不清零、不另起），
@@ -182,10 +184,18 @@ S_ESCALATE → END              : 用户中止
 - 重算游标 → S_LOOP_INPUT。
 
 ## A_SELECT_EXECUTOR (S_SELECT_EXECUTOR) — ◇
-- **选子命令**：ralph（多命令里程碑/最优序列不明/跨阶段）｜odyssey-*（单目标单元：debug/planex/review-test-fix/ui/improve 按域）。
+- **选子命令（决策表，修 R8-D1）** —— 按 task-shape 而非仅"域"，cardinality 优先：
+  | task-shape | 选 |
+  |---|---|
+  | 单个失败测试 / 回归 / 已知症状未知根因 | **odyssey-debug** |
+  | 单需求、有验收标准、要 plan→execute→verify | **odyssey-planex** |
+  | 单元的审查/测试/修复闭环 / UI / 改进 | odyssey-review-test-fix / -ui / -improve（按域） |
+  | ≥2 命令 / 最优序列不明 / 跨阶段里程碑 | **ralph** |
 - **选实现 CLI**：`--executor` > `roles.implement` 链中**首个可用** > 默认 claude。记为 `impl_cli`。
 - **选评审 CLI（invariant#4 具体算法）**：`review_cli` = `roles.review` 链中**首个可用且 ≠ impl_cli**；
-  若可用 CLI 仅 1 个 → 评审改用**不同 model**（`--model`）或升级到 `maestro-collab` 多 CLI；仍无法区分 → 记 blocker 并标"自评风险"。
+  若可用 CLI 仅 1 个 → 评审改用**不同 model**（`--model`）或升级到 `maestro-collab` 多 CLI。
+  - **分离轴（修 R8-D2）**：评审者≠实现者的有效分离轴 = {不同 CLI｜不同 model｜**不同子代理实例/角色（fresh context、无实现者推理）**}。
+    skill-only/零CLI 模式下，**一个独立的 reviewer 子代理实例即满足 #4**，不必记"自评风险" blocker；仅当评审与实现是**同一实例**时才记。
 
 ## A_DELIVER (S_DELIVER) — 投递（区分能否解释 slash）
 **目标 done_when 直接并入 intent 串**（不发独立 `/goal`——它不是命令、单 blob 内两条 slash 不保证都触发）。
@@ -199,6 +209,9 @@ S_ESCALATE → END              : 用户中止
   > 派发、推进），**所有原子写码仍 100% 外派给 impl_cli**——A 窗口绝不自己 Edit 业务代码。托管编排 ≠ 写代码，
   > invariant#1 不破。若想连编排也隔离出去，则只能用 Claude impl_cli（上一条）。
 - 纯 Skill 模式（无 maestro CLI）：直接 `Skill("maestro-ralph")` 托管编排 / `Task` 子代理写码（同样不自写业务码）。
+  编排 Skill 本身不可用时，**裸 `Task` 子代理实现可接受**（记 info blocker）（修 R7-D2）。
+- **增量编辑契约（修 R9-D2）**：多阶段消费边（phase-N 依赖 phase-(N-1) 产物）时，done_when **必须含**：
+  "先 READ 现有文件 + 上一阶段交付符号；**消费**之而非重声明/重复实现；**仅追加/最小改**，不 clobber 既有导出"。
 
 ## A_AWAIT (S_AWAIT) — **等子会话到终态，而非一次 CLI 退出**
 - 子会话 = 一整条 ralph/odyssey 运行，不是单次 delegate 调用。
@@ -215,6 +228,10 @@ S_ESCALATE → END              : 用户中止
 - **L1 轻量**：仅"无代码改动/纯文档"轮。Goal-Backward verify + 结果分析。
 - **L2 标准（含代码的默认下限）**：`quality-review`（用 `review_cli`）+ `insight-challenge` 对每条"绿"对抗反驳
   （把"测试通过/已完成"当**待证声明**，独立复跑、边界用例、git diff 对照声明，不看子会话自带测试）。
+  - **测试调用契约（修 R7-D1/R9-D1，让 invariant#7 可执行而非口号）**：评审复跑**必须用项目真实测试命令**（vitest/bun/pytest…），
+    并**粘贴框架自带的 pass/fail banner**（如 `Tests 6 passed (6)`），**不得**用自制 runner 冒充框架结果。
+    若真实 runner 不可用（无 `node_modules`/out-of-tree 副本）→ 评审**显式声明**改用自包含 runner（如 `node --experimental-strip-types`）
+    并标注"非项目框架"；**A_VERDICT 前 brain 亲自再用真实命令复跑一次对账**（R7 正是靠这步抓出评审用替代 runner 谎报绿）。
 - **L3 全链路**：critical/低置信度/auto 撞硬信号 → + `maestro-collab` 多 CLI 共识 + 重读漂移/未达成证据。
 - 全程用 `review_cli`（A_SELECT_EXECUTOR 已保证 ≠ impl_cli）。
 - **可行性降档（v4，修 R2 #5）**：`--review L3`（或 L2）所需的多 CLI/独立 CLI 在 **skill-only/零CLI** 模式下不可行时
@@ -265,7 +282,7 @@ S_ESCALATE → END              : 用户中止
   "stop_condition": "all milestones completed",
   "stop_predicate": { "all_milestones_completed": true, "no_open_deferred": true, "no_open_defect_blocker": true },
   "key_decisions": [],
-  "blockers": [ { "id": "BLK-01", "severity": "defect|info", "open": true, "note": "" } ],
+  "blockers": [ { "id": "BLK-01", "severity": "defect|info", "state": "open|acknowledged|resolved", "note": "" } ],
   "deferred": [],
   "convergence": { "stuck": { "M3/phase-3": 1 }, "revises": { "export-semantics": 0 } },
   "rounds": [
@@ -348,6 +365,18 @@ swarm/roadmap-revise **无对应 role** → 用 `--to <cli>` 显式（手写 `br
 - [R6-O1 LOW] 结果问题加快路：L2/L3 裁 `UNFIXABLE-EXTERNAL`(conf≥95) → 立即 defer，不必凑满 3 次空转。
 - Wave B 确认核心机制稳：revise/cap/demote、per-unit give-up、降级 preflight、评审者≠实现者、stop_predicate 终止均按设计工作。
 </changelog_v5>
+
+<changelog_v6>
+针对健壮性战役 Wave C（R7/R8/R9 真实代码全过核心检查）修复——主题是评审/测试调用契约：
+- [R7-D1/R9-D1 MED] A_REVIEW 测试调用契约：复跑必须用项目真实测试命令 + 粘框架 pass/fail banner，不得用自制 runner 冒充；
+  真 runner 不可用须显式声明替代 + brain 在 VERDICT 前亲自真实命令复跑对账（R7 靠此抓出评审谎报绿）。
+- [R8-D1 LOW] A_SELECT_EXECUTOR 加 ralph-vs-odyssey 决策表（按 task-shape，cardinality 优先）。
+- [R8-D2 LOW] 评审者≠实现者分离轴明确含"不同子代理实例/角色"；skill-only 下独立 reviewer 实例即满足 #4。
+- [R9-D2 LOW] A_DELIVER 加多阶段消费边的增量编辑契约（READ 先、消费不重声明、仅追加不 clobber）。
+- [R9-D3 LOW] blocker 加 `state: open|acknowledged|resolved`；info blocker 标 acknowledged，终止审计清晰。
+- [R7-D2 INFO] 编排 Skill 不可用时裸 Task 实现可接受（记 info blocker）。
+- Wave C 确认：真实代码上 roadmap-over-existing-code、依赖感知多阶段、debug 执行器选择、根因修复、防假绿、stop_predicate 终止均按设计工作；真仓 src/ 全程未被污染。
+</changelog_v6>
 
 <validation>
 Phase-0 落地前必须实测（来自 doc 08 §8 + round-1/2 评测）：
