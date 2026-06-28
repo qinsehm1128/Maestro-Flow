@@ -89,37 +89,36 @@ export function parseSignal(raw: string | undefined): RoundSignal {
   return { kind: 'ok' };
 }
 
-export function runDecide(opts: { sessionId?: string; signal?: string; json?: boolean }): number {
+export function runDecide(opts: { sessionId?: string; signal?: string; json?: boolean; commit?: boolean }): number {
   const loaded = loadSession(opts.sessionId);
   if (typeof loaded === 'number') return loaded;
   const { sess, state } = loaded;
   const ledger = sess.data;
+  const round = ledger.rounds.length + 1;
   const bs = deriveBrainState(state, ledger.blockers);
   const result = decide({
     stop: bs.stop,
-    round: ledger.rounds.length + 1,
+    round,
     maxRounds: ledger.max_rounds,
     autonomous: ledger.autonomous,
     cursorUnit: bs.cursor,
     signal: parseSignal(opts.signal),
     convergence: ledger.convergence,
   });
-  if (opts.json) console.log(JSON.stringify({ cursor: bs.cursor, ...result }, null, 2));
-  else console.log(`[round ${ledger.rounds.length + 1}] cursor=${bs.cursor} -> ${result.decision}${result.terminalStatus ? `(${result.terminalStatus})` : ''} :: ${result.reason}`);
-  return 0;
-}
 
-export interface RecordOpts { sessionId?: string; round: BrainRound; }
+  // --commit PERSISTS the round: apply the convergence bump (so STUCK_CAP/REVISES_CAP
+  // actually trip across rounds) and append the round to the ledger audit trail.
+  if (opts.commit) {
+    if (result.bump) applyBump(ledger.convergence, result.bump);
+    const rec: BrainRound = { round, cursor: bs.cursor, decision: result.decision };
+    if (result.terminalStatus) ledger.status = result.terminalStatus;
+    if (result.giveUp) rec.deferred = [bs.cursor ?? ''];
+    ledger.rounds.push(rec);
+    writeLedger(sess.ledgerPath, ledger);
+  }
 
-export function runRecord(opts: RecordOpts): number {
-  const loaded = loadSession(opts.sessionId);
-  if (typeof loaded === 'number') return loaded;
-  const { sess } = loaded;
-  const ledger = sess.data;
-  ledger.rounds.push(opts.round);
-  // apply any bump declared by a prior decide so counters persist across rounds
-  writeLedger(sess.ledgerPath, ledger);
-  console.log(`[brain record] round ${opts.round.round} appended (${opts.round.decision})`);
+  if (opts.json) console.log(JSON.stringify({ round, cursor: bs.cursor, ...result }, null, 2));
+  else console.log(`[round ${round}] cursor=${bs.cursor} -> ${result.decision}${result.terminalStatus ? `(${result.terminalStatus})` : ''} :: ${result.reason}`);
   return 0;
 }
 

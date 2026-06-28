@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { runInit, runDerive, runDecide, runRecord, parseSignal } from '../cmd-brain.js';
+import { runInit, runDerive, runDecide, parseSignal } from '../cmd-brain.js';
 import type { BrainLedger } from '../brain-schema.js';
 
 let dir: string;
@@ -74,17 +74,17 @@ describe('maestro brain CLI engine (end-to-end)', () => {
     expect(out).toContain('completed');
   });
 
-  it('decide returns advance mid-roadmap; record persists the round', () => {
+  it('decide --commit persists the round AND bumps the convergence counter (caps trip across rounds)', () => {
     writeState([{ id: 'M1', name: 'M1', title: 'Core', status: 'active', phases: [1, 2] }]);
     runInit({ intent: 'x', autonomous: true });
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-    runDecide({ signal: 'ok', json: true });
-    const out = log.mock.calls.map(c => c[0]).join('\n');
+    // a result-problem advances stuck["M1/phase-1"]: commit twice -> counter persists to 2
+    runDecide({ signal: 'result-problem', commit: true });
+    runDecide({ signal: 'result-problem', commit: true });
     log.mockRestore();
-    expect(out).toContain('"decision": "advance"');
-
-    runRecord({ round: { round: 1, cursor: 'M1/phase-1', decision: 'advance', verdict: 'pass' } });
-    expect(latestLedger().rounds).toHaveLength(1);
+    const led = latestLedger();
+    expect(led.rounds).toHaveLength(2);
+    expect(led.convergence.stuck['M1/phase-1']).toBe(2);
   });
 
   it('parseSignal handles roadmap-problem:<issue>', () => {

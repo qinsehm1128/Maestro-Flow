@@ -8,9 +8,7 @@ import { dirname, join, resolve } from 'node:path';
 import {
   type BrainLedger,
   DEFAULT_AWAIT_TIMEOUT_MIN,
-  DEFAULT_MAX_POLLS,
   DEFAULT_MAX_ROUNDS,
-  DEFAULT_POLL_INTERVAL_S,
   newConvergence,
 } from './brain-schema.js';
 
@@ -90,8 +88,6 @@ export function newLedger(opts: NewLedgerOpts): BrainLedger {
     autonomous: opts.autonomous,
     max_rounds: opts.maxRounds ?? DEFAULT_MAX_ROUNDS,
     await_timeout_min: DEFAULT_AWAIT_TIMEOUT_MIN,
-    poll_interval_s: DEFAULT_POLL_INTERVAL_S,
-    max_polls: DEFAULT_MAX_POLLS,
     mode: opts.mode ?? 'skill-only',
     executor_default: opts.executorDefault ?? 'claude',
     available_clis: opts.availableClis ?? [],

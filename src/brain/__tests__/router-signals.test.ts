@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { deriveRouterSignals } from '../router-signals.js';
+import { deriveRouterSignals } from '../brain-derive.js';
 import { deriveCursor } from '../brain-derive.js';
 import type { ArtifactEntry, StateJsonV2 } from '../../utils/state-schema.js';
 

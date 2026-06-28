@@ -76,8 +76,6 @@ export interface BrainLedger {
   autonomous: boolean;              // -y present
   max_rounds: number;
   await_timeout_min: number;
-  poll_interval_s: number;
-  max_polls: number;
   mode: 'maestro-cli' | 'skill-only';
   executor_default: string;
   available_clis: string[];
@@ -101,8 +99,6 @@ export const STUCK_CAP = 3;         // same unit insert-fixed >= this -> give up
 export const CRASH_RETRIES_CAP = 2; // crash/timeout retries per unit before defer (R10-D2)
 export const DEFAULT_MAX_ROUNDS = 30;
 export const DEFAULT_AWAIT_TIMEOUT_MIN = 10;
-export const DEFAULT_POLL_INTERVAL_S = 20;
-export const DEFAULT_MAX_POLLS = 30;
 
 export function newConvergence(): Convergence {
   return { stuck: {}, revises: {}, crash_retries: {} };

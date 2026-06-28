@@ -47,10 +47,11 @@ export function registerBrainCommand(program: Command): void {
     .description('Run A_DECIDE for a reconciled round signal')
     .option('--session <id>', 'Brain session id (default: latest)')
     .option('--signal <s>', 'ok | result-problem | roadmap-problem:<issue> | unfixable-external', 'ok')
+    .option('--commit', 'Persist: apply the convergence bump + append the round to the ledger')
     .option('--json', 'Machine-readable output')
-    .action(async (opts: { session?: string; signal?: string; json?: boolean }) => {
+    .action(async (opts: { session?: string; signal?: string; commit?: boolean; json?: boolean }) => {
       const { runDecide } = await import('../brain/cmd-brain.js');
-      process.exit(runDecide({ sessionId: opts.session, signal: opts.signal, json: !!opts.json }));
+      process.exit(runDecide({ sessionId: opts.session, signal: opts.signal, commit: !!opts.commit, json: !!opts.json }));
     });
 
   brain

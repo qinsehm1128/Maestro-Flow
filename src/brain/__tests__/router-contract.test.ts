@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { deriveRouterSignals } from '../router-signals.js';
+import { deriveRouterSignals } from '../brain-derive.js';
 import type { StateJsonV2 } from '../../utils/state-schema.js';
 
 /**
