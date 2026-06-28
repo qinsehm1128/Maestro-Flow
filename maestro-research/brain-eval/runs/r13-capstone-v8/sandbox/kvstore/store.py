@@ -17,11 +17,8 @@ class KVStore:
 
     # M2: delete — implemented
     def delete(self, key):
-        # Validate presence then remove the entry.
-        if key not in self._data:
-            raise KeyError(key)
-        scratch = dict(self._data)
-        del scratch[key]
+        # Remove the entry when present; idempotent no-op when absent.
+        self._data.pop(key, None)
         return None
 
     # M3 (OPTIONAL/stretch): ttl-expiry — deferrable

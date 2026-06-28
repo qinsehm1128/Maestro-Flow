@@ -143,4 +143,37 @@ v3（多轮反向评测起点）→ **v4** 参数解析鲁棒性 → **v5** stop
 **仍是设计提案**：所有运行均在 skill-only 模拟下（子代理扮演外部 CLI），命令内 `<validation>` 列的实测项（尤以 **V5 ralph/odyssey 终态字段真名** 为命门，及 v7 新增的超时/重试阈值校准）需在真实 maestro 运行时落地确认。
 
 ### 留痕
-`brain-eval/runs/r1..r12/`（各轮沙盒+ledger）、`brain-eval/round1..2/`（前期反向评测）、命令 `.claude/commands/maestro-brain.md`（v7，含 changelog_v2..v7 + validation）、可行性/流程 `07`、`08`、`09`。
+`brain-eval/runs/r1..r13/`（各轮沙盒+ledger）、`brain-eval/round1..2/`（前期反向评测）、命令 `.claude/commands/maestro-brain.md`（v8，含 changelog_v2..v8 + validation）、可行性/流程 `07`、`08`、`09`。
+
+---
+
+## 后续 1：源码核实（V4/V5 命门）→ v8
+
+战役全程为 skill-only 模拟。收尾把 A_AWAIT 依赖的终态字段**对真实源码核实**，把假设换成真名：
+- **ralph**（`src/ralph/status-schema.ts`）：`SessionStatus = running|paused|completed|failed`(:13)、`task_decomposition_all_done`(:132)、
+  step `completion_status = DONE|DONE_WITH_CONCERNS|NEEDS_RETRY|BLOCKED`(:12)。→ **修正 v7 的错误假设**（失败真名是 `failed`，非 `crashed/error/killed`）。
+- **odyssey**（`workflows/odyssey-base.md:33,35,196`）：**无 status enum**；终态 = `current_state=="COMPLETED"` 或 `phase_goals_all_done==true`；
+  ESCALATED/PARTIAL/INCONCLUSIVE 仅摘要文本标签。
+- **V4**：`src/ralph/` 无引擎 await-sibling → 机制确定为 brain 轮询子状态文件。
+- 残留 validation：V1/V2（Claude headless slash 展开、`/goal` host 语义）、V7（阈值校准）需真实运行时，非仓库可解。
+
+## 后续 2：Capstone v8 回归实跑（r13）— **5/5 PASS，全清**
+
+在全量打补丁的 v8 上跑 3-milestone Python `kvstore`（M1 get/set + M2 delete 强制，M3 ttl 可选），4 轮干净收尾：
+
+| 检查 | 结果 |
+|------|------|
+| /goal 写出 mandatory/optional 分流停止条件(v7/v8) | ✅ PASS |
+| 干净推进 + L2-floor 防假绿(v3-v6)：植入 M2 假绿被独立评审+brain 真 pytest 对账抓住、一轮修复收敛 | ✅ PASS |
+| A_AWAIT 真实终态语义(v8)：查真实 ralph/odyssey 字段而非裸"done" | ✅ PASS |
+| optional milestone 终止(v7/v8)：M3 ack-deferred → `completed-with-optional-deferred`(不空转/不误 PARTIAL) | ✅ PASS |
+| 8 版补丁无冲突：收敛计数器/blocker 严重度/真实测试对账/optional 谓词/真实字段同时协同 | ✅ PASS |
+
+**无回归、无新命令缺陷**；真仓 src/ 零改动。**结论：v8 补丁栈确认无冲突，新特性按设计工作，命令达到"对抗下行为正确 + 关键假设经源码核实"的成熟度。**
+
+## 最终命令成熟度
+- **行为**：12 轮（易→中→真实代码→对抗）+ capstone 全部行为正确。
+- **缺陷**：~20 个发现项无一在 v8 残留为 FATAL/HIGH。
+- **关键假设**：A_AWAIT 命门字段已对真实源码核实（V4/V5 解）。
+- **可发现性**：已注册进 maestro-help `catalog.json`。
+- **仍待真实运行时落地**：V1/V2/V7（harness 行为 + 阈值校准）。
