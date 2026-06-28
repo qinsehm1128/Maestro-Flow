@@ -87,6 +87,60 @@
 
 ---
 
-## Wave D 结果（命令 v6 → 待修）……（运行中）
+## Wave D 结果（对抗鲁棒性，命令 v6 → 修到 v7）— 行为全 PASS
 
-*（最终裁决待续）*
+| 轮 | 难度 | 目标 | 结果 |
+|---|------|------|------|
+| R10 | 对抗 | 子会话崩溃 + delegate 超时恢复 | **4/4 PASS**：A_AWAIT 拒绝半成品(不假绿)、超时不挂死、auto 全链路重试恢复、干净 completed 终止 |
+| R11 | 对抗 | 矛盾需求 + `--auto -y` 永不停(D3) | **5/5 PASS**：检测矛盾不偷选边、S_AUTO_FULLCHAIN 自主选 integer-cents、记 rationale+DEF-01、真 pytest 对账、继续到真完成；确认非 auto 会 AskUserQuestion |
+| R12 | 对抗 | 微妙停止条件 goal 正确性 | **4/4 PASS（行为）**：brain 拒绝 naive `all_completed`、为 optional-C 写对 stop_predicate、A+B 未完不早停、C ack-deferred 即停不空转、终态 `completed-with-optional-deferred` |
+
+**发现缺陷 → 已修 v7**：
+- [R12 **HIGH**] `stop_predicate` 无法原生表达 optional milestone——brain 这次靠**手动覆写**才过。根治：milestone 加 `mandatory|optional`；谓词改为 `mandatory.every(completed) && optional.every(completed||ack-deferred) && 无 open defect`；加终态 `completed-with-optional-deferred`。
+- [R10-D1/D2 MED] A_AWAIT 超时参数化（具体值，绝不无界轮询）；崩溃/超时重试有界 `crash_retries≤2`（不靠 max_rounds spin 掉预算）。
+- [R10-D3/D4 LOW] `crashed/error/killed` 显式硬信号失败；崩溃重试前 re-READ 防 clobber。
+- [R12-INFO] A_DELIVER 安装隔离（委派 install 防污染宿主 package.json/lock）。
+
+**Wave D 结论**：v6 的决策/路由逻辑在崩溃、超时、矛盾、微妙停止四种对抗下**行为全部正确**；暴露的是表达力（optional milestone）与操作化（超时/重试具体值）缺口，v7 已根治。最有价值的是 R12 把"产出正确停止条件"从隐式手动覆写提升为**一等表达**。
+
+---
+
+## 总裁决（12 轮 / 4 波 / v3→v7）
+
+### 逐轮处理的问题（一句话）
+| 轮 | 处理的问题 | 命中缺陷 |
+|---|-----------|---------|
+| R1 | 易-推进能否干净终止 | 0（+1 advisory：机器 stop_predicate）|
+| R2 | 畸形/边界输入 | 参数解析层（-y/--auto 死锁、空 intent、未知 flag、L3 不可行）|
+| R3 | 假绿插修复 | 0（L2-floor 机制稳）|
+| R4 | revise 冲突 + 防饿死 | 3 LOW（预算碰撞、demote 计数、插号格式）|
+| R5 | 零CLI/skill-only 降级 | 1 MED（stop_predicate 信息性 blocker 死锁）|
+| R6 | 不可修复阶段止损 | 0（+1 advisory：外部死依赖快路）|
+| R7 | 真实代码加功能 | 1 MED（评审用替代 runner 谎绿，brain 抓出）|
+| R8 | 真实代码修 bug | 2 LOW（ralph/odyssey 边界、分离轴）|
+| R9 | 真实代码 2 阶段 | 3（测试调用 MED、增量契约、blocker 溯源）|
+| R10 | 崩溃/超时恢复 | 4（超时无参 MED、重试无界 MED、状态词汇、半成品）|
+| R11 | 矛盾需求 auto 永不停 | 0（D3 铁律验证）|
+| R12 | 微妙停止条件正确性 | 1 HIGH（optional milestone 表达力）|
+
+### 命令演进
+v3（多轮反向评测起点）→ **v4** 参数解析鲁棒性 → **v5** stop_predicate 严重度/防空转边角 → **v6** 评审/测试调用契约 → **v7** optional milestone 表达力 + 崩溃/超时操作化。
+
+### 核心机制的鲁棒性裁决（经 12 轮验证）
+| 机制 | 裁决 |
+|------|------|
+| 三种决策（推进/插修复/修 roadmap）+ 优先级互斥穷尽 | ✅ 稳（R3/R4/R6/R8）|
+| 防假绿（L2-floor + 评审者≠实现者 + brain 真实命令对账）| ✅ 稳，且兜住"评审者也假绿"（R3/R7/R11）|
+| 终止控制（/goal 正确停止条件 + 机器 stop_predicate）| ✅ 稳，optional 表达力 v7 根治（R1/R5/R12）|
+| 自治铁律 D3（auto 撞硬信号→全链路→自主决策→不停）| ✅ 稳（R6/R10/R11）|
+| 防空转/防饿死（stuck/revises/crash_retries 有界）| ✅ 稳，crash 维度 v7 补全（R4/R6/R10）|
+| 环境降级（preflight + skill-only + 零CLI Task 回退）| ✅ 稳，invariant#1 诚实记录（R2/R5/R7-R12）|
+| invariant#1（brain 零业务码）| ✅ 全程未破，真仓 src/ 全程未污染 |
+
+### 最终结论
+**maestro-brain 经 12 轮（含真实代码 + 4 类对抗）测试，核心机制行为全部正确**；发现的 ~20 个缺陷中无 1 个在最终版残留为 FATAL/HIGH（R12 的 HIGH 已根治），其余为参数/操作化/表达力的边角细化，均已修入 v3→v7。命令从"happy-path 能跑"演进为"**对抗下行为正确、终止可控、防假绿可执行、降级优雅、自治不失控**"。
+
+**仍是设计提案**：所有运行均在 skill-only 模拟下（子代理扮演外部 CLI），命令内 `<validation>` 列的实测项（尤以 **V5 ralph/odyssey 终态字段真名** 为命门，及 v7 新增的超时/重试阈值校准）需在真实 maestro 运行时落地确认。
+
+### 留痕
+`brain-eval/runs/r1..r12/`（各轮沙盒+ledger）、`brain-eval/round1..2/`（前期反向评测）、命令 `.claude/commands/maestro-brain.md`（v7，含 changelog_v2..v7 + validation）、可行性/流程 `07`、`08`、`09`。
