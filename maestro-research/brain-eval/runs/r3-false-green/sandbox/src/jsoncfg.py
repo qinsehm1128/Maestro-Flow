@@ -47,7 +47,7 @@ def validate_types(config, schema):
         if key not in config:
             continue
         value = config[key]
-        if not isinstance(value, expected_type):
+        if type(value) is not expected_type:
             errors.append(
                 "key {}: expected {}, got {}".format(
                     key, expected_type.__name__, type(value).__name__

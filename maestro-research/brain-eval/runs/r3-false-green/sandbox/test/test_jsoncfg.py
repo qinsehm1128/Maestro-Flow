@@ -95,6 +95,20 @@ def test_types_extra_config_key_ignored():
     assert errors == []
 
 
+def test_types_bool_vs_int_mismatch():
+    config = {"x": True}
+    ok, errors = validate_types(config, {"x": int})
+    assert ok is False
+    assert errors == ["key x: expected int, got bool"]
+
+
+def test_types_bool_vs_bool_ok():
+    config = {"x": True}
+    ok, errors = validate_types(config, {"x": bool})
+    assert ok is True
+    assert errors == []
+
+
 if __name__ == "__main__":
     test_all_required_keys_present()
     test_present_keys_with_extra_config_keys()
@@ -107,4 +121,6 @@ if __name__ == "__main__":
     test_types_str_vs_int_mismatch()
     test_types_missing_key_skipped()
     test_types_extra_config_key_ignored()
+    test_types_bool_vs_int_mismatch()
+    test_types_bool_vs_bool_ok()
     print("all tests passed")
