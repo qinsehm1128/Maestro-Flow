@@ -12,7 +12,7 @@ allowed-tools:
   - AskUserQuestion
 ---
 
-<!-- v2 — patched after round-1 reverse-evaluation (see maestro-research/brain-eval). Changelog at bottom. -->
+<!-- v3 — patched after round-1+round-2 reverse-evaluation + user goal-control correction (see maestro-research/brain-eval). Changelogs at bottom. -->
 
 <purpose>
 maestro-brain 是 maestro 的**外层调度大脑**：站在 roadmap 之上，每轮只做"分析 + 决策 + 派发 + 验收"，
@@ -137,16 +137,24 @@ S_ESCALATE → END              : 用户中止
 1. **游标**：从 `state.json` 求 next-incomplete phase/milestone。
 2. **上轮结果**：读上一子会话 `status.json`（完成态/摘要/caveats/deferred/子目标）。首轮空。
 3. **裁决信号**：上轮 S_VERDICT 结论。首轮空。
-4. 读 ledger（历轮决策/blocker/deferred）。
-5. **轮次自增并检查**：`round++`；若 `round > max_rounds` 标记 budget_exhausted。
+4. 读 ledger（历轮决策/blocker/deferred + 收敛计数器）。
+5. **轮次自增并检查**：`round++`；若 `round > max_rounds` 标记 budget_exhausted（安全兜底）。
+6. **收敛计数器**（防空转，区分"进展" vs "原地打转"）：
+   - `stuck[unit]`：当前游标单元被**连续插入修复**的次数（推进成功或换单元则清零）。
+   - `revises[issue]`：同一 roadmap 问题被**连续修正**的次数（推进/换问题则清零）。
 
-## A_DECIDE (S_DECIDE) — ◇核心自决（**按优先级，互斥穷尽**）
+## A_DECIDE (S_DECIDE) — ◇核心自决（**按优先级，互斥穷尽 + 收敛护栏**）
 按以下顺序，命中即定：
 1. **终止检查（最先）**：roadmap 全单元 completed（以对账后的真值，invariant#7）→ S_TERMINATE；
    或 budget_exhausted → S_TERMINATE(PARTIAL)。
-2. **roadmap 有问题**（需求漏映射/阶段错/依赖环）→ **修正 roadmap** → S_REVISE_ROADMAP。
-   （注：roadmap 问题优先于结果问题——先校正蓝图再谈修补。若同时存在，先修 roadmap，结果问题下一轮再处理。）
-3. **上轮结果有问题**（gap/假绿/未达成）→ **插入修复**（roadmap 不动）→ S_SELECT_EXECUTOR。
+2. **roadmap 有问题** 且 `revises[issue] < 2`（**防饿死/防 revise-thrash**）→ **修正 roadmap** → S_REVISE_ROADMAP。
+   - `revises[issue] ≥ 2`（同一问题反复改仍未解）→ **降级**：不再改 roadmap，记 blocker，转按"结果问题"处理，
+     让真实结果问题不被 revise 持续抢占（修复 N2 饿死）。
+   - 同时存在 roadmap 问题与结果问题：先 roadmap（仅一次），下一轮处理结果问题。
+3. **上轮结果有问题** 且 `stuck[unit] < 3`（**per-unit 提前收敛**）→ **插入修复** → S_SELECT_EXECUTOR。
+   - `stuck[unit] ≥ 3`（同一单元修 3 次仍不过）→ **提前给结论**，不再空转：
+     **auto** → 把该单元标 `deferred` + blocker，**推进过它**（不耗尽全局预算在一个死结上，修复 N1/N6）；
+     **非 auto** → S_ESCALATE。
 4. **默认 → 推进**：取游标下一单元 → S_SELECT_EXECUTOR。
 
 ## A_REVISE_ROADMAP (S_REVISE_ROADMAP)
@@ -170,13 +178,19 @@ S_ESCALATE → END              : 用户中止
   改为 **A 窗口内 `Skill("maestro-ralph")` 起子会话**（ralph 的 Skill 自调用引擎只能在能跑 Skill 的宿主内运行），
   其 execute 步把**原子写码**逐个 `maestro delegate --to <cli> --mode write` 给该 CLI。
   （即：非 Claude 不能"整条 ralph 丢过去跑"，因 ralph 引擎是 Skill 链，预展开纯文本无法复现——round-1 D2/D3 结论。）
-- 纯 Skill 模式（无 maestro CLI）：直接 `Skill("maestro-ralph")` / `Task` 子代理实现。
+  > **与 invariant#1 的边界（修复 N4）**：此处"A 窗口内跑 ralph"指 A 窗口**托管 ralph 的编排链**（决定步骤、
+  > 派发、推进），**所有原子写码仍 100% 外派给 impl_cli**——A 窗口绝不自己 Edit 业务代码。托管编排 ≠ 写代码，
+  > invariant#1 不破。若想连编排也隔离出去，则只能用 Claude impl_cli（上一条）。
+- 纯 Skill 模式（无 maestro CLI）：直接 `Skill("maestro-ralph")` 托管编排 / `Task` 子代理写码（同样不自写业务码）。
 
 ## A_AWAIT (S_AWAIT) — **等子会话到终态，而非一次 CLI 退出**
 - 子会话 = 一整条 ralph/odyssey 运行，不是单次 delegate 调用。
 - **判定完成**：轮询/读子会话 `status.json`（ralph：`status ∈ {completed, paused}` 且 `task_decomposition_all_done`）
   或 `session.json`（odyssey：`phase_goals_all_done` 或 `status ∈ {ESCALATED,PARTIAL,INCONCLUSIVE}`）。
   **未到终态不得进 S_REVIEW**（否则在半成品上验收=结构性假绿，round-1 CRIT）。
+- **字段防御（修复 N5）**：上述 ralph/odyssey 终态字段名是设计期假设，**Phase-0 必须实测确认**（见 §validation）。
+  **缺字段时按"未到终态"处理**（继续轮询 + 设超时），**绝不**把"读不到完成标志"误判成"已完成"——宁可超时也不假绿。
+  超时 → 当作硬信号走 S_VERDICT（auto→全链路/换执行器；非auto→升级）。
 - 取回：完成态、completion_summary、caveats、deferred、子目标达成、是否 paused/ESCALATED。
 
 ## A_REVIEW (S_REVIEW) — 自适应防假绿（评审者≠实现者）
@@ -227,6 +241,7 @@ S_ESCALATE → END              : 用户中止
   "mode": "maestro-cli | skill-only", "executor_default": "claude",
   "available_clis": ["claude","codex"], "stop_condition": "all milestones completed",
   "key_decisions": [], "blockers": [], "deferred": [],
+  "convergence": { "stuck": { "M3/phase-3": 1 }, "revises": { "export-semantics": 0 } },
   "rounds": [
     { "round": 1, "cursor": "M1/phase-1", "decision": "advance|insert-fix|revise-roadmap",
       "executor": "ralph|odyssey-*", "impl_cli": "claude", "review_cli": "codex",
@@ -266,9 +281,8 @@ swarm/roadmap-revise **无对应 role** → 用 `--to <cli>` 显式（手写 `br
 针对 round-1 反向评测（maestro-research/brain-eval）修复：
 - [CRIT] 加 max_rounds/budget 硬上限 + S_TERMINATE(PARTIAL)，auto 永不停的唯一例外（杀活锁）。
 - [CRIT] A_AWAIT 重定义为"等子会话到终态"（读 status.json），非"一次 CLI 退出"（杀半成品假绿）。
-- [CRIT] 投递去掉 `/goal` 第二段 slash（非命令/两 slash 不保证触发）；done_when 并入 intent；
-  非 Claude 改为 A 窗口内 `Skill("maestro-ralph")` + 原子写码外派（预展开无法复现 ralph 引擎）。
-- [HIGH] auto 跳过人工 /goal 粘贴；终止依据改为 ledger.stop_condition + Skill 自调用链。
+- [CRIT] 投递去掉"两条 slash 一个 blob"（单 blob 内两 slash 不保证都触发）；
+  非 Claude 改为 A 窗口内 `Skill("maestro-ralph")` 托管编排 + 原子写码外派（预展开无法复现 ralph 引擎）。
 - [HIGH] 插入修复/全链路/修正后统一回 S_LOOP_INPUT 重装配输入。
 - [HIGH] A_DECIDE 改为优先级互斥穷尽 + 终止检查最先 + roadmap优先于结果问题。
 - [HIGH] evaluator≠implementer 给出具体选择算法（review_cli 首个可用且≠impl_cli，否则换 model/collab）。
@@ -277,3 +291,23 @@ swarm/roadmap-revise **无对应 role** → 用 `--to <cli>` 显式（手写 `br
 - [MED] L2 设为含代码轮的评审下限（invariant#7）；终止前以子会话真值对账（不信过期 state.json）。
 - [MED] ledger 扩展 rationale/evidence/caveats/deferred；S_REVISE_ROADMAP 加 declined-fallback 出口；S_ANALYZE 加失败边。
 </changelog_v2>
+
+<changelog_v3>
+针对用户修正 + round-2 评测（critic-v2-verify）修复：
+- [用户修正] `/goal` 恢复为 loop **主停止控制**（invariant#8）：brain 必须产出**内容正确的 `/goal`** 来武装/控制停止；
+  A_EMIT_GOAL 改回 load-bearing 必做（会话开始一次性武装，`--auto -y` 只管 loop 内不停顿）；max_rounds 降为纯安全兜底。
+- [N1/N6] 加收敛计数器 `convergence.stuck/revises`，区分"进展" vs "原地打转"；不再把空转与进展同等耗 max_rounds。
+- [N2 饿死] A_DECIDE 加护栏：同一 roadmap 问题连续 revise ≥2 次→降级按结果问题处理，避免 revise 持续抢占饿死真实结果问题。
+- [N1] per-unit 提前收敛：同一单元修 ≥3 次仍不过 → auto 标 deferred+blocker 推进过它（不在死结上耗尽全局预算），非auto 升级。
+- [N4 边界] A_DELIVER 澄清"A 窗口内跑 ralph"=托管编排、原子写码仍 100% 外派，不破 invariant#1。
+- [N5 防御] A_AWAIT：ralph/odyssey 终态字段名为设计期假设、Phase-0 必实测；缺字段按"未到终态"处理（宁超时不假绿）。
+</changelog_v3>
+
+<validation>
+Phase-0 落地前必须实测（来自 doc 08 §8 + round-1/2 评测）：
+- V1: 单 blob 内 `/maestro-ralph` 在 Claude headless 是否展开（v3 已不依赖两 slash，但单 slash 展开仍需确认）。
+- V2: `/goal` 由 host 武装 loop 的实际语义（持久化终止条件如何驱动自调用）。
+- V4: "等子会话到终态"的轮询/阻塞原语（`src/ralph/` 无 await-sibling，需自建轮询或同步 delegate）。
+- V5: ralph `status.json` / odyssey `session.json` 的**终态字段真名**（A_AWAIT 的命门，缺则按未完成处理）。
+- V7(新): 收敛阈值（revises≥2 / stuck≥3 / max_rounds=30）需按真实项目校准。
+</validation>

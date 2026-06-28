@@ -32,6 +32,7 @@ Maestro-Flow 是一个**意图驱动的多智能体编排引擎**。它的设计
 | 04 | [`04-engineering-files-cli-design-philosophy.md`](./04-engineering-files-cli-design-philosophy.md) | **工程文件 × CLI 联动设计哲学** —— `.claude`/`.codex`/`.agy` 的投影机制、hooks、`--role` 路由 | `src/core/skill-converter.ts`、`scripts/convert-claude-to-agy.mjs`、`.codex/`、settings |
 | 07 | [`07-maestro-brain-feasibility.md`](./07-maestro-brain-feasibility.md) | **maestro-brain 可行性分析（设计提案）** —— 调度型外层"大脑"循环：7 能力对照、内/外层缝隙(H1–H8)、**决策模型(§3.5：A 窗口自决 + 默认推进 + 结果问题插修复 / roadmap 问题动态修正)**、两策略、分阶段方案 | `chains/_router.json`、`src/coordinator/graph-walker.ts`、`src/ralph/`、`src/commands/delegate.ts`、`state-schema.ts`、`catalog.json` |
 | 08 | [`08-maestro-brain-flow.md`](./08-maestro-brain-flow.md) | **maestro-brain 任务流程（收敛版/canonical）** —— 多轮修正后定稿：既定事实(F1–F9)、已定决策(外部跑/拼接 blob、自适应评审、auto 永不终止)、完整流程、自治铁律、评审三档、投递契约、config 注入、残留验证项 | `r3a–r3f`（命令投递/自治门/goal-loop/swarm/config/防假绿） |
+| 09 | [`09-maestro-brain-eval.md`](./09-maestro-brain-eval.md) | **maestro-brain 多轮反向评测报告** —— 子代理实跑+独立评审，v1→v2→v3 迭代：Round1(5轮全模式+2 FATAL)、v2 修复、Round2(17 FIXED+新缺陷 N1–N6 有界空转)、用户 /goal 修正、v3 收敛护栏；命令本体 `.claude/commands/maestro-brain.md` | `brain-eval/{sandbox,round1,round2}`、`.claude/commands/maestro-brain.md` |
 
 ---
 
