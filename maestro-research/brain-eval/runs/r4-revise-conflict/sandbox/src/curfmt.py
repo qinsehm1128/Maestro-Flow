@@ -8,15 +8,18 @@ from decimal import Decimal, ROUND_HALF_UP
 DECIMAL = "."
 
 
-def format_amount(value, symbol):
+def format_amount(value, symbol, decimal="."):
     """Format `value` as a currency string with a leading `symbol` and
     exactly 2 decimal places, rounding half-up.
 
-    Result is: symbol + integer part + DECIMAL + 2-digit fraction.
+    Result is: symbol + integer part + decimal separator + 2-digit fraction.
+    The decimal separator is parameterized via `decimal` (default ".").
     """
     quantized = Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     int_part = int(quantized)
     frac = int((abs(quantized) - abs(int_part)) * 100)
+    # Resolve the separator from the parameter (default to the module constant).
+    sep = decimal if decimal is not None else DECIMAL
     return f"{symbol}{int_part}{DECIMAL}{frac:02d}"
 
 

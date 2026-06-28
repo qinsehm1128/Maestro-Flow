@@ -31,6 +31,18 @@ def translate(text: str, target_lang: str) -> str:
     return body["translation"]
 
 
+def truncate(text: str, n: int) -> str:
+    """Truncate ``text`` to at most ``n`` characters, adding an ellipsis if truncated.
+
+    If ``len(text) <= n`` the text is returned unchanged. Otherwise the first
+    ``n - 1`` characters are returned followed by a single ellipsis character
+    (``"…"``), giving a total length of exactly ``n``.
+    """
+    if len(text) <= n:
+        return text
+    return text[: n - 1] + "…"
+
+
 def word_count(text: str) -> dict[str, int]:
     """Return a case-insensitive word-frequency map.
 
