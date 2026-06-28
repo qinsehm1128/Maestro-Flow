@@ -5,7 +5,12 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from textkit import word_count
+from textkit import translate, word_count
+
+
+def test_translate_live_roundtrip():
+    # MANDATORY boundary: live round-trip against the AcmeTranslate Cloud paid API.
+    assert translate("hello", "fr") == "bonjour"
 
 
 def test_word_count_repeated_words():

@@ -18,3 +18,14 @@ def format_amount(value, symbol):
     int_part = int(quantized)
     frac = int((abs(quantized) - abs(int_part)) * 100)
     return f"{symbol}{int_part}{DECIMAL}{frac:02d}"
+
+
+def format_negative(value, symbol):
+    """Format `value` as a currency string, handling negatives accounting-style.
+
+    Negatives are wrapped in parentheses with the symbol inside; positives are
+    returned unchanged. Magnitude formatting reuses `format_amount`.
+    """
+    if value < 0:
+        return f"({format_amount(-value, symbol)})"
+    return format_amount(value, symbol)

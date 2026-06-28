@@ -5,7 +5,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from curfmt import format_amount, DECIMAL
+from curfmt import format_amount, format_negative, DECIMAL
 
 
 def test_decimal_constant_is_period():
@@ -22,3 +22,11 @@ def test_zero():
 
 def test_round_half_up_carries():
     assert format_amount(9.999, "$") == "$10.00"
+
+
+def test_negative_accounting_parentheses():
+    assert format_negative(-1234.5, "$") == "($1234.50)"
+
+
+def test_positive_unchanged():
+    assert format_negative(1234.5, "$") == "$1234.50"
