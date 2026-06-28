@@ -2,13 +2,18 @@
 // `maestro brain` subcommand implementations — the deterministic engine the
 // authored FSM (.claude/commands/maestro-brain.md) calls each round.
 //
-//   init     create a brain session + ledger.json
-//   derive   print the decision-input snapshot (cursor, stop eval, router signals)
-//   decide   run the A_DECIDE engine for a given reconciled round-signal
-//   record   append a completed round to the ledger
-//   status   human-readable session summary
+//   init         create a brain session + ledger.json
+//   derive       print the decision-input snapshot (cursor, stop eval, router signals)
+//   decide       run the A_DECIDE engine for a reconciled round-signal (--commit persists)
+//   review-plan  enforce review tier (L2 floor) + reviewer != implementer
+//   await        suspend until a child session reaches a terminal state
+//   status       human-readable session summary
 //
 // Data contract: `.workflow/.brain/brain-*/ledger.json`. Mirrors src/ralph.
+// Exit codes:
+//   0 — ok
+//   1 — no brain session / no state.json (missing input)
+//   2 — usage error (empty intent)
 // ---------------------------------------------------------------------------
 
 import { readFileSync } from 'node:fs';
@@ -16,6 +21,8 @@ import { join } from 'node:path';
 import type { StateJsonV2 } from '../utils/state-schema.js';
 import { deriveBrainState } from './brain-derive.js';
 import { type RoundSignal, applyBump, decide } from './brain-decide.js';
+import { awaitChildTerminal } from './brain-await.js';
+import { selectReviewIsolation, selectTier } from './brain-review.js';
 import {
   type ResolvedBrainSession,
   newLedger,
@@ -55,17 +62,25 @@ export function runInit(opts: InitOpts): number {
   return 0;
 }
 
-function loadSession(sessionId?: string): { sess: ResolvedBrainSession; state: StateJsonV2 } | number {
+function loadSession(who: string, sessionId?: string): { sess: ResolvedBrainSession; state: StateJsonV2 } | number {
   const root = workflowRoot();
   const sess = resolveBrainSession(root, sessionId);
-  if (!sess) { console.error('[brain] no brain session found (run `maestro brain init` first)'); return 3; }
+  if (!sess) {
+    console.error(`[brain ${who}] no brain session found`);
+    console.error('  → run: maestro brain init "<intent>"');
+    return 1;
+  }
   const state = readState(root);
-  if (!state) { console.error('[brain] no .workflow/state.json found'); return 3; }
+  if (!state) {
+    console.error(`[brain ${who}] no .workflow/state.json found`);
+    console.error('  → run: maestro init');
+    return 1;
+  }
   return { sess, state };
 }
 
 export function runDerive(opts: { sessionId?: string; json?: boolean }): number {
-  const loaded = loadSession(opts.sessionId);
+  const loaded = loadSession('derive', opts.sessionId);
   if (typeof loaded === 'number') return loaded;
   const { sess, state } = loaded;
   const bs = deriveBrainState(state, sess.data.blockers);
@@ -90,7 +105,7 @@ export function parseSignal(raw: string | undefined): RoundSignal {
 }
 
 export function runDecide(opts: { sessionId?: string; signal?: string; json?: boolean; commit?: boolean }): number {
-  const loaded = loadSession(opts.sessionId);
+  const loaded = loadSession('decide', opts.sessionId);
   if (typeof loaded === 'number') return loaded;
   const { sess, state } = loaded;
   const ledger = sess.data;
@@ -130,7 +145,6 @@ export interface ReviewPlanOpts {
 
 /** Enforce the brain-specific review decisions (L2-floor + evaluator!=implementer). */
 export async function runReviewPlan(opts: ReviewPlanOpts): Promise<number> {
-  const { selectTier, selectReviewIsolation } = await import('./brain-review.js');
   const tier = selectTier({
     difficulty: opts.difficulty, selfReportedSuccess: opts.selfReported,
     codeChanged: opts.codeChanged, critical: opts.critical, forcedTier: opts.forcedTier,
@@ -145,7 +159,6 @@ export async function runReviewPlan(opts: ReviewPlanOpts): Promise<number> {
 export interface AwaitCliOpts { statusPath: string; kind: 'ralph' | 'odyssey'; timeoutMin?: number; json?: boolean; }
 
 export async function runAwait(opts: AwaitCliOpts): Promise<number> {
-  const { awaitChildTerminal } = await import('./brain-await.js');
   const timeoutMs = (opts.timeoutMin ?? 10) * 60_000;
   const r = await awaitChildTerminal({ statusPath: opts.statusPath, kind: opts.kind, timeoutMs });
   if (opts.json) console.log(JSON.stringify(r, null, 2));
@@ -155,7 +168,7 @@ export async function runAwait(opts: AwaitCliOpts): Promise<number> {
 }
 
 export function runStatus(opts: { sessionId?: string }): number {
-  const loaded = loadSession(opts.sessionId);
+  const loaded = loadSession('status', opts.sessionId);
   if (typeof loaded === 'number') return loaded;
   const { sess, state } = loaded;
   const ledger = sess.data;

@@ -6,7 +6,7 @@
 // deterministically derives decision inputs, evaluates the stop predicate,
 // enforces convergence caps, and persists ledger.json.
 //
-// Source of truth at runtime: `.workflow/.brain/brain-{ts}/ledger.json`.
+// Source of truth: `.workflow/.brain/brain-{ts}/ledger.json`.
 // ---------------------------------------------------------------------------
 
 /** Blocker severity — only `defect` blocks termination; `info` (env/cap degradations) does not. */
