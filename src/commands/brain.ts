@@ -54,6 +54,22 @@ export function registerBrainCommand(program: Command): void {
     });
 
   brain
+    .command('await <statusPath>')
+    .description('SUSPEND until a child ralph/odyssey session reaches a terminal state (event-driven)')
+    .requiredOption('--kind <kind>', 'ralph | odyssey')
+    .option('--timeout-min <n>', 'Hard deadline in minutes (default 10)')
+    .option('--json', 'Machine-readable output')
+    .action(async (statusPath: string, opts: { kind: string; timeoutMin?: string; json?: boolean }) => {
+      if (opts.kind !== 'ralph' && opts.kind !== 'odyssey') {
+        console.error('[brain await] --kind must be ralph | odyssey');
+        process.exit(2);
+      }
+      const { runAwait } = await import('../brain/cmd-brain.js');
+      const timeoutMin = opts.timeoutMin != null ? Number.parseInt(opts.timeoutMin, 10) : undefined;
+      process.exit(await runAwait({ statusPath, kind: opts.kind, timeoutMin, json: !!opts.json }));
+    });
+
+  brain
     .command('status')
     .description('Brain session summary')
     .option('--session <id>', 'Brain session id (default: latest)')

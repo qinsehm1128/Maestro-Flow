@@ -73,3 +73,38 @@ brain 据此镜像出 `src/brain/`。
 ### 留痕
 `src/brain/`（引擎 + `__tests__/`）、`src/commands/brain.ts`、`src/cli.ts`（注册）、`src/coordinator/graph-walker.ts`（_router 接线）、
 命令 `.claude/commands/maestro-brain.md`（v9，`<engine>` 段 + changelog_v9）。
+
+---
+
+## 7. 后续：A_AWAIT 挂起化 + 评审编排（学 Claude Agent SDK / Workflow）→ v10
+
+### 学习来源（claude-code-guide 检索的官方方案）
+- **挂起**：Agent SDK `receive_response()` = 按事件阻塞、无忙轮询；CLI 引擎等价物 = 对子状态文件做**事件驱动等待**（fs.watch 唤醒 + 安全兜底 + 硬超时）。
+- **编排**：Workflow `parallel`(屏障/强制独立) + `pipeline`(默认) + 评审三明治（verify→独立评审→对抗挑战→综合，escalate 升级）；"评审者≠实现者"靠独立 agent 的 fresh context。
+
+### 代码化（仅 Claude）
+- `brain-await.ts` — A_AWAIT 从轮询改为**事件驱动挂起**：`awaitChildTerminal` 用 `fs.watch` 唤醒、低频兜底再检查、硬超时；
+  `classifyChildStatus` 用 v8 真实终态字段（ralph status+task_decomposition_all_done / odyssey current_state+phase_goals_all_done），缺字段一律非终态（绝不假绿）。
+- `brain-review.ts` — 评审三明治编排成确定性计划：`selectTier`（L2 下限）、`selectReviewIsolation`（评审者≠实现者，Claude-only 用 distinct 实例）、
+  `planReview`（verify→review→challenge→[collab=parallel]→synthesize，单 CLI 自动降档不跳过评审）、`aggregateVerdict`（false-green/gap/低置信→失败）。
+- CLI 新增 `maestro brain await <status.json> --kind ralph|odyssey`。
+
+### TDD（续）
+| 轮 | 任务 | 结果 |
+|---|------|------|
+| TDD-7 | await classify + 事件驱动挂起 + 超时 | 新增 `brain-await.test.ts` 12 例 |
+| TDD-8 | review 分档/隔离/计划/裁决聚合 | 新增 `brain-review.test.ts` 14 例 |
+| 合计 | 全 brain 单测 | **63 PASS（7 文件）**，tsc 我方文件 **0 错误** |
+
+### 真实任务测试（编译通过后，跑真实二进制）
+`npx tsc` emit → dist/（其它文件的预存错误是 dashboard 未构建所致，与本引擎无关；brain 模块正常产出）→ `node bin/maestro.js brain`：
+| 命令 | 真实结果 |
+|------|---------|
+| `brain init "..." -y --max-rounds 8` | 建 ledger.json，stop_condition 正确 |
+| `brain derive --json` | cursor=`M1/phase-1`，milestones 视图含 mandatory/optional（M3 mandatory:false） |
+| `brain decide --signal ok` | `advance :: default advance` |
+| **`brain await <status.json> --kind ralph`** | **真挂起**：子状态 1.5s 后翻 terminal，`elapsedMs≈1432` 被唤醒，`outcome=completed`, exit 0（非忙轮询/非固定 sleep） |
+| `brain decide`（M1/M2 done + M3 optional ack-deferred） | `terminate(completed-with-optional-deferred)` —— R12-HIGH 逻辑在真实二进制生效 |
+
+**结论**：A_AWAIT 已是真正的**事件驱动挂起**（仅 Claude），评审编排已代码化为 Workflow 式确定性计划；**真实 `node bin/maestro.js brain` 二进制端到端验证通过**。
+（诚实边界：`npx tsc` 全量编译有其它无关文件的预存错误，因 noEmitOnError=false 仍产出 dist；本引擎所有文件 tsc 零错误 + 63 单测 + 真实二进制冒烟通过。）

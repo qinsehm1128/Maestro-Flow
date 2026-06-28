@@ -123,6 +123,18 @@ export function runRecord(opts: RecordOpts): number {
   return 0;
 }
 
+export interface AwaitCliOpts { statusPath: string; kind: 'ralph' | 'odyssey'; timeoutMin?: number; json?: boolean; }
+
+export async function runAwait(opts: AwaitCliOpts): Promise<number> {
+  const { awaitChildTerminal } = await import('./brain-await.js');
+  const timeoutMs = (opts.timeoutMin ?? 10) * 60_000;
+  const r = await awaitChildTerminal({ statusPath: opts.statusPath, kind: opts.kind, timeoutMs });
+  if (opts.json) console.log(JSON.stringify(r, null, 2));
+  else console.log(`[brain await] ${opts.kind} -> ${r.outcome} (terminal=${r.terminal}, hardSignal=${r.hardSignal}, ${r.elapsedMs}ms)`);
+  // exit code: 0 = clean completed, 1 = hard signal (paused/failed/timeout/missing)
+  return r.outcome === 'completed' ? 0 : 1;
+}
+
 export function runStatus(opts: { sessionId?: string }): number {
   const loaded = loadSession(opts.sessionId);
   if (typeof loaded === 'number') return loaded;
