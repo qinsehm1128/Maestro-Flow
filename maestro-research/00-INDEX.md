@@ -34,6 +34,7 @@ Maestro-Flow 是一个**意图驱动的多智能体编排引擎**。它的设计
 | 08 | [`08-maestro-brain-flow.md`](./08-maestro-brain-flow.md) | **maestro-brain 任务流程（收敛版/canonical）** —— 多轮修正后定稿：既定事实(F1–F9)、已定决策(外部跑/拼接 blob、自适应评审、auto 永不终止)、完整流程、自治铁律、评审三档、投递契约、config 注入、残留验证项 | `r3a–r3f`（命令投递/自治门/goal-loop/swarm/config/防假绿） |
 | 09 | [`09-maestro-brain-eval.md`](./09-maestro-brain-eval.md) | **maestro-brain 多轮反向评测报告** —— 子代理实跑+独立评审，v1→v2→v3 迭代：Round1(5轮全模式+2 FATAL)、v2 修复、Round2(17 FIXED+新缺陷 N1–N6 有界空转)、用户 /goal 修正、v3 收敛护栏；命令本体 `.claude/commands/maestro-brain.md` | `brain-eval/{sandbox,round1,round2}`、`.claude/commands/maestro-brain.md` |
 | 10 | [`10-maestro-brain-robustness-campaign.md`](./10-maestro-brain-robustness-campaign.md) | **maestro-brain 健壮性战役（12 轮统一报告）** —— 4 波难度递进（基线/模式降级/真实代码/对抗）+ 每波先修再继续；命令 v3→v8 演进、逐轮问题、核心机制鲁棒性裁决、A_AWAIT 字段对真实源码核实(V4/V5) | `brain-eval/runs/r1..r12`、`.claude/commands/maestro-brain.md`(v8)、`catalog.json` |
+| 11 | [`11-maestro-brain-codeification.md`](./11-maestro-brain-codeification.md) | **maestro-brain 代码工程化（v8 提示词 → v9 两层）** —— 学 ralph/odyssey 两层架构落成 `src/brain/` TS 引擎(stop-predicate/decide/收敛/原子台账/cursor)；修 `_router.json` 潜伏 bug；6 轮 TDD(37 brain 单测 + 176 coordinator 回归全过) | `src/brain/`、`src/coordinator/graph-walker.ts`、`.claude/commands/maestro-brain.md`(v9) |
 
 ---
 
