@@ -163,11 +163,13 @@ Parse $ARGUMENTS to determine mode and flags:
    - `constraints[status=open]` → prioritize for analysis
    - `open_questions[]` → seed discussion topics
 6. Load project specs: `specs_content = maestro spec load --category arch`
+7. Load domain glossary: read `.workflow/domain/glossary.yaml`（如存在）— 分析过程中使用 canonical term names 保持术语一致性；新发现的术语候选记入 `context-package.json#domain.terminology[]`
 
 **Load prior context** (adhoc/standalone scope):
 1. Read `.workflow/project.md` (if exists) — project vision, Validated requirements, Active requirements, Key Decisions
 2. Read `.workflow/state.json` (if exists) → `accumulated_context` (key_decisions, deferred, blockers)
 3. Load project specs: `specs_content = maestro spec load --category arch`
+4. Load domain glossary: read `.workflow/domain/glossary.yaml`（如存在）
 
 **Quick mode routing**: If QUICK_MODE, skip to Step 8 (Decision Extraction) after loading context.
 
@@ -314,7 +316,7 @@ Append initial Intent Coverage Check to discussion.md.
 
 **Step 4.6: Baseline Confidence Scoring**
 
-Dimensions = the 6 analysis dimensions. Factors (weights): findings_depth(.30), evidence_strength(.25), coverage_breadth(.20), user_validation(.15), consistency(.10). Score each factor per dimension from Round 1 results. Append baseline confidence table to discussion.md. Thresholds: <60% 继续深入 | 60-80% 需用户确认收敛 | >80% 建议收敛.
+Dimensions = the 6 analysis dimensions. Factors (weights): findings_depth(.30), evidence_strength(.25), coverage_breadth(.20), user_validation(.15), consistency(.10). Score each factor per dimension from Round 1 results. Append baseline confidence table to discussion.md. Thresholds: <60% 继续深入 | 60-80% 需用户确认收敛 | >80% → proceed to synthesis (REQUIRED convergence threshold).
 
 ### Step 5: Interactive Discussion Loop
 
@@ -524,8 +526,6 @@ After questions per area: "More questions about {area}, or move to next?"
 Implementer's choice. Research suggests: {relevant finding from researchContext}.
 (e.g., "Standard Stack recommends React Query for server state. Common pitfall: avoid mixing with Redux for async.")
 ```
-
-This makes research findings visible to the planner through context.md without imposing hard constraints.
 
 **8.5: Write context.md**
 
@@ -764,7 +764,7 @@ Replaceable blocks (overwritten each round):
 | Error | Resolution |
 |-------|------------|
 | cli-explore-agent fails | Retry once. If still fails: log W001 warning in discussion.md, flag all subsequent decisions as LOW CONFIDENCE (evidence gap), continue with available context |
-| CLI timeout | Retry with shorter prompt, or skip perspective |
+| CLI timeout | Retry with shorter prompt; if still fails, mark perspective [LOW CONFIDENCE] (evidence gap) in discussion.md and continue |
 | Max rounds reached | Force synthesis, offer continuation |
 | No relevant findings | Broaden search, ask user for clarification |
 | Session folder conflict | Append timestamp suffix |

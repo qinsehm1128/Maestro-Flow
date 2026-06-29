@@ -48,7 +48,7 @@ Execute 4-layer validation (all commands in worktree):
 - Count error occurrences
 
 **4. Quality Analysis** (optional, when > 5 modified files):
-- Use gemini CLI to compare code quality before/after
+- Use agy CLI to compare code quality before/after
 - Assess complexity, duplication, naming quality improvements
 
 **Debt Score Calculation**:
@@ -58,17 +58,13 @@ Execute 4-layer validation (all commands in worktree):
 **Auto-fix attempt** (when total_regressions <= 3):
 - Use CLI tool to fix regressions in worktree:
   ```
-  exec_command({
-    cmd: `cd "${worktreePath}" && maestro delegate "PURPOSE: Fix regressions found in validation
+  shell_exec(`cd "${worktreePath}" && maestro delegate "PURPOSE: Fix regressions found in validation
   TASK: ${regressionDetails}
   MODE: write
   CONTEXT: @${modifiedFiles.join(' @')}
   EXPECTED: Fixed regressions
-  CONSTRAINTS: Fix only regressions | Preserve debt cleanup changes | No suppressions" --role implement --mode write`,
-    yield_time_ms: 30000,
-    max_output_tokens: 6000
-  })
-  // ⚠️ If session_id returned → poll write_stdin until completion (see @~/.maestro/workflows/delegate-protocol.codex.md)
+  CONSTRAINTS: Fix only regressions | Preserve debt cleanup changes | No suppressions" --role implement --mode write`, { timeout: 30000 })
+  // Execution mapping: @~/.maestro/workflows/shell-exec-protocol.md
   // NEVER skip — must wait for fix before re-running validation
   ```
 - Re-run validation checks after fix attempt

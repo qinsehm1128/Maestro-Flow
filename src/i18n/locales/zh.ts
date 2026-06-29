@@ -4,6 +4,7 @@ export const zh: LocaleStrings = {
   install: {
     // Progress step labels
     stepMode: '模式',
+    stepPlatforms: '平台',
     stepMenu: '菜单',
     stepConfirm: '确认',
     stepInstall: '安装',
@@ -12,7 +13,7 @@ export const zh: LocaleStrings = {
     // Footer hints
     footerMode: '[G] 全局  [P] 项目  [Enter] 下一步  [Esc] 退出',
     footerHub: '[Space/1-5] 切换  [Enter] 配置/安装  [Esc] 返回',
-    footerComponents: '[Space] 切换  [1-9] 快选  [A] 全选  [N] 全不选  [Enter] 完成  [Esc] 返回',
+    footerComponents: '[Space] 切换  [1-9] 快选  [A] 全选  [N] 全不选  [D] 默认  [Enter] 完成  [Esc] 返回',
     footerHooks: '[1-4] 选择级别  [Enter] 完成  [Esc] 返回',
     footerMcp: '[y/n] 启用  [1-6] 切换工具  [Enter] 完成  [Esc] 返回',
     footerStatusline: '[y/n] 切换  [Enter] 完成  [Esc] 返回',
@@ -38,6 +39,8 @@ export const zh: LocaleStrings = {
     hubTools: '{count} 个工具',
 
     // Grouped Hub
+    groupPlatforms: '安装平台',
+    groupAddons: '可选组件',
     groupCore: '核心',
     groupClaude: 'Claude Code',
     groupCodex: 'Codex',

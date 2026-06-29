@@ -247,9 +247,10 @@ export function registerSpecCommand(program: Command): void {
     .description('Initialize spec system with seed documents')
     .option('--scope <scope>', 'Spec scope: project|global|team|personal (default: project)')
     .option('--uid <uid>', 'User id for personal scope')
+    .option('--preset <name>', 'Add preset seed docs (e.g., academic)')
     .action(async (opts) => {
       const { logCliEndpoint } = await import('../hooks/spec-analytics.js');
-      logCliEndpoint(process.cwd(), 'spec init', { scope: opts.scope });
+      logCliEndpoint(process.cwd(), 'spec init', { scope: opts.scope, preset: opts.preset });
       const { initSpecSystem } = await import('../tools/spec-init.js');
 
       const scope = validateScope(opts.scope);
@@ -260,9 +261,19 @@ export function registerSpecCommand(program: Command): void {
         process.exit(1);
       }
 
+      if (opts.preset) {
+        const { SPEC_PRESETS } = await import('../tools/spec-seeds.js');
+        if (!SPEC_PRESETS[opts.preset]) {
+          const available = Object.keys(SPEC_PRESETS).join(', ');
+          console.error(`Error: unknown preset "${opts.preset}". Available: ${available}`);
+          process.exit(1);
+        }
+      }
+
       const label = SCOPE_LABELS[scope];
-      console.log(`Initializing ${label.toLowerCase()}...`);
-      const result = initSpecSystem(process.cwd(), scope, uid);
+      const presetLabel = opts.preset ? ` with preset "${opts.preset}"` : '';
+      console.log(`Initializing ${label.toLowerCase()}${presetLabel}...`);
+      const result = initSpecSystem(process.cwd(), scope, uid, opts.preset);
 
       if (result.directories.length > 0) {
         console.log('\nDirectories created:');
@@ -421,6 +432,11 @@ export function registerSpecCommand(program: Command): void {
             }
           }
         }
+        if (results.some(r => r.ok && !r.duplicate)) {
+          const { resolve: pathResolve } = await import('node:path');
+          const { invalidateSearchIndex } = await import('../search/daemon-client.js');
+          invalidateSearchIndex(pathResolve(process.cwd(), '.workflow')).catch(() => {});
+        }
         return;
       }
 
@@ -511,6 +527,11 @@ export function registerSpecCommand(program: Command): void {
           console.error(`Error: failed to add "${result.title}"`);
           process.exit(1);
         }
+        if (result.ok && !result.duplicate) {
+          const { resolve: pathResolve } = await import('node:path');
+          const { invalidateSearchIndex } = await import('../search/daemon-client.js');
+          invalidateSearchIndex(pathResolve(process.cwd(), '.workflow')).catch(() => {});
+        }
         return;
       }
 
@@ -535,6 +556,11 @@ export function registerSpecCommand(program: Command): void {
       } else {
         console.error(`Error: failed to add "${result.title}"`);
         process.exit(1);
+      }
+      if (result.ok && !result.duplicate) {
+        const { resolve: pathResolve } = await import('node:path');
+        const { invalidateSearchIndex } = await import('../search/daemon-client.js');
+        invalidateSearchIndex(pathResolve(process.cwd(), '.workflow')).catch(() => {});
       }
     });
 

@@ -242,15 +242,15 @@ maestro command-help           # 交互式命令参考（别名: ch）
 
 | 指标 | 数量 |
 |------|------|
-| 源文件 (TypeScript) | 454 |
-| 代码行数 | ~111,000 |
+| 源文件 (TypeScript) | 333 |
+| 代码行数 | ~80,700 |
 | 斜杠命令 | 64 |
 | 工作流定义 | 115 |
 | 技能包 | 45 |
 | Agent 定义 | 23 |
-| CLI 命令 | 32 |
+| CLI 命令 | 35+ |
 | 模板 | 92 |
-| 指南（双语） | 67 |
+| 指南（双语） | 76 |
 
 ### 技术栈
 
@@ -270,7 +270,7 @@ maestro command-help           # 交互式命令参考（别名: ch）
 maestro/
 ├── bin/                     # CLI 入口
 ├── src/                     # 核心 CLI (Commander.js + MCP SDK)
-│   ├── commands/            # 32 个 CLI 命令
+│   ├── commands/            # 35+ 个 CLI 命令
 │   ├── mcp/                 # MCP 服务器 (stdio 传输)
 │   ├── graph/               # 知识图谱 (SQLite + tree-sitter)
 │   └── core/                # 工具注册、扩展加载器
@@ -299,7 +299,7 @@ maestro/
 
 **工作流**
 - **[命令使用指南](guide/command-usage-guide.md)** — 全部 64 个命令，含工作流图表和管线衔接
-- **[CLI 命令参考](guide/cli-commands-guide.md)** — 全部 32 个终端命令
+- **[CLI 命令参考](guide/cli-commands-guide.md)** — 全部 35+ 个终端命令
 - **[工作流结构指南](guide/workflow-structure-guide.md)** — 命令拓扑、链组合
 - **[质量管线指南](guide/quality-pipeline-guide.md)** — verify、review、test 管线
 - **[Maestro 协调器指南](guide/maestro-coordinator-guide.md)** — 多智能体协调模式

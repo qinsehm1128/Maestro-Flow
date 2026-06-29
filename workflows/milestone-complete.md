@@ -1,7 +1,5 @@
 # Workflow: milestone-complete
 
-Archive completed milestone, move artifacts to history, and prepare for next.
-
 ---
 
 ## Step 1: Validation
@@ -57,7 +55,7 @@ Archive completed milestone, move artifacts to history, and prepare for next.
         - Update `archive.json.pruned = { "at": now, "counts": { open_questions, constraints, insights, references }, "ref": "context-package.pruned.json" }`
       - Otherwise leave both files untouched and set `archive.json.pruned = { "at": now, "counts": {...zeros}, "ref": null }`
 
-   c. If the session dir lacks `archive.json` (legacy session prior to lifecycle convention), skip (a) and (b) silently — legacy sessions are not indexed.
+   c. If the session dir lacks `archive.json` (legacy session prior to lifecycle convention), skip (a) and (b); log W0xx "legacy session not indexed"; flag archive as [LOW CONFIDENCE] (lifecycle.indexed=false, legacy session).
 
 ---
 
@@ -167,5 +165,3 @@ Next steps:
   /maestro-analyze              -- Start next milestone (standard only)
   /manage-status                -- View project state
 ```
-
-**Adhoc milestone note:** When completing an adhoc milestone, the "Next steps" section omits "Start next milestone" since adhoc milestones have no successor in a roadmap chain.

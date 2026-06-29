@@ -10,8 +10,6 @@ Unified retrospective combining git activity analysis and decision quality evalu
 Two lenses, usable independently or together:
 - **git**: Commit metrics, session detection, per-author breakdown, file hotspots, trends
 - **decision**: Decision tracing across wiki/specs/git, multi-perspective evaluation via 3 parallel agents
-
-Works on raw git history and wiki/spec data — does not require completed phase artifacts.
 </purpose>
 
 <context>

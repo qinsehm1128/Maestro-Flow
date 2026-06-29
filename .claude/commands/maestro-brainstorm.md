@@ -25,6 +25,7 @@ Pipeline: grill (optional) → **brainstorm** → roadmap / analyze / blueprint.
 - [scratch-index.json](~/.maestro/templates/scratch-index.json) — read when operating in scratch mode
 - [index.json](~/.maestro/templates/index.json) — read when operating in phase mode
 - [brainstorm-visualize.md](~/.maestro/workflows/brainstorm-visualize.md) — read when html-prototypes/ produced and user wants to browse them
+- [boundary-grill.md](~/.maestro/workflows/boundary-grill.md) — read when boundary conflicts detected (in cross-role review)
 </deferred_reading>
 
 <context>
@@ -52,12 +53,12 @@ $ARGUMENTS -- topic text for auto mode, or role name for single role mode.
 | `--style-skill PKG` | Style package for ui-designer role | — |
 
 ### Pre-load specs
-1. **Architecture specs**: Run `maestro spec load --category arch` to load architecture constraints. Use as context for multi-role analysis — ensures roles respect documented decisions.
+1. **Architecture specs**: Run `maestro load --type spec --category arch` to load architecture constraints. Use as context for multi-role analysis — ensures roles respect documented decisions.
 2. Optional — proceed without if unavailable.
 
 ### Role Knowledge
 1. `maestro search --category arch` → identify relevant entries
-2. `maestro wiki load <id1> [id2...]` → load selected documents
+2. `maestro load --type knowhow --id <id1> [id2...]` → load selected documents
 </context>
 
 <interview_protocol>
@@ -88,30 +89,16 @@ These gates apply to Auto mode (full pipeline). Do NOT advance past a gate until
 - REQUIRED: Per-feature files `{role}/analysis-F-*.md` written for each feature in §10.
 - BLOCKED if missing: complete all role analyses before spawning cross-role-reviewer.
 
-**GATE 3: Cross-Role Review → Completion** (Step 4.5 → Report)
+**GATE 2.5: Cross-Role Review → Boundary Grill** (Step 4.5 → Step 4.6)
+- REQUIRED: Boundary grill executed per workflow boundary-grill.md after cross-role review.
+- NON-BLOCKING: conflicts logged as warnings.
+
+**GATE 3: Cross-Role Review → Completion** (Step 4.5/4.6 → Report)
 - REQUIRED: Cross-role-reviewer output received with `patch_targets[]`.
-- REQUIRED: If findings > 0, resolutions applied via Edit AND logged in `guidance-specification.md` §12.
-- REQUIRED: If findings == 0, final report explicitly states "No cross-role issues detected".
+- REQUIRED: Boundary grill completed.
+- REQUIRED: Resolutions applied and logged (details in workflow).
 - BLOCKED if missing: complete review synthesis before reporting.
 
-### Artifact Verification (before completion report)
-
-```
-AUTO_MODE_REQUIRED = [
-  "guidance-specification.md",            // Step 1
-  "{role}/analysis.md" (per selected role), // Step 3
-  "{role}/analysis-F-*.md" (per feature),   // Step 3
-]
-```
-If any artifact is missing: DO NOT report completion. Go back and produce the missing artifact.
-
-### Evidence Requirement
-
-Role analysis findings in `{role}/analysis.md` §2 Decision Digest MUST cite concrete evidence:
-- Code references (file:line), API endpoints, data models from the codebase
-- User-provided constraints from interview
-- Cross-role references to other role analyses
-Decisions without evidence are flagged LOW CONFIDENCE.
 </execution>
 
 <completion>
@@ -191,6 +178,8 @@ Status verdicts:
 - [ ] `ui-designer/analysis.md` references DESIGN.md visual constraints when ui-designer is selected
 - [ ] Each `{role}/analysis.md` §2 Decisions table has ≥ 1 row per feature
 - [ ] Cross-role review (Step 4.5) executed; reviewer compares §2 Decision Digests; output includes `patch_targets[]` for every finding
+- [ ] Boundary grill executed after cross-role review (skip if no conflicts detected)
+- [ ] Boundary grill results written to guidance-specification.md §12.5 (if conflicts found)
 - [ ] If findings exist: each accepted resolution applied via Edit (annotate / strikeout / append) AND logged in `guidance-specification.md` §12 "Cross-Role Resolutions"
 - [ ] If zero findings: final report explicitly states "No cross-role issues detected"; guidance §12 unchanged
 - [ ] Heading-drift patch failures surfaced in final report (if any)

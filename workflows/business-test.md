@@ -232,6 +232,8 @@ Wait for user confirmation. If "edit": let user modify plan interactively.
 
 ---
 
+**GATE Step 4→5**: REQUIRED `business-test-plan.json` written and user-confirmed before test generation; BLOCKED if plan missing or unconfirmed.
+
 ### Step 5: Generate Test Code (if --gen-code)
 
 **Detect project tech stack:**
@@ -486,6 +488,8 @@ Update `index.json` with business_test section:
 ```
 
 ---
+
+**GATE Step 8→9**: Glob `${PHASE_DIR}/.tests/business/business-test-report.json` MUST exist before Step 9 issue creation; BLOCKED if missing.
 
 ### Step 9: Feedback Loop
 

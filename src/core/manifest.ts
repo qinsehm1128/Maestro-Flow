@@ -88,6 +88,11 @@ export interface Manifest {
     codex?: McpRecord;
     extras?: ExtraMcpRecord[];
   };
+  /** Native plugin registration via Claude/Codex plugin CLI */
+  plugin?: {
+    claude?: boolean;
+    codex?: boolean;
+  };
 }
 
 /** Current manifest schema version. */

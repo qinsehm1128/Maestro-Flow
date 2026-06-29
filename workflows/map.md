@@ -19,7 +19,7 @@ Codebase scanning with parallel mapper agents.
 
 ## Step 2: Spawn Parallel Mapper Agents
 
-Spawn 4 parallel `workflow-codebase-mapper` agents, each writing to `.workflow/research/`:
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Spawn 4 parallel `workflow-codebase-mapper` agents, each writing to `.workflow/research/`:
 
 | Agent | Focus | Output | Content |
 |-------|-------|--------|---------|
@@ -41,7 +41,7 @@ Each agent spawned in parallel as `workflow-codebase-mapper` subagent with specs
 After all 4 agents complete:
 
 1. Verify all 4 documents exist with >10 lines each.
-2. If any missing/empty → log failure, re-spawn that agent (max 1 retry).
+2. If any missing/empty → log failure, re-spawn that agent (max 1 retry); after retry exhausted, flag SUMMARY as [LOW CONFIDENCE] (incomplete) and list missing docs.
 
 ---
 

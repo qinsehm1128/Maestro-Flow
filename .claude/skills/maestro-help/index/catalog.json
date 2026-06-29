@@ -19,6 +19,7 @@
     {"name": "maestro-update", "command": "/maestro-update", "category": "core", "description": "版本更新 — 检查并安装最新版本", "source": "../../commands/maestro-update.md"},
     {"name": "maestro-grill", "command": "/maestro-grill", "category": "core", "description": "压力测试 — 对计划、想法或需求进行代码库现实性压力测试", "source": "../../commands/maestro-grill.md"},
     {"name": "maestro-next", "command": "/maestro-next", "category": "core", "description": "智能导航 — 检测工作流当前状态并推荐下一步最优命令", "source": "../../commands/maestro-next.md"},
+    {"name": "maestro-brain", "command": "/maestro-brain", "category": "core", "description": "自治调度大脑 — 站在 roadmap 之上每轮自决(推进/插入修复/修正roadmap)、委派外部CLI实现、防假绿验收、自治推进至完成", "source": "../../commands/maestro-brain.md"},
     {"name": "maestro-swarm-workflow", "command": "/maestro-swarm-workflow", "category": "core", "description": "Swarm 并行加速器 — 将意图路由到固定 Workflow 脚本进行多 agent 并发执行", "source": "../../commands/maestro-swarm-workflow.md"},
     {"name": "maestro-universal-workflow", "command": "/maestro-universal-workflow", "category": "core", "description": "动态对抗工作流生成器 — 扫描库匹配或动态生成任务特定 Workflow 脚本", "source": "../../commands/maestro-universal-workflow.md"},
     {"name": "maestro-companion", "command": "/maestro-companion", "category": "core", "description": "知识伴侣 — 加载上下文、记录伴侣文档、捕获洞察、路由到技能", "source": "../../commands/maestro-companion.md"},
@@ -126,7 +127,7 @@
     {"name": "scholar-ideation", "category": "scholar", "description": "研究构思 — 文献搜索到研究规划", "source": "../scholar-ideation/SKILL.md"},
     {"name": "scholar-latex-organizer", "category": "scholar", "description": "LaTeX 模板整理 — 会议模板 .zip 清理为 Overleaf 就绪结构", "source": "../scholar-latex-organizer/SKILL.md"},
     {"name": "scholar-publish", "category": "scholar", "description": "会议发表准备 — 演示文稿、学术海报、推广内容", "source": "../scholar-publish/SKILL.md"},
-    {"name": "scholar-rebuttal-pro", "category": "scholar", "description": "审稿回复 — Gemini/CLI 协作分析 + 多视角讨论 + 证据策略", "source": "../scholar-rebuttal-pro/SKILL.md"},
+    {"name": "scholar-rebuttal-pro", "category": "scholar", "description": "审稿回复 — Agy/CLI 协作分析 + 多视角讨论 + 证据策略", "source": "../scholar-rebuttal-pro/SKILL.md"},
     {"name": "scholar-review", "category": "scholar", "description": "学术论文审查 — 投稿前自审 + 收到评审后的回复写作", "source": "../scholar-review/SKILL.md"},
     {"name": "scholar-thesis-docx", "category": "scholar", "description": "学位论文 Word 文档 — 生成、修订、格式化严格学术排版", "source": "../scholar-thesis-docx/SKILL.md"},
     {"name": "scholar-writing", "category": "scholar", "description": "端到端学术论文写作 — 从研究仓库到出版级 LaTeX 手稿", "source": "../scholar-writing/SKILL.md"}

@@ -63,64 +63,13 @@ export const guideRegistry: Array<{
     icon: 'book-open',
   },
   {
-    slug: 'spec-system',
-    file: 'spec-system-guide.md',
-    file_en: 'spec-system-guide.en.md',
-    title: 'Spec System Guide',
-    description: 'Project specs with <spec-entry> closed-tag format, keyword loading, validation hooks',
-    title_zh: 'Spec 系统指南',
-    description_zh: '<spec-entry> 闭合标签格式、keyword 加载、验证 Hook、session dedup 注入',
-    icon: 'sparkles',
-  },
-  {
-    slug: 'spec-injection',
-    file: 'spec-injection-guide.md',
-    file_en: 'spec-injection-guide.en.md',
-    title: 'Spec Injection Configuration',
-    description: 'Keyword-granularity injection control, extra document binding, agent mapping overrides, CLI/TUI/Dashboard configuration',
-    title_zh: 'Spec 注入配置指南',
-    description_zh: 'keyword 颗粒度注入控制、额外文档绑定、agent 映射覆盖、CLI/TUI/Dashboard 三端配置',
-    icon: 'sliders',
-  },
-  {
-    slug: 'spec-analytics',
-    file: 'spec-analytics-guide.md',
-    file_en: 'spec-analytics-guide.en.md',
-    title: 'Spec Analytics Guide',
-    description: 'Injection logging, hit rate statistics, keyword analysis, hook invocation tracking, and TUI visualization',
-    title_zh: 'Spec 分析系统指南',
-    description_zh: '注入日志、命中率统计、关键词分析、Hook 调用追踪、TUI 可视化',
-    icon: 'bar-chart-2',
-  },
-  {
-    slug: 'overlay',
-    file: 'overlay-guide.md',
-    file_en: 'overlay-guide.en.md',
-    title: 'Overlay System Guide',
-    description: 'Non-invasive command extension with JSON patches and idempotent injection',
-    title_zh: 'Overlay 系统指南',
-    description_zh: '非侵入式命令扩展机制 — JSON 补丁注入，幂等且可逆',
-    icon: 'layers',
-  },
-  {
-    slug: 'worktree',
-    file: 'worktree-guide.md',
-    file_en: 'worktree-guide.en.md',
-    title: 'Worktree Parallel Development',
-    description: 'Milestone-level parallel development using git worktrees',
-    title_zh: 'Worktree 并行开发指南',
-    description_zh: '基于 git worktree 的里程碑级并行开发',
-    icon: 'git-branch',
-  },
-  {
-    slug: 'hooks-codex',
-    file: 'hooks-guide-codex.md',
-    file_en: 'hooks-guide-codex.en.md',
-    title: 'Codex Hooks Integration',
-    description: 'Hooks integration design for OpenAI Codex CLI',
-    title_zh: 'Codex Hooks 集成设计',
-    description_zh: '为 OpenAI Codex CLI 设计的 hooks 集成方案',
-    icon: 'hook',
+    slug: 'spec-config',
+    file: 'spec-config-guide.md',
+    title: 'Spec Configuration Guide',
+    description: 'Spec system, injection, and analytics configuration',
+    title_zh: '规范系统配置指南',
+    description_zh: 'Spec 系统、注入配置和分析配置',
+    icon: 'clipboard-list',
   },
   {
     slug: 'quick-start',
@@ -133,14 +82,13 @@ export const guideRegistry: Array<{
     icon: 'rocket',
   },
   {
-    slug: 'hooks',
-    file: 'hooks-guide.md',
-    file_en: 'hooks-guide.en.md',
-    title: 'Hooks System Guide',
-    description: 'Complete guide to the Maestro hooks system for Claude Code',
-    title_zh: 'Hooks 系统指南',
-    description_zh: 'Maestro hooks 系统的完整使用指南',
-    icon: 'zap',
+    slug: 'hooks-config',
+    file: 'hooks-config-guide.md',
+    title: 'Hooks Configuration Guide',
+    description: 'Hooks, Codex Hooks, Skill parameters, and Overlay configuration',
+    title_zh: 'Hook 系统配置指南',
+    description_zh: 'Hooks、Codex Hooks、Skill 参数和 Overlay 配置',
+    icon: 'settings',
   },
   {
     slug: 'delegate-async',
@@ -151,16 +99,6 @@ export const guideRegistry: Array<{
     title_zh: '异步委派指南',
     description_zh: '异步任务委派与 broker 生命周期管理',
     icon: 'send',
-  },
-  {
-    slug: 'team-lite-usage',
-    file: 'team-lite-guide.md',
-    file_en: 'team-lite-guide.en.md',
-    title: 'Team Lite Usage Guide',
-    description: 'Practical usage guide for Team Lite collaboration features',
-    title_zh: 'Team Lite 使用指南',
-    description_zh: 'Team Lite 协作功能的实际使用指南',
-    icon: 'handshake',
   },
   {
     slug: 'mcp-tools',
@@ -183,24 +121,13 @@ export const guideRegistry: Array<{
     icon: 'terminal',
   },
   {
-    slug: 'role-routing',
-    file: 'role-routing-guide.md',
-    file_en: 'role-routing-guide.en.md',
-    title: 'Role Routing & Tool Config',
-    description: 'Role-based CLI tool routing — 7 fixed roles, fallback chains, domain tags, workspace overrides',
-    title_zh: '角色路由与工具配置',
-    description_zh: '基于角色的 CLI 工具路由 — 7 个固定角色、fallback chain、domain tags、工作空间覆盖',
-    icon: 'shuffle',
-  },
-  {
-    slug: 'skill-config',
-    file: 'skill-config-guide.md',
-    file_en: 'skill-config-guide.en.md',
-    title: 'Skill Config Guide',
-    description: 'Per-skill parameter defaults with TUI editor and hook-based auto-injection',
-    title_zh: 'Skill 参数配置指南',
-    description_zh: '为 51 个命令设置默认参数 — TUI 编辑器、Hook 自动注入、双层级作用域',
-    icon: 'sliders',
+    slug: 'tools-config',
+    file: 'tools-config-guide.md',
+    title: 'Tools & Environment Configuration',
+    description: 'Role routing, Statusline, search system, workspace, and Worktree configuration',
+    title_zh: '工具与环境配置指南',
+    description_zh: '角色路由、Statusline、搜索系统、工作空间和 Worktree 配置',
+    icon: 'tool',
   },
   {
     slug: 'maestro-coordinator',
@@ -293,16 +220,6 @@ export const guideRegistry: Array<{
     icon: 'tool',
   },
   {
-    slug: 'statusline',
-    file: 'statusline-guide.md',
-    file_en: 'statusline-guide.en.md',
-    title: 'Statusline Guide',
-    description: 'Claude Code custom statusline — model, tokens, git status, context usage, milestone tracking',
-    title_zh: 'Statusline 状态栏指南',
-    description_zh: 'Claude Code 自定义状态栏 — 模型、Token、Git、上下文、里程碑追踪',
-    icon: 'monitor',
-  },
-  {
     slug: 'knowledge-management',
     file: 'knowledge-management-guide.md',
     file_en: 'knowledge-management-guide.en.md',
@@ -313,16 +230,6 @@ export const guideRegistry: Array<{
     icon: 'brain',
   },
   {
-    slug: 'team-lite-design',
-    file: 'team-lite-design.md',
-    file_en: 'team-lite-design.en.md',
-    title: 'Team Lite Design',
-    description: 'Minimal collaboration extension for 2-8 person teams — Git-native, file-driven, advisory',
-    title_zh: 'Team Lite 协作方案设计',
-    description_zh: '面向 2-8 人小团队的极简协作扩展 — Git-native + 文件驱动 + advisory',
-    icon: 'users',
-  },
-  {
     slug: 'antigravity-tools',
     file: 'antigravity_tools_guide.md',
     file_en: 'antigravity_tools_guide.en.md',
@@ -331,16 +238,6 @@ export const guideRegistry: Array<{
     title_zh: 'Antigravity 工具指南',
     description_zh: 'Antigravity AI 助手可用工具，包含参数和 Schema',
     icon: 'rocket',
-  },
-  {
-    slug: 'workflow-enhancement',
-    file: 'workflow-enhancement-guide.md',
-    file_en: 'workflow-enhancement-guide.en.md',
-    title: 'Workflow Enhancement Guide',
-    description: 'Dynamic adversarial workflow generation and parallel workflow acceleration',
-    title_zh: '工作流增强指南',
-    description_zh: '动态对抗工作流生成和并行工作流加速',
-    icon: 'workflow',
   },
   {
     slug: 'security-audit',
@@ -363,22 +260,14 @@ export const guideRegistry: Array<{
     icon: 'bug',
   },
   {
-    slug: 'workspace',
-    file: 'workspace-guide.md',
-    title: 'Cross-Workspace Knowledge Sharing',
-    description: 'Link workspaces for shared specs, knowhow, domain glossary, and codebase knowledge across projects',
-    title_zh: '跨工作空间知识共享指南',
-    description_zh: '关联多个项目实现 Spec、Knowhow、Domain、Codebase 的跨工作空间检索与注入',
-    icon: 'link',
-  },
-  {
-    slug: 'search-system',
-    file: 'search-system-guide.md',
-    title: 'Search System Guide',
-    description: 'Unified knowledge search with BM25F, type filtering, and multi-source integration',
-    title_zh: '搜索系统指南',
-    description_zh: '基于 BM25F 的统一知识搜索 — 类型过滤、多源集成、WikiIndexer 与 MaestroGraph',
-    icon: 'search',
+    slug: 'embedding',
+    file: 'embedding-guide.md',
+    file_en: 'embedding-guide.en.md',
+    title: 'Embedding Model Guide',
+    description: 'Semantic search with embedding models — ONNX runtime, device detection, RRF fusion, incremental indexing',
+    title_zh: 'Embedding 模型配置指南',
+    description_zh: '基于 Embedding 的语义搜索 — ONNX 运行时、设备检测、RRF 融合、增量索引',
+    icon: 'cpu',
   },
   {
     slug: 'install',
@@ -390,22 +279,22 @@ export const guideRegistry: Array<{
     icon: 'download',
   },
   {
-    slug: 'plan-maestrograph',
-    file: 'plan-maestrograph.md',
-    title: 'MaestroGraph Unified Knowledge Graph',
-    description: 'Unified knowledge graph engine — 6 sources, 24 query capabilities, AST-level code search',
-    title_zh: 'MaestroGraph 统一知识图谱引擎',
-    description_zh: '统一知识图谱引擎 — 6 种知识源、24 项查询能力、AST 级代码符号搜索',
-    icon: 'share-2',
+    slug: 'explore',
+    file: 'explore-guide.md',
+    title: 'Explore Lightweight Search Guide',
+    description: 'API-driven lightweight code exploration with multi-prompt parallel, multi-endpoint routing',
+    title_zh: 'Explore 轻量搜索指南',
+    description_zh: '通过 API 端点驱动的轻量代码探索，支持多 prompt 并行、多端点路由',
+    icon: 'search',
   },
   {
-    slug: 'plan-domain-knowledge',
-    file: 'plan-domain-knowledge.md',
-    title: 'Domain Knowledge System',
-    description: 'Semantic layer for terminology standardization and concept relationships',
-    title_zh: 'Domain 领域知识系统',
-    description_zh: '语义层设计 — 术语标准化、概念关系、MaestroGraph 知识源集成',
-    icon: 'book',
+    slug: 'team-lite',
+    file: 'team-lite-guide.md',
+    title: 'Team Lite Collaboration Guide',
+    description: 'Git-native collaboration extension for small teams (2-8 people)',
+    title_zh: 'Team Lite 协作指南',
+    description_zh: '面向 2-8 人小团队的 Git-native 协作扩展',
+    icon: 'users',
   },
 ];
 
@@ -414,7 +303,10 @@ export const guideRegistry: Array<{
 const commandModules = import.meta.glob('/.claude/commands/*.md', { query: '?raw', import: 'default' });
 const claudeSkillModules = import.meta.glob('/.claude/skills/*/SKILL.md', { query: '?raw', import: 'default' });
 const codexSkillModules = import.meta.glob('/.codex/skills/*/SKILL.md', { query: '?raw', import: 'default' });
-const guideModules = import.meta.glob('/guides/*.md', { query: '?raw', import: 'default' });
+const guideModules = import.meta.glob('/src/content/docs/guides/*.md', { query: '?raw', import: 'default' });
+// English guide source — bilingual sibling directory. Preferred over legacy
+// `guides/{file_en}` .en.md siblings (which are rarely present on disk).
+const guideModulesEn = import.meta.glob('/src/content/docs/en/guides/*.md', { query: '?raw', import: 'default' });
 
 /**
  * Normalize allowedTools — frontmatter may be a string or an array
@@ -625,16 +517,24 @@ export async function loadGuide(slug: string, locale: string = 'zh-CN'): Promise
   const entry = guideRegistry.find(g => g.slug === slug);
   if (!entry) return null;
 
-  // Determine which file to load
   const isEn = locale === 'en';
-  const targetFile = isEn && entry.file_en ? entry.file_en : entry.file;
 
-  const modulePath = `/guides/${targetFile}`;
-  const loader = guideModules[modulePath] || guideModules[modulePath.replace(/^\//, '')];
-
-  // If English file not found, fall back to Chinese
-  const fallbackPath = `/guides/${entry.file}`;
-  const finalLoader = loader || guideModules[fallbackPath] || guideModules[fallbackPath.replace(/^\//, '')];
+  // Locale-aware fallback chain:
+  //   en: en/guides/{file}  →  guides/{file_en}  →  guides/{file} (zh)
+  //   zh: guides/{file}
+  let finalLoader: (() => Promise<unknown>) | undefined;
+  if (isEn) {
+    const enPath = `/src/content/docs/en/guides/${entry.file}`;
+    finalLoader = guideModulesEn[enPath] || guideModulesEn[enPath.replace(/^\//, '')];
+    if (!finalLoader && entry.file_en) {
+      const enSiblingPath = `/src/content/docs/guides/${entry.file_en}`;
+      finalLoader = guideModules[enSiblingPath] || guideModules[enSiblingPath.replace(/^\//, '')];
+    }
+  }
+  if (!finalLoader) {
+    const zhPath = `/src/content/docs/guides/${entry.file}`;
+    finalLoader = guideModules[zhPath] || guideModules[zhPath.replace(/^\//, '')];
+  }
 
   if (!finalLoader) return null;
 

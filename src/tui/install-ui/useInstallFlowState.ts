@@ -8,7 +8,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import type { HooksSelection } from './HooksConfig.js';
 import type { InstallFlowConfig } from './types.js';
 import type { InstallFlowResult } from './InstallExecution.js';
-import { scanComponents, countExistingTargetFiles, MCP_TOOLS, COMPONENT_DEFS, migrateComponentIds, type ExtraMcpTargetId } from '../../commands/install-backend.js';
+import { scanComponents, countExistingTargetFiles, MCP_TOOLS, COMPONENT_DEFS, migrateComponentIds, type ExtraMcpTargetId, type ComponentDef } from '../../commands/install-backend.js';
 import { detectStatusline, getHooksForLevel, getAllHookNames, type HookLevel } from '../../commands/hooks.js';
 import { findManifest, type Manifest } from '../../core/manifest.js';
 import { exportProfile, importProfile, listProfiles, configToProfile, profileToStateValues } from '../../core/install-profile.js';
@@ -16,7 +16,7 @@ import { paths } from '../../config/paths.js';
 import { buildGroupedHubItems } from './GroupedHub.js';
 
 export type FlowStep =
-  | 'hub'
+  | 'platforms' | 'hub'
   | 'components_config' | 'hooks_config' | 'mcp_config'
   | 'codex_hooks_config' | 'codex_mcp_config'
   | 'agy_hooks_config' | 'extra_mcp_config'
@@ -43,7 +43,7 @@ export interface UseInstallFlowStateOptions {
 export function useInstallFlowState(opts: UseInstallFlowStateOptions) {
   const { pkgRoot, initialStep, initialMode, initialStepIds } = opts;
   const isSubcommand = !!initialStep;
-  const resolvedInitialStep: FlowStep = (initialStep === 'mode' || !initialStep) ? 'hub' : initialStep as FlowStep;
+  const resolvedInitialStep: FlowStep = (initialStep === 'mode' || !initialStep) ? 'platforms' : initialStep as FlowStep;
 
   // --- Core navigation ---
   const [step, setStep] = useState<FlowStep>(resolvedInitialStep);
@@ -70,7 +70,6 @@ export function useInstallFlowState(opts: UseInstallFlowStateOptions) {
 
   // --- Enabled steps ---
   const [enabledSteps, setEnabledSteps] = useState<Record<string, boolean>>({
-    components: initialStepIds ? initialStepIds.includes('components') : true,
     hooks: initialStepIds ? initialStepIds.includes('hooks') : (lastManifest ? prior.claudeHooks : true),
     mcp: initialStepIds ? initialStepIds.includes('mcp') : (lastManifest ? prior.claudeMcp : true),
     codexHooks: initialStepIds ? initialStepIds.includes('codexHooks') : prior.codexHooks,
@@ -79,14 +78,130 @@ export function useInstallFlowState(opts: UseInstallFlowStateOptions) {
     extraMcp: initialStepIds ? initialStepIds.includes('extraMcp') : prior.extraMcp,
     statusline: initialStepIds ? initialStepIds.includes('statusline') : prior.statusline,
     backup: initialStepIds ? initialStepIds.includes('backup') : true,
+    pluginClaude: initialStepIds ? initialStepIds.includes('pluginClaude') : false,
+    pluginCodex: initialStepIds ? initialStepIds.includes('pluginCodex') : false,
   });
 
-  // --- Component selection ---
-  const [selectedComponentIds, setSelectedComponentIds] = useState<string[]>(
-    () => lastManifest?.selectedComponentIds?.length
-      ? migrateComponentIds(lastManifest.selectedComponentIds)
-      : COMPONENT_DEFS.filter((d) => d.defaultSelected !== false).map((d) => d.id),
+  // --- Platform selection ---
+  type Platform = 'claude' | 'codex' | 'agy' | 'agents-standard';
+  const ALL_PLATFORMS: Platform[] = ['claude', 'codex', 'agy', 'agents-standard'];
+
+  const inferPlatformsFromManifest = useCallback((m: Manifest | null): Set<Platform> => {
+    if (!m?.selectedComponentIds?.length) return new Set<Platform>(['claude']);
+    const ids = new Set(m.selectedComponentIds);
+    const plats = new Set<Platform>();
+    for (const def of COMPONENT_DEFS) {
+      if (def.platform && def.platform !== 'shared' && ids.has(def.id)) {
+        plats.add(def.platform as Platform);
+      }
+    }
+    if (plats.size === 0) plats.add('claude');
+    return plats;
+  }, []);
+
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Set<Platform>>(
+    () => inferPlatformsFromManifest(lastManifest),
   );
+
+  const togglePlatform = useCallback((plat: string) => {
+    setSelectedPlatforms(prev => {
+      const next = new Set(prev);
+      const p = plat as Platform;
+      if (next.has(p)) {
+        if (next.size > 1) next.delete(p);
+      } else {
+        next.add(p);
+      }
+      return next;
+    });
+  }, []);
+
+  // --- Chinese response toggle (one switch → all selected platforms) ---
+  const CHINESE_IDS = useMemo(() => new Set(
+    COMPONENT_DEFS.filter(d => d.id.endsWith('-chinese')).map(d => d.id),
+  ), []);
+  const [chineseEnabled, setChineseEnabled] = useState<boolean>(() => {
+    if (!lastManifest?.selectedComponentIds?.length) return true;
+    return lastManifest.selectedComponentIds.some(id => id.endsWith('-chinese'));
+  });
+
+  // --- Addon IDs (optional user-selectable skill packs, excluding chinese) ---
+  const ADDON_IDS = useMemo(() => new Set(
+    COMPONENT_DEFS.filter(d => d.defaultSelected === false && !CHINESE_IDS.has(d.id)).map(d => d.id),
+  ), [CHINESE_IDS]);
+
+  const [selectedAddons, setSelectedAddons] = useState<Set<string>>(() => {
+    if (!lastManifest?.selectedComponentIds?.length) return new Set<string>();
+    return new Set(lastManifest.selectedComponentIds.filter(id => ADDON_IDS.has(id)));
+  });
+
+  const toggleAddon = useCallback((id: string) => {
+    if (id === 'chinese') { setChineseEnabled(v => !v); return; }
+    setSelectedAddons(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  // --- Computed: selectedComponentIds from platforms + chinese + addons ---
+  const selectedComponentIds = useMemo(() => {
+    const ids = new Set<string>();
+    const skipFileCopy = (plat: string, def: ComponentDef) =>
+      !def.inject && (
+        (plat === 'claude' && enabledSteps.pluginClaude) ||
+        (plat === 'codex' && enabledSteps.pluginCodex)
+      );
+    for (const def of COMPONENT_DEFS) {
+      const plat = def.platform ?? 'shared';
+      if (CHINESE_IDS.has(def.id)) continue;
+      if (ADDON_IDS.has(def.id)) continue;
+      if (plat === 'shared') { ids.add(def.id); continue; }
+      if (selectedPlatforms.has(plat as Platform)) {
+        if (skipFileCopy(plat, def)) continue;
+        ids.add(def.id);
+      }
+    }
+    if (chineseEnabled) {
+      for (const cid of CHINESE_IDS) {
+        const def = COMPONENT_DEFS.find(d => d.id === cid);
+        if (!def) continue;
+        const plat = def.platform ?? 'shared';
+        if (plat === 'shared' || selectedPlatforms.has(plat as Platform)) {
+          ids.add(cid);
+        }
+      }
+    }
+    for (const addon of selectedAddons) {
+      const def = COMPONENT_DEFS.find(d => d.id === addon);
+      if (!def) continue;
+      const plat = def.platform ?? 'shared';
+      if (plat === 'shared' || selectedPlatforms.has(plat as Platform)) {
+        if (skipFileCopy(plat, def)) continue;
+        ids.add(addon);
+      }
+    }
+    return Array.from(ids);
+  }, [selectedPlatforms, chineseEnabled, selectedAddons, ADDON_IDS, CHINESE_IDS, enabledSteps.pluginClaude, enabledSteps.pluginCodex]);
+
+  const applyComponentIds = useCallback((ids: string[]) => {
+    const idSet = new Set(ids);
+    const plats = new Set<Platform>();
+    for (const def of COMPONENT_DEFS) {
+      if (def.platform && def.platform !== 'shared' && idSet.has(def.id)) {
+        plats.add(def.platform as Platform);
+      }
+    }
+    if (plats.size > 0) setSelectedPlatforms(plats);
+    setChineseEnabled(ids.some(id => id.endsWith('-chinese')));
+    setSelectedAddons(new Set(ids.filter(id => ADDON_IDS.has(id))));
+  }, [ADDON_IDS]);
+
+  const setSelectedComponentIds = applyComponentIds;
+
+  // --- Codex dedupe: disable .agents/ skills in codex config to avoid duplicates ---
+  const [codexDedupeAgents, setCodexDedupeAgents] = useState(true);
 
   // --- Claude hooks ---
   const [claudeHooksSelection, setClaudeHooksSelection] = useState<HooksSelection>(
@@ -144,8 +259,11 @@ export function useInstallFlowState(opts: UseInstallFlowStateOptions) {
   useEffect(() => {
     if (isFirstRender.current) { isFirstRender.current = false; return; }
     if (isSubcommand) return;
+    setSelectedPlatforms(inferPlatformsFromManifest(lastManifest));
+    setSelectedAddons(lastManifest?.selectedComponentIds?.length
+      ? new Set(lastManifest.selectedComponentIds.filter(id => ADDON_IDS.has(id)))
+      : new Set<string>());
     setEnabledSteps({
-      components: true,
       hooks: lastManifest ? prior.claudeHooks : true,
       mcp: lastManifest ? prior.claudeMcp : true,
       codexHooks: prior.codexHooks,
@@ -154,12 +272,9 @@ export function useInstallFlowState(opts: UseInstallFlowStateOptions) {
       extraMcp: prior.extraMcp,
       statusline: prior.statusline || !lastManifest,
       backup: true,
+      pluginClaude: false,
+      pluginCodex: false,
     });
-    setSelectedComponentIds(
-      lastManifest?.selectedComponentIds?.length
-        ? migrateComponentIds(lastManifest.selectedComponentIds)
-        : COMPONENT_DEFS.filter((d) => d.defaultSelected !== false).map((d) => d.id),
-    );
     setClaudeHooksSelection(makeHooksSelection((lastManifest?.hooks?.claude?.level as HookLevel) || 'standard', 'claude'));
     setCodexHooksSelection(makeHooksSelection((lastManifest?.hooks?.codex?.level as HookLevel) || 'standard', 'codex'));
     setAgyHooksSelection(makeHooksSelection((lastManifest?.hooks?.agy?.level as HookLevel) || 'standard', 'agy'));
@@ -183,7 +298,7 @@ export function useInstallFlowState(opts: UseInstallFlowStateOptions) {
 
   const flowConfig: InstallFlowConfig = useMemo(() => ({
     mode, projectPath,
-    installComponents: enabledSteps.components,
+    installComponents: true,
     installHooks: enabledSteps.hooks,
     installMcp: enabledSteps.mcp && mcpEnabled,
     installCodexHooks: enabledSteps.codexHooks,
@@ -204,17 +319,29 @@ export function useInstallFlowState(opts: UseInstallFlowStateOptions) {
     backupClaudeMd: enabledSteps.backup && backupClaudeMd,
     backupAll: enabledSteps.backup && backupAll,
     claudeHooksSelection, codexHooksSelection, agyHooksSelection,
+    codexDedupeAgents: selectedPlatforms.has('codex' as any) && selectedPlatforms.has('agents-standard' as any) && codexDedupeAgents,
+    installPluginClaude: enabledSteps.pluginClaude,
+    installPluginCodex: enabledSteps.pluginCodex,
   }), [mode, projectPath, enabledSteps, hookLevel, selectedComponents.length,
     fileCount, mcpTools, mcpEnabled, selectedComponentIds, mcpProjectRoot,
     codexHookLevel, codexMcpEnabled, codexMcpTools, codexMcpProjectRoot,
     agyHookLevel, extraMcpTargetIds,
     installStatusline, statuslineTheme, backupClaudeMd, backupAll,
-    claudeHooksSelection, codexHooksSelection, agyHooksSelection]);
+    claudeHooksSelection, codexHooksSelection, agyHooksSelection,
+    selectedPlatforms, codexDedupeAgents]);
 
   // --- Hub groups ---
   const claudeAllHooks = useMemo(() => getAllHookNames('claude'), []);
   const codexAllHooks = useMemo(() => getAllHookNames('codex'), []);
   const agyAllHooks = useMemo(() => getAllHookNames('agy'), []);
+
+  // --- Addon defs for hub display ---
+  const addonDefs = useMemo(() =>
+    COMPONENT_DEFS.filter(d => ADDON_IDS.has(d.id)).map(d => ({
+      id: d.id, label: d.label, description: d.description,
+      platform: d.platform ?? 'shared',
+    })),
+  [ADDON_IDS]);
 
   const hubGroups = useMemo(() => buildGroupedHubItems(
     enabledSteps as Record<string, boolean>,
@@ -236,16 +363,29 @@ export function useInstallFlowState(opts: UseInstallFlowStateOptions) {
       extraMcpTargetCount: extraMcpTargetIds.length,
       statuslineDetected, statuslineTheme,
       backupClaudeMd, backupAll,
+      selectedPlatforms: Array.from(selectedPlatforms),
+      selectedAddons: Array.from(selectedAddons),
+      chineseEnabled,
+      addonDefs,
     },
   ), [enabledSteps, selectedComponents.length, fileCount, hookLevel, mcpTools.length,
     mcpEnabled, codexHookLevel, codexMcpTools.length, codexMcpEnabled,
     agyHookLevel, extraMcpTargetIds.length,
     statuslineDetected, statuslineTheme, backupClaudeMd, backupAll,
     claudeHooksSelection, codexHooksSelection, agyHooksSelection,
-    claudeAllHooks, codexAllHooks, agyAllHooks]);
+    claudeAllHooks, codexAllHooks, agyAllHooks,
+    selectedPlatforms, selectedAddons, chineseEnabled, addonDefs]);
 
   // --- Actions ---
   const toggleStep = useCallback((id: string) => {
+    if (ALL_PLATFORMS.includes(id as Platform)) {
+      togglePlatform(id as Platform);
+      return;
+    }
+    if (ADDON_IDS.has(id)) {
+      toggleAddon(id);
+      return;
+    }
     setEnabledSteps((prev) => {
       const next = !prev[id];
       if (next) {
@@ -258,7 +398,7 @@ export function useInstallFlowState(opts: UseInstallFlowStateOptions) {
       }
       return { ...prev, [id]: next };
     });
-  }, []);
+  }, [togglePlatform, toggleAddon, ADDON_IDS]);
 
   const enterConfig = useCallback((id: string) => {
     const map: Record<string, FlowStep> = {
@@ -323,6 +463,8 @@ export function useInstallFlowState(opts: UseInstallFlowStateOptions) {
 
     // Config state
     enabledSteps, selectedComponentIds, setSelectedComponentIds,
+    selectedPlatforms, togglePlatform, selectedAddons, toggleAddon,
+    codexDedupeAgents, setCodexDedupeAgents,
     claudeHooksSelection, setClaudeHooksSelection,
     mcpEnabled, setMcpEnabled, mcpTools, setMcpTools, mcpProjectRoot, setMcpProjectRoot,
     codexHooksSelection, setCodexHooksSelection,

@@ -21,6 +21,24 @@
       "route": { "graph": "spec-driven" }
     },
     {
+      "type": "grill",
+      "regex": "grill|stress.?test|压力测试|拷问|验证假设",
+      "flags": "i",
+      "route": { "graph": "grill-driven" }
+    },
+    {
+      "type": "blueprint",
+      "regex": "blueprint|蓝图|7.?phase|正式.*文档",
+      "flags": "i",
+      "route": { "graph": "blueprint-driven" }
+    },
+    {
+      "type": "analyze_macro",
+      "regex": "overhaul|migrate|rewrite|revamp|全面重写|整体迁移",
+      "flags": "i",
+      "route": { "graph": "analyze-plan-execute" }
+    },
+    {
       "type": "brainstorm",
       "regex": "brainstorm|ideate|头脑风暴|发散",
       "flags": "i",
@@ -61,12 +79,6 @@
       "regex": "execute|implement|build|develop|code|实现|开发",
       "flags": "i",
       "route": { "graph": "singles/execute" }
-    },
-    {
-      "type": "verify",
-      "regex": "verif[iy]|validate.*result|验证|校验",
-      "flags": "i",
-      "route": { "graph": "singles/verify" }
     },
     {
       "type": "review",
@@ -175,6 +187,24 @@
       "regex": "codebase.*refresh|刷新.*文档",
       "flags": "i",
       "route": { "graph": "singles/codebase-refresh" }
+    },
+    {
+      "type": "domain_add",
+      "regex": "domain.*add|领域.*注册|register.*domain|添加.*领域",
+      "flags": "i",
+      "route": { "graph": "singles/domain-add" }
+    },
+    {
+      "type": "domain_list",
+      "regex": "domain.*list|领域.*列表|list.*domain",
+      "flags": "i",
+      "route": { "graph": "singles/domain-list" }
+    },
+    {
+      "type": "domain_discover",
+      "regex": "domain.*discover|领域.*发现|discover.*term",
+      "flags": "i",
+      "route": { "graph": "singles/domain-discover" }
     },
     {
       "type": "spec_setup",

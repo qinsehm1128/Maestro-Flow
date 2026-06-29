@@ -68,10 +68,9 @@ For each group:
   Merge keywords from all issues in group: title, description, location, affected_components.
   Deduplicate keywords.
 
-  Standard depth: grep keywords in source files → top 20 paths, read 10 lines around
-    top 5 matches.
-  Deep depth: standard grep + semantic Agent search (error handling, data flow, deps),
-    merge results.
+  Standard depth: maestro explore per group (keywords as prompt), fallback grep; flag analysis as [LOW CONFIDENCE] (grep fallback, semantic depth lost).
+  Deep depth: maestro explore multi-prompt + semantic Agent search (error handling,
+    data flow, deps), merge results.
 
   Build GROUP_CONTEXT: related files, key snippets (max 50 lines), dependency chain.
   Shared context benefits co-located issues — avoids redundant exploration.
@@ -82,7 +81,7 @@ For each group:
 ### Step 4: Run Analysis (per group, parallel across groups)
 
 ```
-Launch analysis for each group in parallel using Agent tool:
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Launch analysis for each group in parallel using Agent tool:
 
   Agent({
     subagent_type: "general-purpose",
@@ -98,10 +97,10 @@ Launch analysis for each group in parallel using Agent tool:
 
 Alternatively, attempt CLI delegate first per group:
 
-  maestro delegate "<same prompt>" --role analyze --mode analysis
+  MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: maestro delegate "<same prompt>" --role analyze --mode analysis
 
   If delegate fails (timeout, unavailable, parse error):
-    Fall back to Agent tool with same prompt.
+    Fall back to Agent tool with same prompt; set analysis confidence=low and flag as [LOW CONFIDENCE] (delegate failed).
     Record fallback in analysis metadata: { tool: "agent-fallback", reason: "<error>" }
 
 Validate response per issue: all required fields present.

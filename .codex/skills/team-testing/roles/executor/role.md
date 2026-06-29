@@ -24,7 +24,7 @@ Execute tests, collect coverage, attempt auto-fix for failures. Acts as the Crit
 | .msg/meta.json | <session>/wisdom/.msg/meta.json | No |
 
 1. Extract session path and test directory from task description
-2. Load test specs: Run `maestro spec load --category test` for test framework conventions and coverage targets
+2. Load test specs: Run `maestro load --type spec --category test` for test framework conventions and coverage targets
 3. Extract coverage target (default: 80%)
 3. Read .msg/meta.json for framework info (from strategist namespace)
 4. Determine test framework:
@@ -51,7 +51,7 @@ Glob("<session>/<test-dir>/**/*")
 | 2 | Parse results: pass rate + coverage |
 | 3 | pass_rate >= 0.95 AND coverage >= target -> success, exit |
 | 4 | Extract failing test details |
-| 5 | Delegate fix to CLI tool (gemini write mode) |
+| 5 | Delegate fix to CLI tool (agy write mode) |
 | 6 | Increment iteration; >= 3 -> exit with failures |
 
 ```
@@ -61,19 +61,15 @@ Bash("<test-command> 2>&1 || true")
 **Auto-fix delegation** (on failure):
 
 ```
-exec_command({
-  cmd: `maestro delegate "PURPOSE: Fix test failures to achieve pass rate >= 0.95; success = all tests pass
+shell_exec(`maestro delegate "PURPOSE: Fix test failures to achieve pass rate >= 0.95; success = all tests pass
 TASK: • Analyze test failure output • Identify root causes • Fix test code only (not source) • Preserve test intent
 MODE: write
 CONTEXT: @<session>/<test-dir>/**/* | Memory: Test framework: <framework>, iteration <N>/3
 EXPECTED: Fixed test files with: corrected assertions, proper async handling, fixed imports, maintained coverage
 CONSTRAINTS: Only modify test files | Preserve test structure | No source code changes
 Test failures:
-<test-output>" --role implement --mode write --cd <session>`,
-  yield_time_ms: 30000,
-  max_output_tokens: 6000
-})
-// ⚠️ If session_id returned → poll write_stdin until completion (see @~/.maestro/workflows/delegate-protocol.codex.md)
+<test-output>" --role implement --mode write --cd <session>`, { timeout: 30000 })
+// Execution mapping: @~/.maestro/workflows/shell-exec-protocol.md
 // NEVER skip — must wait for fix to complete before re-running tests
 ```
 

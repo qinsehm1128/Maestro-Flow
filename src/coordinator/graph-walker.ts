@@ -14,6 +14,7 @@ import type {
 import type { GraphLoader } from './graph-loader.js';
 import type { ParallelCommandExecutor, BranchResult } from './parallel-executor.js';
 import type { WorkflowHookRegistry } from '../hooks/workflow-hooks.js';
+import { deriveRouterSignals } from '../utils/state-schema.js';
 
 export interface StartOptions {
   tool: string;
@@ -261,11 +262,17 @@ export class GraphWalker {
 
     const prompt = await this.assembler.assemble(assembleReq);
 
+    // Embed explore pre-step marker if node declares explore queries
+    let assembledPrompt = prompt;
+    if (node.explore) {
+      assembledPrompt = `<!-- EXPLORE_QUERIES:${JSON.stringify(node.explore)}-->\n${prompt}`;
+    }
+
     // Hook: transformPrompt waterfall
-    let finalPrompt = prompt;
+    let finalPrompt = assembledPrompt;
     if (this.hooks) {
       try {
-        finalPrompt = await this.hooks.transformPrompt.call(prompt);
+        finalPrompt = await this.hooks.transformPrompt.call(assembledPrompt);
       } catch (e) { console.error(`[walker] hook error: ${e instanceof Error ? e.message : String(e)}`); }
     }
 
@@ -903,6 +910,16 @@ export class GraphWalker {
             }
           }
         }
+        // Derive the router-decision signals that chains/_router.json reads but
+        // nothing computed (latent bug: router collapsed to to_analyze). Additive.
+        try {
+          const sig = deriveRouterSignals(raw);
+          const p = project as unknown as Record<string, unknown>;
+          p.milestones_total = sig.milestones_total;
+          p.latest_artifact_type = sig.latest_artifact_type;
+          p.has_pending_plans = sig.has_pending_plans;
+          p.all_phases_executed = sig.all_phases_executed;
+        } catch { /* derivation is best-effort */ }
       }
     } catch { /* no state file */ }
 

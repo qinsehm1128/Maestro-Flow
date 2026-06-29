@@ -1,8 +1,7 @@
 # Workflow: maestro
 
 Intelligent coordinator that routes user intent to optimal command chain based on project state.
-Two step types: **Skill** (in-process, synchronous) and **CLI** (via `maestro delegate`, async with role-based tool selection).
-Default `auto` mode selects type based on step complexity. All execution dispatched to unified executor (`maestro-ralph-execute`).
+Builds a `ralph_protocol_version: "2"` session: every executable step carries `skill,args,stage,scope,command_scope,command_path`; every cross-step gate is a `step.decision` node. All execution dispatched to unified executor (`maestro-ralph-execute`); the command body (`.claude/commands/maestro.md`) owns session build + dispatch. `--exec` is legacy input only — recorded to `legacy_options.exec_mode`, never changes execution. This brain is consumed for **classification only** (intent → task_type → chain); it does NOT prescribe execution semantics.
 
 **Prerequisites:**
 - None for initial invocation (can bootstrap)
@@ -110,6 +109,9 @@ Directly match user intent to the best `task_type` (maps to chain in chainMap). 
 | `overlay` | Create/edit command overlays |
 | `update` | Update maestro itself |
 | `harvest` | Extract knowledge from artifacts |
+| `domain_add` | Register a domain term into glossary |
+| `domain_list` | List registered domain terms |
+| `domain_discover` | Discover domain term candidates from codebase |
 | `wiki` | Manage wiki graph |
 | `knowhow` | Manage knowhow entries |
 | `impeccable_chain` | UI design — explore, general |
@@ -127,6 +129,9 @@ Directly match user intent to the best `task_type` (maps to chain in chainMap). 
 | `team_tech_debt` | Team tech debt remediation |
 | `team_lifecycle` | Team full lifecycle (plan+dev+test+review) |
 | `full-lifecycle` | Complete phase: plan→execute→review→test→audit |
+| `grill` | Stress-test a plan/idea against codebase reality (Socratic; `-y` → Auto mode code-answers, stage NOT skipped) |
+| `blueprint` | Formal spec package — 7-phase spec-generate |
+| `analyze-macro` | Broad/medium intent, no numeric phase — produces scope_verdict for ralph `post-analyze-scope` |
 | `brainstorm-driven` | Start from exploration/brainstorm |
 | `spec-driven` | From spec/requirements (heavy, with init) |
 | `roadmap-driven` | From requirements (light, with init) |
@@ -170,7 +175,7 @@ Display intent analysis: action, object, scope, issue_id, phase_ref, task_type, 
 
 **Resolution order:**
 1. `state_continue` → `detectNextAction(projectState)` → `{ chain, argsOverride? }`. Apply argsOverride before template substitution.
-2. Task-type aliases → named chain: `spec_generate`→`spec-driven`, `brainstorm`→`brainstorm-driven`, `issue_execute`→`issue-full`
+2. Task-type aliases → named chain: `spec_generate`→`spec-driven`, `brainstorm`→`brainstorm-driven`, `grill`→`grill-driven`, `blueprint`→`blueprint-driven`, `analyze_macro`→`analyze-plan-execute`, `issue_execute`→`issue-full`
 3. `chainMap[taskType]` → direct lookup
 
 Full `chainMap` and `detectNextAction` are in the [Reference Data](#reference-data) section.
@@ -210,9 +215,9 @@ When executing issue chains, replace `{issue_id}` in step args with resolved ID.
 **If not `autoYes`:** Confirm with user — show numbered steps, offer: Execute / Execute from step N / Cancel.
 If user chooses "Execute from step N": set `$START_STEP = N` (used in 3f to set `current_step`).
 
-### 3e: Step-level type selection
+### 3e: Step-level command resolution (v1)
 
-Step type is selected **per step**, not per chain. Pre-compute and write to each step's `type` field in status.json (executor reads this, does not re-compute).
+> **Superseded by `ralph_protocol_version: "2"`.** The command body resolves `command_scope`/`command_path` per execution step via `maestro ralph skills --platform claude --json --quiet`; cross-step gates carry `step.decision`. Do NOT write a per-step `type` field (legacy skill/cli). `--exec` is recorded to `legacy_options.exec_mode` only — it never changes execution. FSM owns step ordering + decision evaluation (control-plane precedence, see command-body invariant 15).
 
 ```
 If execMode is 'cli' or 'internal' → force that type for all steps ("cli" or "skill").
@@ -287,7 +292,7 @@ status.json already created in Step 3g, TodoWrite initialized in Step 3h.
 Skill({ skill: "maestro-ralph-execute" })
 ```
 
-The unified executor discovers the latest running session from `.workflow/.maestro/*/status.json` and executes steps sequentially. For maestro sessions (source: "maestro"), there are no decision nodes — execution is purely sequential.
+The unified executor discovers the latest running session from `.workflow/.maestro/*/status.json` and executes steps in order. maestro sessions (source: "maestro") are `ralph_protocol_version: "2"`: execution steps load via `maestro ralph next`; any `step.decision` node hands off to `Skill("maestro-ralph")` for evaluation (same mechanism as ralph sessions). Decision nodes ARE supported in maestro sessions.
 
 ---
 
@@ -300,6 +305,9 @@ const chainMap = {
   // ── Single-step ──
   'status':             [{ cmd: 'manage-status' }],
   'init':               [{ cmd: 'maestro-init' }],
+  'grill':              [{ cmd: 'maestro-grill', args: '"{description}"' }],
+  'blueprint':          [{ cmd: 'maestro-blueprint', args: '"{description}"' }],
+  'analyze-macro':      [{ cmd: 'maestro-analyze', args: '"{description}"' }],
   'analyze':            [{ cmd: 'maestro-analyze', args: '{phase}' }],
   'analyze-quick':      [{ cmd: 'maestro-analyze', args: '{phase} -q' }],
   'ui_design':          [{ cmd: 'maestro-impeccable', args: '"{description}" --chain build' }],
@@ -327,6 +335,9 @@ const chainMap = {
   'spec_add':           [{ cmd: 'spec-add', args: '"{description}"' }],
   'spec_load':          [{ cmd: 'spec-load' }],
   'spec_map':           [{ cmd: 'manage-codebase-rebuild' }],
+  'domain_add':         [{ cmd: 'domain-add', args: '"{description}"' }],
+  'domain_list':        [{ cmd: 'domain-list' }],
+  'domain_discover':    [{ cmd: 'domain-discover' }],
   'knowhow_capture':     [{ cmd: 'manage-knowhow-capture', args: '"{description}"' }],
   'issue':              [{ cmd: 'manage-issue', args: '"{description}"' }],
   'issue_discover':     [{ cmd: 'manage-issue-discover', args: '"{description}"' }],
@@ -349,20 +360,22 @@ const chainMap = {
   'team_tech_debt':     [{ cmd: 'team-tech-debt', args: '"{description}"' }],
 
   // ── Multi-step chains ──
-  'full-lifecycle':       [{ cmd: 'maestro-plan', args: '{phase}' }, { cmd: 'maestro-execute', args: '{phase}' }, { cmd: 'quality-review', args: '{phase}' }, { cmd: 'quality-test', args: '{phase}' }, { cmd: 'maestro-milestone-audit' }],
-  'spec-driven':          [{ cmd: 'maestro-init' }, { cmd: 'maestro-roadmap', args: '--mode full "{description}"' }, { cmd: 'maestro-plan', args: '{phase}' }, { cmd: 'maestro-execute', args: '{phase}' }],
-  'roadmap-driven':       [{ cmd: 'maestro-init' }, { cmd: 'maestro-roadmap', args: '"{description}"' }, { cmd: 'maestro-plan', args: '{phase}' }, { cmd: 'maestro-execute', args: '{phase}' }],
-  'brainstorm-driven':    [{ cmd: 'maestro-brainstorm', args: '"{description}"' }, { cmd: 'maestro-plan', args: '{phase}' }, { cmd: 'maestro-execute', args: '{phase}' }],
+  'full-lifecycle':       [{ cmd: 'maestro-plan', args: '{phase}' }, { cmd: 'maestro-execute', args: '{phase}' }, { cmd: 'quality-review', args: '{phase}' }, { cmd: 'quality-test', args: '{phase}' }, { cmd: 'maestro-milestone-audit' }, { cmd: 'manage-harvest', args: '--auto' }],
+  'spec-driven':          [{ cmd: 'maestro-init' }, { cmd: 'maestro-roadmap', args: '--mode full "{description}"' }, { cmd: 'maestro-plan', args: '{phase}' }, { cmd: 'maestro-execute', args: '{phase}' }, { cmd: 'manage-harvest', args: '--auto' }],
+  'roadmap-driven':       [{ cmd: 'maestro-init' }, { cmd: 'maestro-roadmap', args: '"{description}"' }, { cmd: 'maestro-plan', args: '{phase}' }, { cmd: 'maestro-execute', args: '{phase}' }, { cmd: 'manage-harvest', args: '--auto' }],
+  'grill-driven':         [{ cmd: 'maestro-grill', args: '"{description}"' }, { cmd: 'maestro-brainstorm', args: '"{description}" --from grill:{grill_id}' }, { cmd: 'maestro-plan', args: '{phase}' }, { cmd: 'maestro-execute', args: '{phase}' }, { cmd: 'manage-harvest', args: '--auto' }],
+  'blueprint-driven':     [{ cmd: 'maestro-init' }, { cmd: 'maestro-blueprint', args: '"{description}"' }, { cmd: 'maestro-plan', args: '{phase}' }, { cmd: 'maestro-execute', args: '{phase}' }, { cmd: 'manage-harvest', args: '--auto' }],
+  'brainstorm-driven':    [{ cmd: 'maestro-brainstorm', args: '"{description}"' }, { cmd: 'maestro-plan', args: '{phase}' }, { cmd: 'maestro-execute', args: '{phase}' }, { cmd: 'manage-harvest', args: '--auto' }],
   'brainstorm_visualize': [{ cmd: 'brainstorm-visualize', args: '"{description}"' }],
   'impeccable-build':       [{ cmd: 'maestro-impeccable', args: '"{description}" --chain build' }, { cmd: 'maestro-plan', args: '{phase}' }, { cmd: 'maestro-execute', args: '{phase}' }],
   'impeccable-driven':      [{ cmd: 'maestro-impeccable', args: '"{description}" --chain build' }, { cmd: 'maestro-execute', args: '{phase}' }],
-  'analyze-plan-execute': [{ cmd: 'maestro-analyze', args: '"{description}" -q' }, { cmd: 'maestro-plan', args: '--dir {scratch_dir}' }, { cmd: 'maestro-execute', args: '--dir {scratch_dir}' }],
+  'analyze-plan-execute': [{ cmd: 'maestro-analyze', args: '"{description}" -q' }, { cmd: 'maestro-plan', args: '--dir {scratch_dir}' }, { cmd: 'maestro-execute', args: '--dir {scratch_dir}' }, { cmd: 'manage-harvest', args: '--auto' }],
   'quality-loop':         [{ cmd: 'quality-review', args: '{phase}' }, { cmd: 'quality-auto-test', args: '{phase}' }, { cmd: 'quality-test', args: '{phase}' }, { cmd: 'quality-debug', args: '--from-uat {phase}' }, { cmd: 'maestro-plan', args: '{phase} --gaps' }, { cmd: 'maestro-execute', args: '{phase}' }],
   'milestone-close':      [{ cmd: 'maestro-milestone-audit' }, { cmd: 'maestro-milestone-complete' }],
   'next-milestone':       [{ cmd: 'maestro-roadmap', args: '"{description}"' }, { cmd: 'maestro-plan', args: '{phase}' }, { cmd: 'maestro-execute', args: '{phase}' }],
   'review-fix':           [{ cmd: 'maestro-plan', args: '{phase} --gaps' }, { cmd: 'maestro-execute', args: '{phase}' }, { cmd: 'quality-review', args: '{phase}' }],
   'quality-loop-partial': [{ cmd: 'maestro-plan', args: '{phase} --gaps' }, { cmd: 'maestro-execute', args: '{phase}' }],
-  'issue-full':           [{ cmd: 'maestro-analyze', args: '--gaps {issue_id}' }, { cmd: 'maestro-plan', args: '--gaps' }, { cmd: 'maestro-execute', args: '' }, { cmd: 'quality-review', args: '{phase}' }, { cmd: 'manage-issue', args: 'close {issue_id} --resolution fixed' }],
+  'issue-full':           [{ cmd: 'maestro-analyze', args: '--gaps {issue_id}' }, { cmd: 'maestro-plan', args: '--gaps' }, { cmd: 'maestro-execute', args: '' }, { cmd: 'quality-review', args: '{phase}' }, { cmd: 'manage-issue', args: 'close {issue_id} --resolution fixed' }, { cmd: 'manage-harvest', args: '--auto' }],
   'issue-quick':          [{ cmd: 'maestro-plan', args: '--gaps' }, { cmd: 'maestro-execute', args: '' }, { cmd: 'manage-issue', args: 'close {issue_id} --resolution fixed' }],
   'milestone-release':    [{ cmd: 'maestro-milestone-audit' }, { cmd: 'maestro-milestone-release' }],
 
@@ -417,19 +430,19 @@ detectNextAction(state):
 
 | Chain | Steps | Use Case |
 |-------|-------|----------|
-| `full-lifecycle` | plan → execute → review → test → audit | Full milestone completion |
-| `blueprint-driven` | init → blueprint → plan → execute | From idea/requirements (heavy) |
-| `roadmap-driven` | init → roadmap → plan → execute | From requirements (light) |
-| `brainstorm-driven` | brainstorm → plan → execute | From exploration |
+| `full-lifecycle` | plan → execute → review → test → audit → harvest | Full milestone completion |
+| `blueprint-driven` | init → blueprint → plan → execute → harvest | From idea/requirements (heavy) |
+| `roadmap-driven` | init → roadmap → plan → execute → harvest | From requirements (light) |
+| `brainstorm-driven` | brainstorm → plan → execute → harvest | From exploration |
 | `impeccable-build` | impeccable --chain build → plan → execute | From design system generation |
-| `analyze-plan-execute` | analyze -q → plan --dir → execute --dir | Fast track (scratch mode) |
+| `analyze-plan-execute` | analyze -q → plan --dir → execute --dir → harvest | Fast track (scratch mode) |
 | `review-fix` | plan --gaps → execute → review | Fix review-blocked issues |
 | `quality-loop` | review → test-gen → test → debug → plan --gaps → execute | Fix quality issues |
 | `quality-loop-partial` | plan --gaps → execute | Partial quality fix cycle |
 | `milestone-close` | audit → complete | Close a milestone |
 | `milestone-release` | audit → release | Release with version tag |
 | `next-milestone` | roadmap → plan → execute | Next milestone (auto-loads deferred) |
-| `issue-full` | analyze → plan → execute → review → close | Issue with quality gate |
+| `issue-full` | analyze → plan → execute → review → close → harvest | Issue with quality gate |
 | `issue-quick` | plan → execute → close | Issue fast path |
 
 ### Pipeline Examples

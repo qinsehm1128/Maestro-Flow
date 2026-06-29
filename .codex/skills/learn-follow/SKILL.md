@@ -9,9 +9,6 @@ allowed-tools: Read, Write, Edit, Bash, Glob, Grep, request_user_input
 Guided reading experience for code files, wiki entries, or topics. Walks through content
 section by section using 4 forcing questions to extract patterns, identify assumptions,
 and build a structured understanding map. Insights persist to `.workflow/specs/learnings.md`.
-
-Unlike `learn-decompose` which is parallel pattern extraction, this is sequential
-deep reading that builds understanding incrementally.
 </purpose>
 
 <context>

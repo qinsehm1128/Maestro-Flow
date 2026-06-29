@@ -40,10 +40,8 @@ Flags:
 Load project UI conventions before extracting design system:
 
 ```bash
-maestro spec load --category ui
+maestro load --type spec --category ui
 ```
-
-If specs not initialized, continue without — the workflow still produces valid output.
 
 ## 2. Execute Workflow
 

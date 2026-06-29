@@ -1,7 +1,7 @@
 ---
 name: maestro-ralph
 description: Use when the optimal command sequence is unclear and needs automated state-based determination
-argument-hint: "<intent> [-y] | status [session-id] | continue [session-id]"
+argument-hint: "<intent> [-y] | status [session-id] | continue [session-id] | --amend [change]"
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep, request_user_input
 ---
 <purpose>
@@ -19,6 +19,8 @@ Reads project state → infers position → builds adaptive chain → delegates 
 - **`$maestro-ralph status [session-id]`** — 显示进度；省略=最新 ralph session
 
 > 推进规则：**step 推进由 `$maestro-ralph-execute` 负责**；ralph 仅在 build / decision 评估时介入。decision 节点由 ralph-execute 自动 `$maestro-ralph` 直调 handoff，无需用户手动切换。
+
+> **CLI vs Skill 边界**：`maestro` 作为 CLI 二进制只有结构化子命令（`ralph`、`delegate`、`explore` 等），不接受裸 intent。`Bash("maestro \"some intent\"")` 会报错退出。创建 session 和路由 intent 必须通过 `$maestro-ralph` 或 `$maestro` skill 调用。CLI 层仅用于 step 加载（`ralph next`）和完成标记（`ralph complete`）。
 
 Initial decomposition (S_DECOMPOSE): boundary-clarified via ≤3 questions for broad intents (重构/全面/迁移/重写). 写入 status.json 的 `boundary_contract` / `execution_criteria` / `task_decomposition`，附 `/goal` prompt。
 
@@ -48,15 +50,20 @@ Mutual invocation with `$maestro-ralph-execute` forms a self-perpetuating work l
 ```
 </purpose>
 
+<deferred_reading>
+- [ralph-amend-goal.md](~/.maestro/workflows/ralph-amend-goal.md) — read when `--amend` flag active for goal amendment flow
+</deferred_reading>
+
 <context>
 $ARGUMENTS — intent text, flags, or keywords.
 
 **Parse:**
 ```
 -y flag                          → auto_confirm = true
+--amend / -a                     → amend_mode = true (running session 存在时触发目标修改流程)
 .md/.txt path                    → input_doc (supplementary context only, NEVER substitutes lifecycle stages)
 status|continue + session-id     → 当 intent ∈ {status,continue} 且后续 token 匹配 ralph-*|maestro-* → target_session_id
-Remaining                        → intent
+Remaining                        → intent (amend_mode 时为 change_request)
 ```
 
 **State files:**
@@ -80,6 +87,7 @@ Remaining                        → intent
 12. **Platform** — `session.platform = "codex"`；CLI 调用一律带 `--platform codex`
 13. **Invariant violation = BLOCK** — violating any invariant above blocks the current operation. Do NOT bypass for "efficiency" or "clear intent" reasons. Especially invariants about ralph never executing steps and completion_confirmed by CLI.
 14. **Delegate fallback must be marked** — when A_DELEGATE_EVALUATE verdict parse fails and falls back to "fix", MUST record `parse_failed: true, confidence_score: 0` in decisions.ndjson. Subsequent steps inherit LOW CONFIDENCE flag.
+15. **CLI ≠ Skill** — `maestro` CLI binary 只提供结构化子命令（`ralph next|complete|skills|check|session`、`delegate`、`explore`、`search` 等），**不接受裸 intent**。Session 创建、intent 路由、decision 评估均为 skill 层操作：`$maestro-ralph "intent"` 或 `$maestro "intent"`。**严禁** `Bash("maestro \"intent text\"")` — CLI 会报错退出。
 </invariants>
 
 <state_machine>
@@ -100,6 +108,7 @@ S_CONFIRM         — 用户确认                             PERSIST: —
 S_DISPATCH        — 移交 maestro-ralph-execute           PERSIST: —
 S_DECISION_EVAL   — 委托评估质量门                       PERSIST: —
 S_APPLY_VERDICT   — 应用裁决 + 插入命令                  PERSIST: session.steps[], session.passed_gates[]
+S_AMEND_GOAL      — 修改 running session 目标               PERSIST: session.task_decomposition, .boundary_contract, .goal_changelog, .steps[]
 S_FALLBACK        — 请求用户输入                         PERSIST: —
 </states>
 
@@ -108,6 +117,8 @@ S_FALLBACK        — 请求用户输入                         PERSIST: —
 S_PARSE_ROUTE:
   → S_STATUS        WHEN: intent == "status"
   → S_CONTINUE      WHEN: intent == "continue"
+  → S_AMEND_GOAL    WHEN: amend_mode == true AND running session exists
+  → S_FALLBACK      WHEN: amend_mode == true AND no running session  DO: Display: "无 running session，--amend 需要活跃 session"
   → S_DECISION_EVAL WHEN: running session with decision step in "running" status
   → S_RESOLVE_PHASE WHEN: intent is non-empty                  ← phase 必须先于 position
   → S_FALLBACK      WHEN: no intent AND no running session
@@ -168,6 +179,8 @@ S_DECISION_EVAL: (decision 节点 == `step.decision` 非空，下述 gate 名取
                      DO: A_GOAL_AUDIT_EVALUATE
   → S_APPLY_VERDICT WHEN: scope-gate (post-analyze-scope)
                      DO: A_SCOPE_EVALUATE
+  → S_APPLY_VERDICT WHEN: reground-gate (post-reground)
+                     DO: A_REGROUND_EVALUATE
   → S_APPLY_VERDICT WHEN: structural (post-milestone, post-debug-escalate)
                      DO: A_STRUCTURAL_EVALUATE
 
@@ -182,11 +195,20 @@ S_APPLY_VERDICT:
   → END             WHEN: post-milestone + standard + no next milestone DO: mark completed
   → END             WHEN: post-milestone + adhoc                       DO: mark completed (adhoc self-contained)
   → END             WHEN: post-debug-escalate (always STOP)  DO: A_PAUSE_ESCALATE
+  → END             WHEN: post-reground + drifted + confidence_score >= 60  DO: A_REGROUND_HALT
+  → S_DISPATCH      WHEN: post-reground + aligned                           DO: A_APPLY_PROCEED
+  → S_DISPATCH      WHEN: post-reground + drifted + confidence_score < 60   DO: A_APPLY_PROCEED (标 LOW CONFIDENCE)
+  GUARD: post-reground + drifted + confidence_score >= 60 → A_REGROUND_HALT（漂移熔断，auto_confirm 不跳过）
   GUARD: retry_count >= max_retries → force escalate
   GUARD: confidence_score < 60 AND proceed → override to fix
   GUARD: confidence_score > 95 AND fix AND retry > 0 → suggest proceed
   GUARD: auto_confirm → skip user prompt, apply adjusted verdict
   GUARD: not auto_confirm → request_user_input with override options
+
+S_AMEND_GOAL:
+  → S_DISPATCH      WHEN: change applied + user confirmed    DO: A_AMEND_GOAL
+  → END             WHEN: user cancels
+  GUARD: RISK_LEVEL=high → auto_confirm 无效，强制用户确认
 
 S_FALLBACK:
   → S_PARSE_ROUTE   WHEN: user provides input               DO: request_user_input
@@ -244,7 +266,7 @@ resolve_milestone(phase_number):
 
 | Pattern | Position |
 |---------|----------|
-| 压力测试 / 拷问 / 验证假设 / grill / stress-test | `grill`（**auto_confirm=true 时跳过，直接 `brainstorm`**） |
+| 压力测试 / 拷问 / 验证假设 / grill / stress-test | `grill`（**auto_confirm=true 时透传 `-y`，grill Auto mode 代码代答，不跳过**） |
 | brainstorm / 头脑风暴 / 探索 / ideate / 设计思路 | `brainstorm` |
 | blueprint / 规格 / 正式文档 / spec-generate / 7-phase | `blueprint` |
 | broad/medium intent 无数字 phase (重构/全面/重写/迁移/新功能 X) | `analyze-macro` |
@@ -294,7 +316,8 @@ resolve_milestone(phase_number):
 |-----------|----------|
 | review.json: verdict=="BLOCK" | `review-failed` |
 | review.json: verdict!="BLOCK" | `test` |
-| uat.md: all passed | `milestone-audit` |
+| uat.md: all passed + `session.milestone` 存在 | `milestone-audit` |
+| uat.md: all passed + `session.milestone=null` (standalone) | 标记 session completed（无 milestone 可审计） |
 | uat.md: has failures | `test-failed` |
 
 ### A_DETERMINE_QUALITY_MODE
@@ -376,11 +399,11 @@ narrow → derive defaults from intent + codebase, skip questions.
 
 ### A_BUILD_STEPS
 
-Generate steps from `session.lifecycle_position` to `milestone-complete`.
+Generate steps from `session.lifecycle_position` to `milestone-complete`（`session.milestone` 存在时）或最后一个质量门（standalone 时）。
 
 | Stage | Skill (independent) | Skill (unified) | Decision after | quality_mode |
 |-------|---------------------|-----------------|----------------|--------------|
-| grill | `maestro-grill "{intent}"` | *(same)* | — | all (**skip when auto_confirm**) |
+| grill | `maestro-grill "{intent}"` | *(same)* | — | all (**auto_confirm → 透传 `-y`，不跳过**) |
 | brainstorm | `maestro-brainstorm "{intent}" --from grill:{grill_id}` *(if grill ran)* / `maestro-brainstorm "{intent}"` *(otherwise)* | *(same)* | — | all |
 | blueprint | `maestro-blueprint "{intent}"` | *(same)* | — | all |
 | init | `maestro-init` | *(same)* | — | all |
@@ -405,10 +428,15 @@ Generate steps from `session.lifecycle_position` to `milestone-complete`.
 1. **起点**：从 `session.lifecycle_position` 开始
 2. **跳过已完成**：跳过当前 milestone+phase 下已有 completed artifact 的 stage（按 `session.phase` 过滤）；unified 按 milestone 过滤
 3. **quality_mode 过滤**：按 `session.quality_mode` 排除不匹配 stage
-3.5. **grill auto_confirm 跳过**：`auto_confirm == true` 时删除 `grill` stage（grill 为交互式苏格拉底拷问，不支持自动模式）；brainstorm args 不含 `--from grill:*`
+3.5. **grill auto_confirm 透传**：`auto_confirm == true` 时为 `grill` step args 追加 `-y`（grill 自身 Auto mode 用代码代答）；保留 `grill` stage 与 brainstorm 的 `--from grill:*`
 4. **决策节点**：每个 Decision after 非空的 stage 之后插入 `{ decision: "<gate>", retry_count: 0, max_retries: 2, command_scope: null, command_path: null }`
 5. **goal-audit 插入**：`task_decomposition` 存在时，在最后一个 evidence-producing stage（verify/review/test）之后、`milestone-complete` 之前插入 `decision:post-goal-audit`
-6. **终点硬约束**：chain 以 `milestone-complete` 结尾
+5.5. **re-grounding 插入**：WHEN `task_decomposition` 存在 AND 执行 step（不含 decision）≥3
+   - 从第 3 个执行 step 起每隔 3 个插入 `{ decision: "post-reground", retry_count: 0, max_retries: 0, command_scope: null, command_path: null }`
+   - 不在最后一个执行 step 后插入（由 goal-audit 覆盖）
+   - 不与已有 quality-gate decision 节点相邻（顺延到下一个 3-step 边界）
+   - fix-loop 动态插入的 step **纳入**计数（从插入点起重新计算 3-step 间隔）
+6. **终点硬约束**：`session.milestone` 存在时 chain 以 `milestone-complete` 结尾；`session.milestone=null`（standalone）时跳过 `milestone-audit` + `milestone-complete` stage，chain 以最后一个质量门 stage 结尾
 7. **goal_ref 传播**：`task_decomposition` 存在时，每个 step 按 `step.stage ∈ g.lifecycle` 匹配 `step.goal_ref = g.id`（多匹配取字典序最小）；decision 节点不打 goal_ref
 8. **占位符**：independent 保留 `{phase}` `{intent}`；unified 不带 `{phase}`
 9. **command_path 解析**（每个执行 step，decision 节点跳过）：
@@ -417,7 +445,7 @@ Generate steps from `session.lifecycle_position` to `milestone-complete`.
      - 命中 → `command_scope = "global" | "project"`，`command_path = <绝对 SKILL.md 路径>`
      - 未命中 → `command_scope = "missing"`, `command_path = null`，A_CREATE_SESSION 报错 E006
    - **不在 build 阶段读取 SKILL.md 内容**；`<required_reading>` / `<deferred_reading>` 解析与加载由 `maestro ralph next` CLI 在执行期完成
-10. **每个 step 初始化** `completion_confirmed: false`, `completion_status: null`, `completion_evidence: null`, `deferred_reads: []`, `load: null`（由 `ralph next` 写入）
+10. **每个 step 初始化** `completion_confirmed: false`, `completion_status: null`, `completion_evidence: null`, `completion_summary: null`, `completion_decisions: null`, `completion_caveats: null`, `completion_deferred: null`, `deferred_reads: []`, `load: null`（由 `ralph next` 写入）
 11. **scope_verdict gating**（仅当 chain 起点 = `analyze-macro`）：
     - `scope_verdict ∈ {medium, small}` → 跳过 `roadmap` + `analyze` 两 stage；`plan` 选 standalone 列（`--from analyze:{analyze_macro_id}`），不带 `{phase}`
     - `scope_verdict == large` → 保留 `roadmap` + `analyze`；`plan` 选 phase 列（`{phase}`）
@@ -581,11 +609,84 @@ Runs only when `task_decomposition` present.
 2. Insert full lifecycle steps for next milestone
 3. Reindex, write status.json
 
+### A_REGROUND_EVALUATE
+
+GUARD: `task_decomposition` 存在（周期触发，见 build rule 5.5）
+
+1. Read status.json：
+   - `session.intent`, `session.boundary_contract`
+   - `steps[]` WHERE `status=="completed"` → 取 `completion_evidence`, `completion_summary`, `completion_decisions`, `completion_caveats`
+   - `task_decomposition[]` WHERE `status=="done"` → 取 `goal`, `done_when`
+2. Delegate read-only audit (run_in_background, STOP, wait):
+   ```
+   maestro delegate "PURPOSE: 意图保真检查 — 对照 intent 验证累积执行是否漂移
+   TASK:
+     1. 读取 intent + boundary_contract.definition_of_done
+     2. 读取已完成 steps 的 completion_summary + completion_decisions
+     3. 判定累积产出是否仍服务 intent；是否有 step 产出超出 in_scope 或触碰 out_of_scope
+     4. 输出 aligned / drifted
+   CONTEXT:
+     intent             = {session.intent}
+     definition_of_done = {boundary_contract.definition_of_done}
+     in_scope           = {boundary_contract.in_scope}
+     out_of_scope       = {boundary_contract.out_of_scope}
+     completed_steps    = [{index, skill, stage, completion_evidence, completion_summary, completion_decisions, completion_caveats}, ...]
+     done_goals         = [{id, goal, done_when}, ...]
+     accumulated_deferred = [{from_step, item}, ...]
+     goal_changelog     = {session.goal_changelog ?? []}
+   EXPECTED:
+     ---VERDICT---
+     STATUS=aligned|drifted
+     DRIFT_DESCRIPTION=<空或具体描述>
+     CORRECTIVE_ACTION=<空或建议>
+     CONFIDENCE_SCORE=0-100
+     ---END---
+   CONSTRAINTS:
+     - 只评估不修改
+     - aligned 阈值：≥80% 已完成产出直接服务 intent
+     - 单个 step 触碰 out_of_scope → 直接判 drifted
+     - goal_changelog 存在 → 以最新 after.goals 为基准"
+   --role analyze --mode analysis
+   ```
+3. On callback: parse verdict
+4. Append `{session_dir}/decisions.ndjson`：`{ "id": "DEC-{ts}", "type": "reground-gate", "source": "ralph", "node_id": "post-reground", "verdict": "{aligned|drifted}", "confidence_score": {N} }`
+5. Verdict routing：`aligned` → A_APPLY_PROCEED；`drifted` + `confidence_score >= 60` → A_REGROUND_HALT；`drifted` + `confidence_score < 60` → A_APPLY_PROCEED（标 LOW CONFIDENCE）
+
+### A_REGROUND_HALT
+
+漂移熔断（安全门，auto_confirm 不跳过）。
+
+1. Set `session.status = "paused"`，write status.json
+2. Display:
+   ```
+   ⚠️ Re-grounding 检测失败 — 执行已偏离 intent。
+   Intent: {session.intent}
+   Drift:  {drift_description}
+   建议回归: {corrective_action}
+   选项：1) $maestro-ralph continue 忽略漂移继续  2) 手动修正后 continue  3) $maestro-ralph status 查看后决定
+   ```
+3. GUARD: auto_confirm 对本动作无效——漂移熔断不可自动跳过
+
 ### A_PAUSE_ESCALATE
 
 1. Set session status = "paused", write status.json
 2. Display: ◆ 已达最大重试次数，debug 已执行。请人工介入。
 3. Display: $maestro-ralph continue 恢复
+
+### A_AMEND_GOAL
+
+修改 running session 目标。详细流程由 `<deferred_reading>` 加载 `ralph-amend-goal.md`。
+
+| Phase | 行为 | 产出 |
+|-------|------|------|
+| 1. 快照 | 读 `task_decomposition` + `boundary_contract` + 已完成 steps 的 `completion_summary` | Display: 目标列表 + 进度 |
+| 2. 解析 | `change_request` 非空 → 直接用；为空 → request_user_input（修改/新增/移除/调整边界） | `change_type` + `change_request` |
+| 3. Mini Grill | `maestro delegate --role analyze --mode analysis`：评估影响 | RISK_LEVEL + AFFECTED_GOALS + INVALIDATED_STEPS + NEW_GAPS |
+| 4. 确认 | request_user_input：应用并继续 / 仅改目标 / 取消 | 用户选择 |
+| 5. 应用 | 归档旧目标（`superseded`）→ 写入新目标（`origin: CHG-xxx`）→ 重建链路 → write status.json | handoff $maestro-ralph-execute |
+
+GUARD: `RISK_LEVEL == high` → request_user_input 不跳过（auto_confirm 无效）
+GUARD: 已完成（`status: "done"`）的目标不可 supersede（skip + warn）
 
 </actions>
 
@@ -599,7 +700,7 @@ Runs only when `task_decomposition` present.
 {
   "session_id": "ralph-{YYYYMMDD-HHmmss}",
   "source": "ralph", "status": "running",
-  "ralph_protocol_version": "1",   // CLI-driven; absent/0 → legacy inline ralph-execute
+  "ralph_protocol_version": "2",   // CLI-driven; absent/0 → legacy; "1" → basic CLI; "2" → structured completion + enhanced anchor
   "active_step_index": null,       // CLI-managed; only one step held at a time
   "intent": "", "lifecycle_position": "",
   "phase": null, "phase_is_new": false,
@@ -633,6 +734,10 @@ Runs only when `task_decomposition` present.
     "completion_confirmed": false,
     "completion_status": null,
     "completion_evidence": null,
+    "completion_summary": null,      // 一句话总结：做了什么（MUST on DONE）
+    "completion_decisions": null,    // 本 step 做出的关键决策列表
+    "completion_caveats": null,      // 后续 step 需注意的事项
+    "completion_deferred": null,     // 被推迟到后续的工作列表
     "completed_at": null,
     "deferred_reads": [],         // 由 ralph next CLI 解析 SKILL.md 时填充
     "load": null                  // { loaded_at, required_files[], deferred_files[], resolve_version } —— 由 ralph next 写入
@@ -646,10 +751,22 @@ Runs only when `task_decomposition` present.
   "execution_criteria": [],
   "task_decomposition": [
     { "id": "G1", "goal": "", "boundary": "", "done_when": "",
-      "evidence": "", "lifecycle": [], "status": "pending|done",
-      "completion_confirmed": false, "completed_at": null }
+      "evidence": "", "lifecycle": [], "status": "pending|done|superseded",
+      "completion_confirmed": false, "completed_at": null,
+      "superseded_by": null, "superseded_at": null, "origin": null }
   ],
-  "task_decomposition_all_done": false
+  "task_decomposition_all_done": false,
+
+  // goal_changelog: additive; absent → no amendments
+  "goal_changelog": [
+    { "id": "CHG-001", "timestamp": "{ISO}",
+      "change_type": "modify|add|remove|boundary",
+      "reason": "变更描述",
+      "impact_assessment": { "risk_level": "low|medium|high",
+        "invalidated_steps": [], "new_steps_inserted": 0 },
+      "before": { "goals": [{"id":"G1","goal":"...","done_when":"..."}] },
+      "after":  { "goals": [{"id":"G1v2","goal":"...","done_when":"..."}] } }
+  ]
 }
 ```
 
@@ -743,7 +860,7 @@ decision:post-goal-audit {retry+1}
 - [ ] D-007 反查：phase 数字 → `session.milestone`，禁止读 current_milestone；写入 step.milestone_id
 - [ ] phase_is_new=true → lifecycle_position 强制 `analyze`
 - [ ] Intent overrides 识别 grill / brainstorm / blueprint / analyze-macro
-- [ ] auto_confirm=true 时 grill stage 跳过（交互式拷问不支持自动模式）
+- [ ] auto_confirm=true 时 grill step args 追加 `-y`（Auto mode 代码代答，stage 不跳过）
 - [ ] A_RESOLVE_SCOPE_VERDICT 读 macro analyze conclusions.scope_verdict，写入 session.scope_verdict + analyze_macro_id
 - [ ] 链路起点 = analyze-macro 时：large→roadmap+analyze+plan(phase)；medium/small→直跳 plan --from analyze:{ANL_ID}（跳过 roadmap+analyze）
 - [ ] post-analyze-scope decision 节点在 macro analyze 之后插入；A_SCOPE_EVALUATE/A_APPLY_SCOPE_VERDICT 重塑链路
@@ -767,5 +884,19 @@ decision:post-goal-audit {retry+1}
 - [ ] Phase-level deferred chaining：plan/execute step 的 `--from`/`--dir` 注入由 A_RESOLVE_ARGS（ralph-execute）运行时完成；build 阶段标记意图，不预知 artifact ID
 - [ ] Phase-level plan step 运行时获得 `--from analyze:{phase_analyze_id}`（由 ralph-execute 从 state.json 查找注入）
 - [ ] Phase-level execute step 运行时获得 `source_artifact_ref = "plan:{id}"`
+- [ ] 每个 step 含 `completion_summary` + `completion_decisions` + `completion_caveats` + `completion_deferred`（初始 null）
+- [ ] `completion_summary` 在 DONE/DONE_WITH_CONCERNS 时为 MUST（由 CLI `--summary` 参数传入）
+- [ ] session_anchor 包含最近 5 个已完成 step 的 `completion_summary` + `completion_caveats`（滑动窗口）
+- [ ] session_anchor 包含 task_decomposition 全局视图（仅 `status != "superseded"` 的目标）
+- [ ] session_anchor 包含 Accumulated Signals（聚合所有 caveats + deferred）
+- [ ] `--amend` 路由到 S_AMEND_GOAL（需 running session）
+- [ ] A_AMEND_GOAL 执行 5 阶段（快照→解析→mini grill→确认→应用），每阶段产出可审计
+- [ ] 旧目标标 `superseded`（`superseded_by` + `superseded_at`），新目标标 `origin: "CHG-xxx"`
+- [ ] `goal_changelog` 记录完整 before/after 快照 + impact_assessment
+- [ ] `RISK_LEVEL=high` 时 amend 不跳过 auto_confirm
+- [ ] re-grounding 完成 steps 信息含 completion_summary/decisions/caveats
+- [ ] fix-loop 动态插入 step 纳入 re-grounding 3-step 计数
+- [ ] post-reground + drifted + confidence >= 60 → A_REGROUND_HALT（auto_confirm 不跳过）
+- [ ] session_anchor boundary_contract 不截断（capAnchorList n=8）
 
 </appendix>

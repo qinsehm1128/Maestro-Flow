@@ -403,3 +403,53 @@ registerNotice({
   ],
   actions: [],
 });
+
+registerNotice({
+  version: '0.5.36',
+  title: 'Session Anchor 锚定 + Search Daemon + API Explore',
+  highlights: [
+    'Session Anchor：每个 step 自动注入 intent/boundary/goal 上下文锚定',
+    'Re-grounding 漂移熔断：周期性意图保真检查 + 漂移安全门',
+    'Search Daemon 常驻进程：ONNX 模型热缓存，搜索响应提速',
+    '新增 api-explore 轻量代码探索 subagent + 独立配置文件',
+    'Boundary Grill 协议：analyze/collab/plan/brainstorm 边界冲突审查',
+  ],
+  actions: [],
+});
+
+registerNotice({
+  version: '0.5.38',
+  title: 'Dashboard 入口恢复 + Install TUI 重构 + 反漂移防护',
+  highlights: [
+    '恢复 maestro view/stop 命令，前端 dashboard 入口重新启用',
+    'install TUI 重构：平台驱动安装 + update 迁移修复',
+    '新增 manage-drift-realign 命令 + maestro timeline CLI',
+    'ralph 反漂移 4 层防护 + 目标热修改 --amend',
+    'codex 完整移植 re-grounding 子系统',
+  ],
+  actions: [],
+});
+
+registerNotice({
+  version: '0.5.40',
+  title: '原生插件安装 + 代码框复制按钮 + shell_exec 统一',
+  highlights: [
+    '新增 maestro plugin 命令：原生插件安装模式，第三方插件直接安装到工作区',
+    'docs-site 代码框增加复制按钮 + 亮色模式深色背景修复',
+    '修复 7 个核心 skill 的确认门控缺失和 wave 流程缺陷',
+    'CLI 裸 intent 拦截优化 + codex skill shell_exec 统一抽象',
+  ],
+  actions: [],
+});
+
+registerNotice({
+  version: '0.5.42',
+  title: '.agents/ 指令注入 + explore 增强 + 命令内容分离',
+  highlights: [
+    '新增 AGENTS.md 指令注入组件：.agents/ 平台自动注入项目指令',
+    'explore 指令增强：Context Injection + Cross-Search 交叉验证',
+    '8 个命令文件内容分离：过程性逻辑下沉到 workflow 层',
+    'spec-loader category 匹配放宽 + codex skill dedupe 修复',
+  ],
+  actions: [],
+});

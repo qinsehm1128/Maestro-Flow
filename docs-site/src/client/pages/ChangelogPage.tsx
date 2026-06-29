@@ -17,6 +17,88 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '0.5.42',
+    date: '2026-06',
+    changes: [
+      { type: 'feat', text_en: 'AGENTS.md instruction injection component for .agents/ platform', text_zh: '新增 .agents/ 平台 AGENTS.md 指令注入组件' },
+      { type: 'feat', text_en: 'Enhanced install-guide skill pages + per-skill detail pages on docs-site', text_zh: '完善附加安装包 skill 介绍 + 每技能单独详情页' },
+      { type: 'feat', text_en: 'Unified workflow documentation format with explore enhancements', text_zh: '统一工作流文档指令格式 + explore Cross-Search 增强' },
+      { type: 'fix', text_en: 'Relax spec-loader category matching — support filename stem inference', text_zh: 'spec-loader 放宽 category 匹配——支持文件名 stem 推断' },
+      { type: 'fix', text_en: 'Fix codex config.toml skill dedupe marker misalignment causing infinite file growth', text_zh: '修复 codex config.toml skill dedupe 标记错位导致文件无限膨胀' },
+      { type: 'refactor', text_en: 'Command content separation — move procedural logic to workflow layer', text_zh: '命令文件内容分离——过程性逻辑下沉到 workflow 层' },
+    ],
+  },
+  {
+    version: '0.5.41',
+    date: '2026-06',
+    changes: [
+      { type: 'feat', text_en: 'spec init --preset extension mechanism + academic preset', text_zh: 'spec init --preset 扩展机制 + academic 学术预设' },
+      { type: 'fix', text_en: 'Inline base-delegated content into all 10 Odyssey commands', text_zh: '将 base 委托内容内联到全部 10 个 Odyssey 命令' },
+      { type: 'fix', text_en: 'Disambiguate 5 codex odyssey skills and create dedicated base', text_zh: '消除 5 个 codex odyssey skill 的歧义并创建专用 base' },
+      { type: 'refactor', text_en: 'Streamline 10 Odyssey command file structures — remove base duplication and prose', text_zh: '精简 10 个 Odyssey 命令文件结构，去除 base 重复与散文' },
+    ],
+  },
+  {
+    version: '0.5.40',
+    date: '2026-06',
+    changes: [
+      { type: 'feat', text_en: 'Native plugin install mode (maestro plugin) — install third-party plugins directly into workspace', text_zh: '新增原生插件安装模式 (maestro plugin)——第三方插件直接安装到工作区' },
+      { type: 'feat', text_en: 'Code block copy button + light mode dark background fix for docs-site', text_zh: 'docs-site 代码框增加复制按钮 + 亮色模式深色背景修复' },
+      { type: 'fix', text_en: 'Fix 7 core skill confirmation gate missing and wave flow defects', text_zh: '修复 7 个核心 skill 的确认门控缺失和 wave 流程缺陷' },
+      { type: 'fix', text_en: 'CLI bare intent interception + Codex skill disambiguation enhancement', text_zh: 'CLI 裸 intent 拦截优化 + Codex skill 防混淆增强' },
+      { type: 'fix', text_en: 'Fix docs-site guide loading path mismatch and missing completion icons', text_zh: '修复 docs-site guide 加载路径不匹配及补全缺失图标' },
+      { type: 'refactor', text_en: 'Unify codex skill shell execution interface to shell_exec abstraction', text_zh: '统一 codex skill 的 shell 执行接口为 shell_exec 抽象' },
+    ],
+  },
+  {
+    version: '0.5.39',
+    date: '2026-06',
+    changes: [
+      { type: 'feat', text_en: 'Embedding supports KG node hierarchical indexing + dynamic token batching', text_zh: 'embedding 支持 KG 节点分层索引 + 动态 token 分批' },
+      { type: 'feat', text_en: 'Embedding supports external API configuration (~/.maestro/api-embedding.json)', text_zh: 'embedding 支持外部 API 配置 (~/.maestro/api-embedding.json)' },
+      { type: 'feat', text_en: 'Session-context hook injects project summary, source file tree and recent sessions', text_zh: 'session-context hook 注入项目摘要、源码文件树和最近 session' },
+      { type: 'fix', text_en: 'Embedding system review fixes — daemon notification resilience, race protection, partial failure retention', text_zh: 'embedding 系统 review 修复——daemon 通知容错、竞态防护、部分失败保留' },
+      { type: 'refactor', text_en: 'Odyssey commands extract shared base + inject anti-stagnation mechanism', text_zh: 'Odyssey 命令提取共享基座 + 注入防停滞机制' },
+      { type: 'refactor', text_en: 'Codex Odyssey command sync refactor', text_zh: 'codex 版本 Odyssey 命令同步重构' },
+    ],
+  },
+  {
+    version: '0.5.38',
+    date: '2026-06',
+    changes: [
+      { type: 'feat', text_en: 'Restore maestro view/stop commands — re-enable frontend dashboard entry', text_zh: '恢复 maestro view/stop 命令，重新启用前端 dashboard 入口' },
+      { type: 'feat', text_en: 'Install TUI refactor — platform-driven installation + update migration fix', text_zh: 'install TUI 重构——平台驱动安装 + update 迁移修复' },
+      { type: 'feat', text_en: 'New manage-drift-realign command + maestro timeline CLI', text_zh: '新增 manage-drift-realign 命令 + maestro timeline CLI' },
+      { type: 'feat', text_en: 'Ralph anti-drift 4-layer protection + goal hot-amendment --amend', text_zh: 'ralph 反漂移 4 层防护 + 目标热修改 --amend' },
+      { type: 'feat', text_en: 'Codex full re-grounding subsystem migration + grill auto_mode alignment', text_zh: 'codex 完整移植 re-grounding 子系统 + grill auto_mode 对齐' },
+      { type: 'fix', text_en: 'Cross-file schema alignment + protocol version fix', text_zh: '跨文件 schema 对齐 + protocol version 遗漏修复' },
+    ],
+  },
+  {
+    version: '0.5.37',
+    date: '2026-06',
+    changes: [
+      { type: 'feat', text_en: 'Profile-based reinstall for maestro update — avoids Windows cmd length limits', text_zh: 'update 重装改用 profile-based --import --upgrade 机制，解决 Windows 命令行长度限制' },
+      { type: 'feat', text_en: 'Unified maestro load command — merged spec/wiki/session loading', text_zh: '统一 maestro load 命令——合并 spec/wiki/session 加载' },
+      { type: 'feat', text_en: 'maestro search --kg mode — unified KG full-source search', text_zh: 'maestro search --kg 模式——KG 全源统一搜索' },
+      { type: 'feat', text_en: 'Search cold-start optimization — from ~3200ms down to ~280ms', text_zh: 'search 命令冷启动优化——从 ~3200ms 降至 ~280ms' },
+      { type: 'refactor', text_en: 'Replace gemini CLI with agy CLI globally', text_zh: '全局替换 gemini CLI 为 agy CLI' },
+      { type: 'chore', text_en: 'Migrate 37 node:test suites to vitest', text_zh: '测试体系统一——37 个 node:test 全迁 vitest' },
+    ],
+  },
+  {
+    version: '0.5.36',
+    date: '2026-06',
+    changes: [
+      { type: 'feat', text_en: 'Session Anchor — auto-inject intent/boundary/goal context grounding per step', text_zh: 'Session Anchor——每个 step 自动注入 intent/boundary/goal 上下文锚定' },
+      { type: 'feat', text_en: 'Re-grounding drift circuit breaker — periodic intent fidelity checks with safety halt', text_zh: 'Re-grounding 漂移熔断——周期性意图保真检查 + 漂移安全门' },
+      { type: 'feat', text_en: 'Search daemon with ONNX model hot cache for faster search responses', text_zh: 'Search Daemon 常驻进程——ONNX 模型热缓存，搜索响应提速' },
+      { type: 'feat', text_en: 'New api-explore lightweight code exploration subagent with standalone config', text_zh: '新增 api-explore 轻量代码探索 subagent + 独立配置文件' },
+      { type: 'feat', text_en: 'Boundary Grill protocol — analyze/collab/plan/brainstorm boundary conflict review', text_zh: 'Boundary Grill 协议——analyze/collab/plan/brainstorm 边界冲突审查' },
+      { type: 'fix', text_en: 'Search scoring optimization — dynamic weights, name-match fix, tie handling', text_zh: '搜索评分优化——动态权重 + name-match 修复 + tie 处理' },
+    ],
+  },
+  {
     version: '0.5.35',
     date: '2026-06',
     changes: [
@@ -125,6 +207,15 @@ const changelog: ChangelogEntry[] = [
     changes: [
       { type: 'feat', text_en: 'delegate: add proxy config in cli-tools.json — per-tool proxy toggle, subprocess-only env injection', text_zh: 'delegate: cli-tools.json 新增代理配置，支持 per-tool 开关，仅注入子进程环境变量' },
       { type: 'fix', text_en: 'codex adapter: classify Rust tracing stderr (RMCP/MCP errors) as non-fatal thinking instead of error', text_zh: 'codex adapter: 将 Rust tracing stderr（RMCP/MCP 错误）归类为非致命诊断信息而非错误' },
+    ],
+  },
+  {
+    version: '0.4.26',
+    date: '2026-06',
+    changes: [
+      { type: 'feat', text_en: 'commands: new manage-drift-realign — detect and realign .workflow/ artifact drift against code reality with 4 parallel scanners (roadmap/spec/codebase/artifact)', text_zh: 'commands: 新增 manage-drift-realign — 4 路并行 scanner 检测重构后 .workflow/ 产物与代码的偏移并交互式对齐' },
+      { type: 'feat', text_en: 'cli: new maestro timeline command — unified git + session activity timeline with platform breakdown and hot/cold path analysis', text_zh: 'cli: 新增 maestro timeline 命令 — git + session 统一活动时间线，支持平台分组和热/冷路径分析' },
+      { type: 'feat', text_en: 'codex: new manage-drift-realign skill with CSV-wave parallel scanner pattern', text_zh: 'codex: 新增 manage-drift-realign 技能，使用 CSV-wave 并行 scanner 模式' },
     ],
   },
   {

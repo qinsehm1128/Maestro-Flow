@@ -47,7 +47,7 @@ Otherwise ANALYSIS_CONTEXT = "" (proceed without).
 ```
 Delegate planning prompt with issue details + ANALYSIS_CONTEXT:
 
-  maestro delegate "Generate step-by-step solution for {ISS-ID}: {ISSUE.title}
+  MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: maestro delegate "Generate step-by-step solution for {ISS-ID}: {ISSUE.title}
   ISSUE: title, description, severity, location, fix_direction
   {ANALYSIS_CONTEXT}
   TASK: Break into atomic steps with action types (create|modify|delete|test)

@@ -36,8 +36,8 @@ No files changed → emit W001, exit
 Read .workflow/codebase/doc-index.json
 Extract: components[], features[], requirements[], architecture_decisions[]
 
-If missing: prompt → (a) run /manage-codebase-rebuild then re-run (recommended)
-             or    → (b) DEGRADED_MODE: git-diff-only, skip Steps 3-5
+If missing: prompt → (a) MUST run /manage-codebase-rebuild then re-run
+             or    → (b) DEGRADED_MODE: git-diff-only, skip Steps 3-5; flag sync as [LOW CONFIDENCE] (git-diff-only, Steps 3-5 skipped)
 ```
 
 ### Step 4: Impact Chain Traversal
@@ -49,6 +49,8 @@ Traverse impact chain: file → components (via code_locations match)
   → features (via component.feature_ids) → requirements (via feature.requirement_ids)
 Aggregate deduplicated: { files, components, features, requirements }
 ```
+
+GATE Step 4→5: impact_chain non-empty BEFORE update index; BLOCKED if impact_chain empty (no affected components/features/requirements identified)
 
 ### Step 5: Update Doc Index (skip if --dry-run)
 

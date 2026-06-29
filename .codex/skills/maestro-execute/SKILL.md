@@ -82,6 +82,7 @@ $maestro-execute --continue "20260318-execute-P3-phase3"
 - `--auto-commit`: Atomic git commit after each task completion
 - `--method agent|cli`: Override execution method (default: from config.json)
 - `--dir <path>`: Use arbitrary directory instead of phase resolution (scratch mode)
+- `--skip-verify`: Skip Phase 2.5 verification gate
 
 When `--yes` or `-y`: Auto-confirm task breakdown, skip blocked-task prompts, auto-continue through all waves.
 
@@ -159,14 +160,14 @@ Each wave generates `wave-{N}.csv` with extra `prev_context` column populated fr
 3. **CSV is Source of Truth**: Master tasks.csv holds all execution state
 4. **Context Propagation**: prev_context built from master CSV findings, not from memory
 5. **Discovery Board is Append-Only**: Never clear, modify, or recreate discoveries.ndjson
-6. **Cascading Skip on Failure**: If a task fails/blocks, all dependent tasks are skipped
+6. **Cascading Skip on Failure**: If a task fails/blocks, all dependent tasks are marked `skipped` with error referencing the failed dependency. Skipped tasks have no summaries — this is expected, not a violation of invariant 12/13.
 7. **Cleanup Temp Files**: Remove `wave-{N}.csv` AND `wave-{N}-results.csv` after results are merged
 8. **Max 3 Fix Attempts**: Per task, auto-fix convergence failures up to 3 times, then mark blocked
 9. **Breakpoint Resume**: Always detect completed tasks and skip them on re-run
-10. **DO NOT STOP**: Continuous execution until all waves complete or user explicitly stops
-11. **Invariant violation = BLOCK** — violating any invariant above blocks the current operation.
-12. **Evidence required in task summaries** — task summaries MUST include: files actually modified (not just planned targets), convergence criteria verification results (pass/fail with evidence), any deviations from plan with rationale. "Task completed successfully" without evidence is INVALID.
-13. **Artifact verification before completion** — for each completed task, .summaries/TASK-{NNN}-summary.md MUST exist with concrete evidence. EXC artifact MUST be registered in state.json. If any missing: DO NOT report completion.
+10. **Pipeline continuity**: Continuous execution until all waves complete or user explicitly stops. When all tasks in a wave are blocked/failed, stop execution and report the blocked wave — this is a defined termination, not an invariant violation.
+11. **Invariant violation = BLOCK** — violating any invariant above blocks the current operation. Defined termination (invariant 10) and cascading skips (invariant 6) are not violations.
+12. **Evidence required in task summaries** — task summaries MUST include: files actually modified (not just planned targets), convergence criteria verification results (pass/fail with evidence), any deviations from plan with rationale. "Task completed successfully" without evidence is INVALID. Does NOT apply to `skipped` tasks (invariant 6).
+13. **Artifact verification before completion** — for each completed task, .summaries/TASK-{NNN}-summary.md MUST exist with concrete evidence. EXC artifact MUST be registered in state.json. If any missing: DO NOT report completion. Skipped tasks are exempt (no summary expected).
 </invariants>
 
 <execution>
@@ -230,9 +231,9 @@ If exit code is 1, present warnings and ask whether to proceed.
 
 4. **Build tasks.csv**: For each pending task per wave, read `.task/TASK-{NNN}.json` and extract: title, description, scope (from files), convergence.criteria, hints, execution_directives. Set `deps` from task dependency, `context_from` = deps, `wave` from plan.json.
 
-5. **Load project specs + tools**: Run `maestro spec load --category coding` to load coding conventions, architecture constraints, AND discoverable knowhow tools (passed to all agents)
+5. **Load project specs + tools**: Run `maestro load --type spec --category coding` to load coding conventions, architecture constraints, AND discoverable knowhow tools (passed to all agents)
 
-6. **Load UI specs (conditional)**: If any task involves frontend/UI work (task scope/description contains component, page, style, layout, CSS, HTML, frontend; or focus_paths in `src/components/`, `src/pages/`, `src/styles/`, `src/ui/`), also run `maestro spec load --category ui` and include in agent context.
+6. **Load UI specs (conditional)**: If any task involves frontend/UI work (task scope/description contains component, page, style, layout, CSS, HTML, frontend; or focus_paths in `src/components/`, `src/pages/`, `src/styles/`, `src/ui/`), also run `maestro load --type spec --category ui` and include in agent context.
 
 7. **Load codebase + wiki context** (optional, passed to all agents):
    - If `.workflow/codebase/ARCHITECTURE.md` exists: read and include as `codebase_context` in agent instructions
@@ -255,7 +256,7 @@ If exit code is 1, present warnings and ask whether to proceed.
 For each wave N in ascending order:
 
 1. Extract wave N pending rows from master `tasks.csv` (skip wave if none)
-2. Build `prev_context` per task from completed predecessor findings
+2. Build `prev_context` per task from completed predecessor findings. For `context_from` IDs whose status is `failed`/`blocked`/`skipped`: exclude from prev_context and append gap_note listing missing task IDs so the executor knows its context is incomplete.
 3. Write `wave-{N}.csv` with `prev_context` column, then execute:
 
 ```javascript
@@ -365,13 +366,19 @@ Skip Phase 2.5 when `--skip-verify` flag present or task count == 0.
 
 2. **Update task files**: Write each task's status from CSV back to `.task/{id}.json`
 
-3. **Issue status sync**: For tasks with `issue_id`, update `.workflow/issues/issues.jsonl`:
+3. **Register EXC artifact in state.json**: Find matching plan artifact, create `{ id: "EXC-{next_id}", type: "execute", milestone, phase, scope, path, status: "completed", depends_on: plan_artifact.id, harvested: false, created_at, completed_at }`. `milestone` MUST come from D-007 `phase_slugs` reverse lookup (numeric phase) — inherit from matching plan artifact if available, otherwise reverse-lookup directly.
+
+4. **Side-effect confirmation gate** (skip when `-y/--yes`):
+   Before writing to external stores, present a summary to the user via `request_user_input`:
+   - Issue status changes (count + IDs to resolve/update)
+   - Specs to extract (count + titles)
+   The user can approve all, selectively exclude, or skip entirely.
+
+   4a. **Issue status sync** (approved items only): For tasks with `issue_id`, update `.workflow/issues/issues.jsonl`:
    - All task_refs completed -> `issue.status = "resolved"`; any failed -> `"in_progress"`
    - Append history entry: `{ action: "executed", at: <ISO>, by: "maestro-execute", summary: "TASK-{NNN} {status}" }`
 
-4. **Register EXC artifact in state.json**: Find matching plan artifact, create `{ id: "EXC-{next_id}", type: "execute", milestone, phase, scope, path, status: "completed", depends_on: plan_artifact.id, harvested: false, created_at, completed_at }`. `milestone` MUST come from D-007 `phase_slugs` reverse lookup (numeric phase) — inherit from matching plan artifact if available, otherwise reverse-lookup directly.
-
-5. **Extract incremental specs**: Read `.summaries/`, use `maestro spec add` CLI:
+   4b. **Extract incremental specs** (approved items only): Read `.summaries/`, use `maestro spec add` CLI:
    - Learnings/pitfalls → `maestro spec add learning "<title>" "<content>" --keywords ... --description "<summary>" --source execute:{PLAN_DIR}`
    - Design rationale → `maestro spec add coding "<title>" "<content>" --keywords ... --description "<summary>"`
    - Root cause/workaround → `maestro spec add debug "<title>" "<content>" --keywords ... --description "<summary>"`
@@ -400,7 +407,7 @@ Skip Phase 2.5 when `--skip-verify` flag present or task count == 0.
 
 8. **Auto-sync** (if config.json.codebase.auto_sync_after_execute == true): detect changed files, trigger codebase doc update.
 
-9. **Display completion report**: Phase, completed/blocked counts, wave progress, paths to `.summaries/` and `.task/`, next step suggestions (`quality-review`, `manage-status`).
+9. **Display completion report**: Phase, completed/blocked counts, wave progress, paths to `.summaries/` and `.task/`. **Next-step suggestion** (suggest only, NEVER auto-execute): display recommended next command (e.g., `quality-review`, `manage-status`). The user decides whether to proceed.
 
 ### Shared Discovery Board Protocol
 
@@ -435,7 +442,7 @@ echo '{"ts":"<ISO>","worker":"TASK-001","type":"code_pattern","data":{"name":"Re
 | Agent spawn fails | Retry once, then mark task as blocked with checkpoint |
 | Convergence criteria not met after 3 attempts | Mark task as blocked, write checkpoint |
 | Git commit fails (--auto-commit) | Log warning, continue (task still marked completed) |
-| All tasks in wave blocked | Stop execution, report blocked wave |
+| All tasks in wave blocked | Stop execution, report blocked wave. Cascade-skip all tasks in subsequent waves. Proceed to Phase 3 aggregation with partial results. |
 | CSV parse error | Validate format, show line number |
 | discoveries.ndjson corrupt | Ignore malformed lines, continue |
 | Continue mode: no session found | List available sessions |

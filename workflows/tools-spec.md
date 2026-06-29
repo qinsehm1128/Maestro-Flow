@@ -1,14 +1,8 @@
 # Tool Spec Reference
 
-<reference>
-Tool specs are a **subtype of knowhow** (`tool: true` frontmatter on knowhow documents). For the full knowhow data model, lifecycle, and management commands, see `knowhow.md`. This file documents only the tool-specific subset.
-</reference>
-
-Shared reference for tool spec registration and execution commands.
-
 ## Storage
 
-Tool specs are stored as knowhow documents in `.workflow/knowhow/` with `tool: true` in YAML frontmatter. Tool registration creates new knowhow files or promotes existing ones (via frontmatter update). The `category` field determines which `spec load --category` queries match this tool.
+Path: `.workflow/knowhow/` with `tool: true` in YAML frontmatter.
 
 ## Entry Format
 

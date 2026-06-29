@@ -1,14 +1,8 @@
 # Learn Workflow
 
-Atomic insight capture, search, and retrieval. Lightweight gstack-style "eureka moment" log that complements the retrospective workflow: where retrospective extracts insights from completed phases in bulk, `manage-learn` captures one insight at a time during active work.
-
 Storage:
 - `.workflow/specs/learnings.md` — append-only container of `<spec-entry>` sub-entries (shared with retrospective output)
 - Auto-indexed by WikiIndexer (no manual index required)
-
-**Shared store rationale:** Manual captures (`source: "manual"`), tips (`source: "tip"`), retrospective-distilled insights (`source: "retrospective"`, `lens: <name>` from `quality-retrospective`), and learn-retro insights (`source: "retro-git"` or `source: "retro-decision"` from `learn-retro`) all live in the same store so search and list see the entire knowledge corpus. The `source` field disambiguates origin.
-
-This workflow does NOT spawn sub-agents; it may invoke maestro CLI utilities (e.g. `maestro wiki search`, `maestro wiki list`) for list/search subcommands. The core capture flow is a thin file operation: parse → infer → append → confirm.
 
 ---
 

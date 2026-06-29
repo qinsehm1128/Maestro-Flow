@@ -23,6 +23,7 @@ Multi-dimensional analysis of a proposal, decision, or architecture choice via C
 <deferred_reading>
 - [state.json](~/.maestro/templates/state.json) — read when registering artifact
 - [issue-gaps-analyze.md](~/.maestro/workflows/issue-gaps-analyze.md) — read when --gaps is triggered
+- [boundary-grill.md](~/.maestro/workflows/boundary-grill.md) — read when boundary conflicts detected (between Phase 4 and Phase 5)
 </deferred_reading>
 
 <context>
@@ -62,12 +63,12 @@ Output directory format, artifact registration schema, and output artifact listi
 ### Pre-load
 
 1. **Codebase docs**: IF `.workflow/codebase/doc-index.json` exists → Read ARCHITECTURE.md for module boundaries
-2. **Specs**: `maestro spec load --category arch` — load architecture constraints
+2. **Specs**: `maestro load --type spec --category arch` — load architecture constraints
 3. **Wiki search**: `maestro search "{topic keywords}" --json` → top 5-10 entries as prior knowledge
 4. All optional — proceed without if unavailable (log warning)
 
 ### Role Knowledge
-`maestro search --category debug` → select relevant → `maestro wiki load`
+`maestro search --category debug` → select relevant → `maestro load --type knowhow --id`
 </context>
 
 <interview_protocol>
@@ -85,45 +86,9 @@ Follows @~/.maestro/workflows/interview-mechanics.md standard.
 <execution>
 Follow '~/.maestro/workflows/analyze.md' completely.
 
-### Evidence-Backed Decisions
-
-Every decision MUST trace to independently gathered evidence. Manual Read/Grep is preparation — NOT evidence. Valid evidence sources:
-- cli-explore-agent output (code anchors, call chains, data flows)
-- maestro delegate CLI analysis output (multi-perspective findings)
-- User-provided input (domain knowledge, constraints, corrections)
-
-Decisions without CLI/agent-sourced evidence MUST be flagged as LOW CONFIDENCE.
-
-### Standard Mode Gates
-
-Gates 1-4 are defined in `analyze.md`. NEVER skip gates. NEVER substitute manual Read/Grep for agent/CLI exploration.
-
-### Artifact Verification
-
-Before writing the completion report (Step 9), verify ALL expected artifacts exist in OUTPUT_DIR:
-```
-FULL_MODE_REQUIRED = [
-  "discussion.md",             // Step 3+5
-  "exploration-codebase.json", // Step 4.1
-  "explorations.json" OR "perspectives.json", // Step 4.3
-  "analysis.md",               // Step 6
-  "conclusions.json",          // Step 7
-  "context.md",                // Step 8
-  "context-package.json"       // Step 8.6
-]
-```
-If any artifact is missing: DO NOT report completion. Produce the missing artifact first.
-
 ### --gaps Mode
 
 When `--gaps` is present, follow `~/.maestro/workflows/issue-gaps-analyze.md` instead of the standard pipeline.
-
-**Handoff:** context.md is consumed by maestro-plan. In --gaps mode, context.md contains issue root causes for `plan --gaps`.
-
-**scope_verdict** (added to context.md in Step 6 Synthesis for macro/adhoc/standalone scopes):
-- `large` (3+ independent subsystems or hard serial dependencies) → suggest `/maestro-roadmap --from analyze:ANL-xxx`
-- `medium` (1-2 subsystems, parallelizable) → suggest `/maestro-plan --from analyze:ANL-xxx`
-- `small` (single-file or few-file change) → suggest `/maestro-plan --from analyze:ANL-xxx`
 </execution>
 
 <completion>
@@ -193,6 +158,8 @@ Full mode:
 - [ ] Confidence tracking initialized (Step 4.6) and re-scored each round (Step 5.8)
 - [ ] Readiness gate checked before synthesis (Step 5.10)
 - [ ] Pressure pass completed ≥ 1 time before Step 6
+- [ ] Boundary grill executed between Phase 4 and Phase 5 (skip if no conflicts detected)
+- [ ] Boundary grill results written to analysis.md § Boundary Grill Results (if conflicts found)
 - [ ] Confidence summary with factor decomposition written to analysis.md
 
 Gaps mode:

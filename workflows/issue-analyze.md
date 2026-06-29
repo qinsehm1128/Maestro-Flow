@@ -3,8 +3,6 @@
 > **DEPRECATED**: Superseded by `issue-gaps-analyze.md` which adds batch support and context.md output.
 > Use `maestro-analyze --gaps [ISS-ID]` instead.
 
-This workflow's executable steps have been removed to prevent divergent implementations.
-
 ## Migration
 
 | Old usage | New usage |
@@ -20,6 +18,3 @@ This workflow's executable steps have been removed to prevent divergent implemen
 - `issue-execute.md` — downstream execution after planning
 
 ## Notes
-
-- Issue records analyzed by the new pipeline still write to `.workflow/issues/issues.jsonl` with `analysis` field (root_cause, impact, related_files, confidence, suggested_approach, analyzed_at, analyzed_by).
-- Status is unchanged by analysis (non-destructive enrichment).

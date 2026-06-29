@@ -1,7 +1,5 @@
 # TDD Workflow
 
-Test-Driven Development discipline for plan generation and execution. Invoked when `maestro-plan --tdd` is used. Transforms feature requirements into RED-GREEN-REFACTOR task chains that `maestro-execute` can consume.
-
 ---
 
 ## Iron Law

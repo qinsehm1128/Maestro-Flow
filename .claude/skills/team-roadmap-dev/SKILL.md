@@ -49,8 +49,8 @@ Multi-phase:
 ## Pre-load (coordinator, before dispatch)
 
 1. **Codebase docs**: If `.workflow/codebase/ARCHITECTURE.md` exists, read for module boundaries
-2. **Specs (arch)**: `maestro spec load --category arch` — load arch constraints as shared context
-3. **Specs (coding)**: `maestro spec load --category coding` — load coding constraints as shared context
+2. **Specs (arch)**: `maestro load --type spec --category arch` — load arch constraints as shared context
+3. **Specs (coding)**: `maestro load --type spec --category coding` — load coding constraints as shared context
 4. **Wiki knowledge**: `maestro search "roadmap milestone development" --json` — top 5 entries as prior context
 5. All optional — proceed without if unavailable
 ## Role Router
@@ -112,7 +112,7 @@ Execute built-in Phase 1 (task discovery) -> role Phase 2-4 -> built-in Phase 5 
 ```
 .workflow/.team/RD-<slug>-<date>/
 +-- roadmap.md                 # Phase plan with requirements and success criteria
-+-- state.md                   # Living memory (<100 lines)
++-- state.md                   # Living memory (concise)
 +-- config.json                # Session settings (mode, depth, gates)
 +-- wisdom/                    # Cross-task knowledge accumulation
 |   +-- learnings.md

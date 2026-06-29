@@ -199,10 +199,12 @@ export function registerInstallCommand(program: Command): void {
     .option('--extra-mcp <targets>', 'Comma-separated extra MCP targets (cursor,qoder,trae,kiro,roo,vscode,gemini)')
     .option('--components <ids>', 'Comma-separated component IDs to install (with --force)')
     .option('--statusline [theme]', 'Install statusline with optional theme (with --force)')
+    .option('--plugin', 'Register as native plugin instead of file copy (with --force)')
     .option('--export [path]', 'Export current install config as profile JSON')
     .option('--import <path>', 'Import profile and install non-interactively')
+    .option('--upgrade', 'With --import: merge new default-selected components (used by update)')
     .option('--load <path>', 'Load profile into interactive TUI (pre-fill state)')
-    .action(async (opts: { force?: boolean; global?: boolean; path?: string; hooks?: string; mcp?: boolean; codexHooks?: string; codexMcp?: boolean; agyHooks?: string; extraMcp?: string; components?: string; statusline?: boolean | string; export?: boolean | string; import?: string; load?: string }) => {
+    .action(async (opts: { force?: boolean; global?: boolean; path?: string; hooks?: string; mcp?: boolean; codexHooks?: string; codexMcp?: boolean; agyHooks?: string; extraMcp?: string; components?: string; statusline?: boolean | string; plugin?: boolean; export?: boolean | string; import?: string; upgrade?: boolean; load?: string }) => {
       const pkgRoot = getPackageRoot();
 
       // Validate package root
@@ -227,22 +229,27 @@ export function registerInstallCommand(program: Command): void {
       // Profile import — non-interactive install from profile
       if (opts.import) {
         const { importProfile } = await import('../core/install-profile.js');
-        const { migrateComponentIds: migrateIds } = await import('./install-backend.js');
+        const { migrateComponentIds: migrateIds, mergeNewDefaults } = await import('./install-backend.js');
         const profile = importProfile(opts.import);
         console.error(`Importing profile: ${profile.name} (${profile.scope})`);
+        const componentIds = opts.upgrade
+          ? mergeNewDefaults(profile.components.selectedIds)
+          : migrateIds(profile.components.selectedIds);
         await forceInstall(pkgRoot, version, {
           global: profile.scope === 'global',
+          path: opts.path,
           hooks: profile.claude.hooks.basePreset,
           mcp: profile.claude.mcp.enabled || undefined,
           codexHooks: profile.codex.hooks.basePreset,
           codexMcp: profile.codex.mcp.enabled || undefined,
           agyHooks: profile.agy.hooks.basePreset,
           extraMcp: profile.extraMcp.enabled ? profile.extraMcp.targetIds.join(',') : undefined,
-          components: migrateIds(profile.components.selectedIds).join(','),
+          components: componentIds.join(','),
           statusline: profile.claude.statusline.enabled ? profile.claude.statusline.theme : undefined,
           claudeHooksSelection: profile.claude.hooks.isCustom ? profile.claude.hooks : undefined,
           codexHooksSelection: profile.codex.hooks.isCustom ? profile.codex.hooks : undefined,
           agyHooksSelection: profile.agy.hooks.isCustom ? profile.agy.hooks : undefined,
+          plugin: profile.plugin?.enabled || undefined,
         });
         return;
       }
@@ -296,6 +303,7 @@ interface ForceInstallOpts {
   claudeHooksSelection?: { basePreset: string; selectedHooks: string[]; isCustom: boolean };
   codexHooksSelection?: { basePreset: string; selectedHooks: string[]; isCustom: boolean };
   agyHooksSelection?: { basePreset: string; selectedHooks: string[]; isCustom: boolean };
+  plugin?: boolean;
 }
 
 async function forceInstall(
@@ -322,9 +330,19 @@ async function forceInstall(
   const componentIds = opts.components
     ? migrateComponentIds(opts.components.split(','))
     : undefined;
-  const toInstall = componentIds
+  let toInstall = componentIds
     ? available.filter(c => componentIds.includes(c.def.id))
     : available;
+
+  // Plugin mode: skip file-copy components for platforms using native plugin
+  if (opts.plugin) {
+    toInstall = toInstall.filter(c => {
+      if (c.def.inject) return true; // keep inject components (CLAUDE.md, AGENTS.md)
+      if (c.def.platform === 'claude') return false;
+      if (c.def.platform === 'codex') return false;
+      return true;
+    });
+  }
 
   const hookLevel = (opts.hooks ?? 'none') as HookLevel;
   const codexHookLevel = (opts.codexHooks ?? 'none') as HookLevel;
@@ -367,6 +385,9 @@ async function forceInstall(
     claudeHooksSelection: opts.claudeHooksSelection as import('../tui/install-ui/HooksConfig.js').HooksSelection,
     codexHooksSelection: opts.codexHooksSelection as import('../tui/install-ui/HooksConfig.js').HooksSelection,
     agyHooksSelection: opts.agyHooksSelection as import('../tui/install-ui/HooksConfig.js').HooksSelection,
+    codexDedupeAgents: toInstall.some(c => c.def.id.startsWith('codex-')) && toInstall.some(c => c.def.id.startsWith('agents-standard-')),
+    installPluginClaude: !!opts.plugin,
+    installPluginCodex: !!opts.plugin,
   };
 
   const result = await executeInstallPipeline({
@@ -399,17 +420,46 @@ async function forceInstall(
 
 async function warmupEmbedding(): Promise<void> {
   try {
-    process.stderr.write('  Embedding: warming up model...\r');
-    const { isAvailable, getUnavailableReason, embedTexts, getDeviceSummary } = await import('#maestro-dashboard/wiki/embedding.js');
+    const { isAvailable, getUnavailableReason, embedTexts, getDeviceSummary, setProgressCallback } = await import('#maestro-dashboard/wiki/embedding.js');
     if (!await isAvailable()) {
       const reason = getUnavailableReason?.() ?? 'unknown';
       console.error(`  Embedding: unavailable (${reason})`);
       return;
     }
+
+    const isTTY = process.stderr.isTTY === true;
+    let downloadStarted = false;
+    let lastPct = -1;
+    setProgressCallback((info) => {
+      if (info.status === 'progress' && info.file === 'onnx/model.onnx' && !downloadStarted) {
+        downloadStarted = true;
+        console.error(`  Embedding: downloading model (~465 MB, first time only)...`);
+      }
+      if (info.status === 'progress' && info.file === 'onnx/model.onnx' && typeof info.progress === 'number') {
+        const pct = Math.round(info.progress);
+        if (pct === lastPct) return;
+        lastPct = pct;
+        const loaded = info.loaded ? `${(info.loaded / 1024 / 1024).toFixed(0)}` : '0';
+        const total = info.total ? `${(info.total / 1024 / 1024).toFixed(0)}` : '?';
+        if (isTTY) {
+          const bar = '█'.repeat(Math.floor(pct / 5)) + '░'.repeat(20 - Math.floor(pct / 5));
+          process.stderr.write(`  Embedding: [${bar}] ${pct}% ${loaded}/${total} MB\r`);
+        } else if (pct % 25 === 0) {
+          console.error(`  Embedding: ${pct}% (${loaded}/${total} MB)`);
+        }
+      }
+      if (info.status === 'done' && info.file === 'onnx/model.onnx' && downloadStarted) {
+        if (isTTY) process.stderr.write('\x1b[2K\r');
+      }
+    });
+
     const t0 = Date.now();
+    process.stderr.write('  Embedding: warming up model...\r');
     await embedTexts(['warmup']);
+    if (isTTY) process.stderr.write('\x1b[2K\r');
     console.error(`  ✓ Embedding: model ready (${getDeviceSummary()}, ${Date.now() - t0}ms)`);
   } catch (e: unknown) {
+    process.stderr.write('\x1b[2K\r');
     console.error(`  Embedding: warmup failed (${e instanceof Error ? e.message : e})`);
   }
 }

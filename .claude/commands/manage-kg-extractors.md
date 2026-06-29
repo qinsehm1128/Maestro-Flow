@@ -15,8 +15,6 @@ allowed-tools:
 
 <purpose>
 Analyze current repository's code patterns to auto-generate `.workflow/kg/extractors.yaml` — a declarative config that teaches MaestroGraph's codegraph extractor to recognize project-specific symbols beyond standard function/class/method declarations.
-
-Detects: builder/factory API registrations, domain constant patterns, custom decorator conventions, framework-specific patterns, module-level constants.
 </purpose>
 
 <context>
@@ -103,7 +101,7 @@ If `--scan-only`: stop after Phase 2 summary.
 
 | Condition | Suggestion |
 |-----------|-----------|
-| Verify new symbols | `maestro kg search "<pattern_name>"` |
+| Verify new symbols | `maestro search --kg "<pattern_name>"` |
 | Re-index after changes | `maestro kg index` |
 | View KG stats | `maestro kg stats` |
 | Edit rules manually | Edit `.workflow/kg/extractors.yaml` |
@@ -124,5 +122,5 @@ If `--scan-only`: stop after Phase 2 summary.
 - [ ] extractors.yaml generated with valid rules
 - [ ] Each rule has match.type, match.pattern, extract.kind
 - [ ] Re-index succeeds with new extractors.yaml active
-- [ ] New symbols searchable via `maestro kg search`
+- [ ] New symbols searchable via `maestro search --kg`
 </success_criteria>

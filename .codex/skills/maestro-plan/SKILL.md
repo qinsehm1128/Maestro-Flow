@@ -88,9 +88,11 @@ Write resolved milestone into PLN artifact registration and `plan.json.milestone
 **Session**: `.workflow/.csv-wave/{YYYYMMDD}-plan-P{N}-{slug}/`
 **Scratch**: `.workflow/scratch/{YYYYMMDD}-plan-P{N}-{slug}/` (.task/ subdir)
 
-**Pre-load** (optional): context-package.json (via `--from`, takes precedence), context.md (prior analyze), conclusions.json, codebase ARCHITECTURE.md, `maestro search`, `maestro spec load --category arch`, team preflight `maestro collab preflight`.
+**Pre-load** (optional): context-package.json (via `--from`, takes precedence), context.md (prior analyze), conclusions.json, codebase ARCHITECTURE.md, `maestro search`, `maestro load --type spec --category arch`, team preflight `maestro collab preflight`.
 
-**D-008 Ad-hoc Milestone Auto-Creation**: When scope resolves to `standalone` via standard resolution (routes 6 or 7, NOT via `--from`), and `state.json.current_milestone == null`, auto-create an adhoc milestone:
+**D-008 Ad-hoc Milestone Auto-Creation**: When scope resolves to `standalone` via standard resolution (routes 6 or 7, NOT via `--from`), and `state.json.current_milestone == null`:
+- **Interactive mode**: prompt user via `request_user_input` — "No active milestone. Create ad-hoc milestone `ADH-{YYYYMMDD}-{slug}`?" with options: Create (Recommended) / Abort / Specify milestone name. Only write to state.json after user confirms.
+- **Auto mode (`-y`)**: auto-create with log notification.
 ```
 milestone_id = "ADH-{YYYYMMDD}-{slug}"
 state.json.milestones.push({ id: milestone_id, name: "{intent slug}", type: "adhoc", status: "active", phase_slugs: [] })
@@ -114,10 +116,10 @@ Wave 1: N exploration rows (parallel). Wave 2: 1 planning row (sequential).
 1. **Wave order sacred**: Explorations (W1) before planning (W2)
 2. **CSV source of truth**: Master tasks.csv holds all state
 3. **Discovery board append-only**: Never modify/delete
-4. **Skip on failure**: If all explorations fail, planner proceeds with available context
-5. **DO NOT STOP**: Continuous until all waves complete
-6. **Invariant violation = BLOCK** — violating any invariant above blocks the current operation.
-7. **Verifiable convergence criteria required** — every task MUST have convergence.criteria[] with grep-verifiable conditions (no subjective language like "well-structured" or "properly implemented"). If any task lacks verifiable criteria: DO NOT report completion — fix the criteria first.
+4. **Skip on failure**: If all explorations fail, planner proceeds with available context but ALL generated tasks inherit LOW CONFIDENCE flag. Record `degradation_event` in discoveries.ndjson. This is a defined degradation path, not an invariant violation.
+5. **Pipeline continuity**: Continuous until all waves complete. When invariant 4 (skip on failure) activates, the pipeline continues in degraded mode — this is NOT a violation of invariant 6.
+6. **Invariant violation = BLOCK** — violating any invariant above blocks the current operation. Defined degradation paths (invariant 4) are not violations.
+7. **Verifiable convergence criteria required** — every task MUST have convergence.criteria[] with grep-verifiable conditions (no subjective language like "well-structured" or "properly implemented"). If any task lacks verifiable criteria: DO NOT report completion — fix the criteria first. **Degradation exception**: when invariant 4 is active (exploration failed), criteria that would normally reference exploration findings MAY use available context instead, but MUST be flagged LOW CONFIDENCE.
 8. **Artifact verification before completion** — plan.json and .task/TASK-*.json files MUST exist. PLN artifact MUST be registered in state.json. If any missing: DO NOT report completion.
 </invariants>
 
@@ -138,23 +140,31 @@ S_REGISTER    — 注册 PLN artifact、更新 index.json           PERSIST: sta
 <transitions>
 S_PARSE → S_RESUME     WHEN: --continue
 S_PARSE → S_CONTEXT    WHEN: phase/dir/--from resolved (D-007 reverse lookup for numeric)
-S_PARSE → S_CONTEXT    WHEN: no args + no roadmap AND latest analyze artifact found in state.json (scope=standalone)
+S_PARSE → S_CONTEXT    WHEN: no args + no roadmap AND latest analyze artifact found in state.json (scope=standalone). Interactive mode: confirm the auto-discovered artifact with user ("Using analyze artifact ANL-xxx from {date}. Proceed?"). -y mode: auto-proceed with log.
 S_PARSE → ERROR        WHEN: no args + no roadmap + no analyze artifact
 
 S_RESUME → S_WAVE_1    WHEN: W1 incomplete    DO: load session, resume
 S_RESUME → S_WAVE_2    WHEN: W1 done, W2 pending
 S_RESUME → S_CHECK     WHEN: W2 done, check pending
+S_RESUME → ERROR       WHEN: session file corrupted/missing or CSV parse failure
 
 S_CONTEXT → S_CSV_GEN  DO: if --from: resolve context-package.json (precedence over context.md); load context.md, conclusions.json, specs, wiki, codebase docs
 
 S_CSV_GEN → S_WAVE_1   DO: pre-flight (`maestro collab preflight --phase N`; exit 1 → warn + ask), determine exploration angles, generate tasks.csv, user validates (skip -y)
 
-S_WAVE_1 → S_WAVE_2    DO: spawn parallel explorations, merge results, build prev_context
+S_WAVE_1 → S_WAVE_2    WHEN: 1+ completed    DO: spawn parallel explorations, merge results, build prev_context. For failed exploration tasks: exclude from prev_context and append gap_note to W2 planning instruction listing missing angles.
+S_WAVE_1 → S_WAVE_1    WHEN: all failed, retry available   DO: retry once
+S_WAVE_1 → S_WAVE_2    WHEN: all failed, retry exhausted   DO: proceed with available context only, flag LOW CONFIDENCE (invariant 4 degradation)
 
 S_WAVE_2 → S_CHECK     DO: spawn planning agent, merge results
 
-S_CHECK → S_CONFIRM    WHEN: plan passes or max 3 iterations    DO: A_PLAN_CHECK
-S_CHECK → S_WAVE_2     WHEN: plan fails check, iterations < 3   DO: feed checker feedback back
+S_CHECK → S_BOUNDARY_GRILL  WHEN: plan passes or max 3 iterations    DO: A_PLAN_CHECK
+S_CHECK → S_WAVE_2         WHEN: plan fails check, iterations < 3   DO: feed checker feedback back
+
+S_BOUNDARY_GRILL:
+  → S_CONFIRM    WHEN: no boundary conflicts detected     DO: —
+  → S_CONFIRM    WHEN: conflicts detected + resolved      DO: A_BOUNDARY_GRILL
+  GUARD: max 3 conflicts × 3 questions; non-blocking (see boundary-grill.md)
 
 S_CONFIRM → S_REGISTER WHEN: -y OR user confirms
 S_CONFIRM → S_CSV_GEN  WHEN: user wants to modify
@@ -224,16 +234,27 @@ Consumes all exploration findings + context.md + specs. Produces:
 
 Verifies plan.json and every .task/*.json exists on disk before reporting completed; else report blocked.
 
+### A_BOUNDARY_GRILL
+
+Run boundary grill per `~/.maestro/workflows/boundary-grill.md` after plan-checker pass.
+Input: plan.json tasks + convergence criteria + upstream context. Scope guard: "only plan scope; do not re-analyze or re-scope".
+IF conflicts → results to plan.json `boundary_grill` section + affected TASK files. DEC conflicts add `boundary_warning` to confidence.
+Non-blocking: warnings, not hard stops.
+
 ### A_PLAN_CHECK
 Run plan-checker: coverage, dependency validity, criteria quality, pressure pass on highest-complexity task.
 Confidence: 5-dimension factor model + readiness gate.
 Collision detection against same-milestone plans.
 
 ### A_REGISTER
+
+**Note**: S_CONFIRM already gates user confirmation (or -y skip). The writes below execute only after S_CONFIRM passes.
+
 1. Register PLN artifact in state.json (scope, milestone, phase, depends_on)
 2. Update index.json with plan metadata
 3. If --gaps: link TASK files back to issues bidirectionally (task_refs[], task_plan_dir in issues.jsonl)
-4. Display: phase, task count, wave count, check status, confidence, next steps
+4. Display: phase, task count, wave count, check status, confidence
+5. **Next-step suggestion** (suggest only, NEVER auto-execute): display recommended next command (e.g., `maestro-execute {phase}`). The user decides whether to proceed.
 
 </actions>
 </state_machine>
@@ -263,6 +284,9 @@ Collision detection against same-milestone plans.
 - [ ] .task/TASK-*.json with read_first[] (file being modified + source of truth files)
 - [ ] Every task has convergence.criteria[] with grep-verifiable conditions (no subjective language)
 - [ ] Every task action and implementation contain concrete values (no "align X with Y")
+- [ ] Boundary grill executed after plan-checker pass (skip if no conflicts detected)
+- [ ] Boundary grill results written to plan.json `boundary_grill` section (if conflicts found)
+- [ ] DEC conflicts reflected in confidence `boundary_warning` factor
 - [ ] Plan confidence scored with 5-dimension factor model
 - [ ] Readiness gate checked before collision detection
 - [ ] Pressure pass completed on highest-complexity task

@@ -187,7 +187,9 @@ Write enriched args + source_artifact_ref back to status.json.
    - 退出码 2 → 交给 S_LOCATE
    - 退出码 3 → active_step_index 已被占用
    - 退出码 1 → pause session
-2. **Goal context pre-injection** — 若 A_RESOLVE_ARGS 产出了 `goal_snippet`（step.goal_ref 非空），在 ralph next stdout prompt **顶部前置**以下 block，使执行命令感知当前子目标和执行约束：
+2. **Goal context pre-injection**:
+   - GUARD: `ralph_protocol_version >= "2"` → skip（session_anchor 已含 goal context）
+   - WHEN `ralph_protocol_version < "2"` 或缺失 AND `step.goal_ref` 非空 → 在 stdout 顶部前置：
    ```
    <goal_context>
    Sub-goal: {goal.id} — {goal.goal}
@@ -197,13 +199,19 @@ Write enriched args + source_artifact_ref back to status.json.
    Execution criteria: {session.execution_criteria joined by '; '}
    </goal_context>
    ```
-   无 goal_snippet 时跳过此步。goal_context block 不替换 ralph next 的 stdout 内容，仅在其前方拼接。
-3. **Inline execution** — 按 stdout（含 goal_context 前置）执行；deferred_reading 按需 Read
+3. **Inline execution** — 按 stdout 执行；deferred_reading 按需 Read
 4. **Complete**:
-   - `Bash("maestro ralph complete N --status DONE [--evidence <path>]")`
-   - `Bash("maestro ralph complete N --status DONE_WITH_CONCERNS --concerns \"...\"")`
+   - `Bash("maestro ralph complete N --status DONE --summary \"...\" [--evidence <path>] [--decisions \"...\"] [--caveats \"...\"] [--deferred \"...\"]")`
+   - `Bash("maestro ralph complete N --status DONE_WITH_CONCERNS --summary \"...\" --concerns \"...\"")`
    - `Bash("maestro ralph retry N")`
    - `Bash("maestro ralph complete N --status BLOCKED --reason \"...\"")`
+
+   | Param | 必填 | 格式 | 示例 |
+   |-------|------|------|------|
+   | `--summary` | MUST | 动词开头，≤100 字 | `"实现搜索 API 分页逻辑，新增 3 端点"` |
+   | `--decisions` | SHOULD（可多次） | 每条一个决策 | `"选择 ELK 布局而非 dagre"` |
+   | `--caveats` | SHOULD | 后续注意事项 | `"X 模块 e2e 暂未覆盖新端点"` |
+   | `--deferred` | SHOULD（可多次） | 推迟工作 | `"性能优化留到 review 后"` |
 5. **Propagate context signals** — 关键信号 (`PHASE: N` / `scratch_dir: path` / `BLP-xxx`) 写入 `status.json.context`
 
 完成后 S_LOCATE 触发 `Skill({ skill: "maestro-ralph-execute" })` 自调用。
@@ -282,8 +290,11 @@ Display: `[{index}/{total}] ✗ {step.skill} 失败，会话已暂停。/maestro
 - [ ] 自调用持续到全部 completion_confirmed 或 paused
 - [ ] --from auto-injection：phase-level plan step 运行时从 state.json 查找同 phase+milestone 最新 completed analyze artifact → 注入 `--from analyze:{id}`，写 `source_artifact_ref`
 - [ ] --from auto-injection：phase-level execute step 运行时查找同 phase+milestone 最新 completed plan artifact → 注入 `--dir`，写 `source_artifact_ref`
-- [ ] Goal context injection：step.goal_ref 非空时从 task_decomposition 提取 goal_snippet，A_EXEC_STEP 在 ralph next stdout 顶部前置 `<goal_context>` block
+- [ ] Goal context injection：`ralph_protocol_version < "2"` → 前置 `<goal_context>` block；`>= "2"` → skip（session_anchor 覆盖）
 - [ ] Goal context 包含 sub-goal description、done_when、boundary、evidence、execution_criteria
 - [ ] 已有 `--from` 或 `--dir` 的 step 不被 auto-injection 覆盖
+- [ ] `--summary` 在 DONE/DONE_WITH_CONCERNS 时为 MUST（动词开头，≤100 字）
+- [ ] `--decisions`/`--caveats`/`--deferred` 为 SHOULD；存在关键决策/注意事项/推迟工作时填写
+- [ ] 结构化总结由 CLI 写入 status.json，session_anchor 自动聚合注入下游 step
 
 </appendix>

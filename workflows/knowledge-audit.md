@@ -1,9 +1,5 @@
 # Knowledge Audit Workflow
 
-审查 spec / knowhow / artifact 三大知识存储，识别矛盾、失效、老化、孤儿，通过 keep/deprecate/delete 三态决策淘汰。
-
-与 `harvest.md` 对称：harvest 写入知识 → knowledge-audit 清理知识。与 `harvest --prune`（Stage 9）的区别：prune 做物理 GC（孤儿指针、格式损坏），audit 做语义审查（逻辑矛盾、生命周期决策）。
-
 ---
 
 ## Prerequisites
@@ -354,5 +350,5 @@ Next:
 4. **Double confirmation** — `--purge` 需 flag + 交互输入 artifact id 双重确认
 5. **Rescue before delete** — 删 artifact 前若 harvest-log 无记录，强制提示先跑 `/manage-harvest`
 6. **No dedup re-run** — audit 不做"是否重复"判断（harvest 负责），只做"是否矛盾/失效/老化"
-7. **Graceful degradation** — LLM detector 不可用时跳过 B/G 类语义场景，A/D/F 类正则+图算法仍可执行
+7. **Graceful degradation** — LLM detector 不可用时跳过 B/G 类语义场景，A/D/F 类正则+图算法仍可执行; Stage 8 报告加 partial_audit: true, skipped: [B,G] 并标 [LOW CONFIDENCE]
 8. **Idempotent** — 同一存储状态下重跑 `--dry-run` 必须输出一致的 finding 集

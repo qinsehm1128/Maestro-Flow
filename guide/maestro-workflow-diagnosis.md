@@ -69,7 +69,7 @@
 **第 3 层 · `.claude/commands/maestro.md`（命令体，新架构 ralph-protocol-v1）**
 同一个 `/maestro` 命令的命令体描述的是**新一代架构**：
 - `.claude/commands/maestro.md:46-60` 的 invariants 与 `:62-119` 的状态机引入 `boundary_contract`、`execution_criteria`、`task_decomposition`、`scope_verdict`。
-- `:170-201` 的 `A_CREATE_SESSION` schema 里有 `ralph_protocol_version: "1"`、`active_step_index`、`command_scope`/`command_path`、`task_decomposition`——**与第 2 层的 schema 完全是两套**。
+- `:170-201` 的 `A_CREATE_SESSION` schema 里有 `ralph_protocol_version: "2"`、`active_step_index`、`command_scope`/`command_path`、`task_decomposition`——**与第 2 层的 schema 完全是两套**。
 - `:53` 的链路目录是 `grill / brainstorm / blueprint / analyze-macro / analyze / roadmap / plan(三路径) / execute`；`:162`/`:227` 还在 maestro-source 会话里追加 `decision:post-analyze-scope` / `post-goal-audit` 决策节点（由 ralph handoff 评估）——而第 2 层大脑 `:290` 说"maestro 会话无决策节点、纯顺序"。**两份文档对同一 `source:"maestro"` 会话给出不同执行模型（含决策节点 vs 纯顺序），是命令体↔大脑的架构漂移。**（注：`:290` 仅限定 maestro 会话，不能拿去与 coordinate 引擎 GraphWalker 比——那是另一 runtime，§9 R6 撤回的正是那个误读。）
 
 **这套新架构是"活的"**（不是废弃文档）：`src/commands/ralph.ts`、`src/ralph/cmd-next.ts`、`src/ralph/cmd-skills.ts` 都已实现 `maestro ralph next/skills/complete`。

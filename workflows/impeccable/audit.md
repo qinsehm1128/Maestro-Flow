@@ -1,7 +1,5 @@
 Run systematic **technical** quality checks and generate a comprehensive report. Don't fix issues; document them for other commands to address.
 
-This is a code-level audit, not a design critique. Check what's measurable and verifiable in the implementation.
-
 ## Diagnostic Scan
 
 Run comprehensive checks across 5 dimensions. Score each dimension 0-4 using the criteria below.

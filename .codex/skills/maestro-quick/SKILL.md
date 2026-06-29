@@ -51,7 +51,7 @@ Extract from arguments:
 
 Read `.workflow/state.json` and `.workflow/project.md` if they exist. If `.workflow/` does not exist, create minimal scratch structure anyway (quick works without full init).
 
-Load coding specs + tools if available: `maestro spec load --category coding`. If the task involves frontend/UI work (description contains component, page, style, layout, CSS, HTML, frontend), also run `maestro spec load --category ui`. Browse wiki: `maestro search --category coding`, load relevant entries via `maestro wiki load <id>`. All optional — proceed without if unavailable.
+Load coding specs + tools if available: `maestro load --type spec --category coding`. If the task involves frontend/UI work (description contains component, page, style, layout, CSS, HTML, frontend), also run `maestro load --type spec --category ui`. Browse wiki: `maestro search --category coding`, load relevant entries via `maestro load --type knowhow --id <id>`. All optional — proceed without if unavailable.
 
 ### Step 3: Create Scratch Directory
 
@@ -70,7 +70,7 @@ Analyze the task for gray areas and ambiguities:
 ### Step 5: Quick Analysis
 
 Rapid codebase exploration focused on the task:
-1. Search for related files using Grep/Glob
+1. Search for related files using `maestro explore` (preferred, fallback Grep/Glob)
 2. Identify existing patterns to follow
 3. Map dependencies and integration points
 4. Write analysis findings to `context.md` (append if --discuss created it)

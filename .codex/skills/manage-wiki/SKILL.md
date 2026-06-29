@@ -7,8 +7,6 @@ allowed-tools: Read, Write, Edit, Bash, Glob, Grep, request_user_input
 
 <purpose>
 Unified wiki graph management. Health monitoring, interactive search, orphan cleanup, and graph statistics. Day-to-day operations to keep the knowledge graph healthy.
-
-Complements `wiki-connect` (link discovery) and `wiki-digest` (synthesis) with operational tooling.
 </purpose>
 
 <required_reading>

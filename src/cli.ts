@@ -35,13 +35,16 @@ const commandLoaders: Record<string, () => Promise<(p: Command) => void>> = {
   cli:        async () => (await import('./commands/cli.js')).registerCliCommand,
   install:    async () => (await import('./commands/install.js')).registerInstallCommand,
   uninstall:  async () => (await import('./commands/uninstall.js')).registerUninstallCommand,
+  plugin:     async () => (await import('./commands/plugin.js')).registerPluginCommand,
   view:       async () => (await import('./commands/view.js')).registerViewCommand,
   stop:       async () => (await import('./commands/stop.js')).registerStopCommand,
+
   spec:       async () => (await import('./commands/spec.js')).registerSpecCommand,
   wiki:       async () => (await import('./commands/wiki.js')).registerWikiCommand,
   hooks:      async () => (await import('./commands/hooks.js')).registerHooksCommand,
   coordinate: async () => (await import('./commands/coordinate.js')).registerCoordinateCommand,
   ralph:      async () => (await import('./commands/ralph.js')).registerRalphCommand,
+  brain:      async () => (await import('./commands/brain.js')).registerBrainCommand,
   launcher:   async () => (await import('./commands/launcher.js')).registerLauncherCommand,
   delegate:   async () => (await import('./commands/delegate.js')).registerDelegateCommand,
   'agent-msg': async () => (await import('./commands/msg.js')).registerMsgCommand,
@@ -62,11 +65,16 @@ const commandLoaders: Record<string, () => Promise<(p: Command) => void>> = {
   'command-help': async () => (await import('./commands/command-help.js')).registerCommandHelpCommand,
   ch: async () => (await import('./commands/command-help.js')).registerCommandHelpCommand,
   kg:         async () => (await import('./graph/kg/surface/cli.js')).registerKgCommands,
+  load:       async () => (await import('./commands/load.js')).registerLoadCommand,
   search:     async () => (await import('./commands/search.js')).registerSearchCommand,
+  'search-daemon': async () => (await import('./commands/search.js')).registerSearchCommand,
+  'search-start-daemon': async () => (await import('./commands/search.js')).registerSearchCommand,
   embedding:  async () => (await import('./commands/search.js')).registerSearchCommand,
   domain:     async () => (await import('./commands/domain.js')).registerDomainCommand,
   workspace:  async () => (await import('./commands/workspace.js')).registerWorkspaceCommand,
   ws:         async () => (await import('./commands/workspace.js')).registerWorkspaceCommand,
+  explore:    async () => (await import('./commands/explore.js')).registerExploreCommand,
+  timeline:   async () => (await import('./commands/timeline.js')).registerTimelineCommand,
 };
 
 // Determine which command is being invoked from argv (if any)
@@ -77,8 +85,25 @@ if (requestedCommand && requestedCommand in commandLoaders) {
   // Load only the requested command module
   const register = await commandLoaders[requestedCommand]();
   register(program);
+} else if (requestedCommand && !(requestedCommand in commandLoaders)) {
+  // Bare intent or unknown command — guide to correct skill invocation
+  console.error(`[maestro] Unknown command: "${requestedCommand}"`);
+  console.error();
+  console.error('  The maestro CLI does not accept bare intent text.');
+  console.error('  Use the platform-specific skill invocation instead:');
+  console.error();
+  console.error('    Claude Code:  /maestro "your intent"');
+  console.error('    Codex:        $maestro "your intent"');
+  console.error();
+  console.error('  Or use a CLI subcommand directly:');
+  console.error('    maestro ralph next|complete|skills|check|session');
+  console.error('    maestro brain init|derive|decide|status');
+  console.error('    maestro delegate "prompt" --to <tool>');
+  console.error('    maestro explore "prompt"');
+  console.error();
+  process.exit(1);
 } else {
-  // No command or unknown command (e.g., --help, --version) — register all.
+  // No command (e.g., --help, --version) — register all.
   // Multiple keys may point to the same register function (e.g. a command and
   // its alias share one module); deduplicate so we register each module once.
   const seen = new Set<(p: Command) => void>();

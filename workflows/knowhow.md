@@ -69,7 +69,13 @@ Full-text search across both stores. Rank: exact match > heading > content.
 
 ### Step 5-9: View, Edit, Delete, Prune, Integrity Check
 
-Same logic as before. Workflow entries managed via WikiWriter; system entries via direct file ops.
+MANDATORY: execute View/Edit/Delete/Prune/Integrity-Check logic per spec; REQUIRED produce: per-step result + final store-consistency report; BLOCKED if any step's produce missing.
+
+- **View**: Workflow `maestro wiki get <slug>`, System Read file; BLOCKED if entry not found.
+- **Edit**: System store only, direct file edit preserving frontmatter; BLOCKED if frontmatter schema invalid after edit.
+- **Delete**: Workflow `maestro wiki delete <slug>`, System mv to `.workflow/.trash/`; REQUIRED produce backup; BLOCKED if backup missing.
+- **Prune**: Scan `status=deprecated|superseded` entries, list candidates, delete after confirm; REQUIRED produce prune report; BLOCKED if delete without backup.
+- **Integrity Check**: Workflow verify `wiki-index.json` matches disk, System verify MEMORY.md links; REQUIRED produce report {missing[], stale[]}; BLOCKED if missing>0.
 
 ---
 

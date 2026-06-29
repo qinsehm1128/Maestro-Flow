@@ -245,12 +245,13 @@ export function registerKgCommands(program: Command): void {
 
   kg
     .command('search <text>')
-    .description('Compatibility alias for query')
+    .description('[deprecated] Use "maestro search --kg" instead')
     .option('--source <types>', 'Filter by source type (comma-separated)')
     .option('--kind <types>', 'Filter by node kind')
     .option('--limit <n>', 'Max results', '20')
     .option('--json', 'Output as JSON')
     .action(async (text: string, opts) => {
+      console.warn('[deprecated] Use "maestro search --kg" instead');
       const mg = await openGraph();
       try {
         const parsed = parseQuery(text);
@@ -576,12 +577,15 @@ export function registerKgCommands(program: Command): void {
         },
         {
           name: 'domain-glossary',
-          path: resolve(workflowRoot, 'domain', 'glossary.json'),
+          path: existsSync(resolve(workflowRoot, 'domain', 'glossary.yaml'))
+            ? resolve(workflowRoot, 'domain', 'glossary.yaml')
+            : resolve(workflowRoot, 'domain', 'glossary.json'),
           estimateNodes: (p: string) => {
             if (!existsSync(p)) return 0;
             try {
               const { readFileSync } = require('node:fs');
-              const data = JSON.parse(readFileSync(p, 'utf-8'));
+              const raw = readFileSync(p, 'utf-8');
+              const data = p.endsWith('.yaml') ? require('yaml').parse(raw) : JSON.parse(raw);
               return Array.isArray(data) ? data.length : Object.keys(data).length;
             } catch { return 0; }
           },

@@ -1,4 +1,5 @@
 import { resolve } from 'node:path';
+import { existsSync } from 'node:fs';
 import type { ExtractionResult, SourceType } from '../db/types.js';
 import { extractDomain } from './knowledge/domain-extractor.js';
 import { extractSpec } from './knowledge/spec-extractor.js';
@@ -28,7 +29,11 @@ class KnowledgeExtractorRegistryImpl {
       name: 'domain',
       sourceType: 'domain',
       extractFn: extractDomain,
-      resolvePath: (wr) => resolve(wr, 'domain', 'glossary.json'),
+      resolvePath: (wr) => {
+        const yaml = resolve(wr, 'domain', 'glossary.yaml');
+        const json = resolve(wr, 'domain', 'glossary.json');
+        return existsSync(yaml) ? yaml : json;
+      },
     });
     this.register({
       name: 'spec',

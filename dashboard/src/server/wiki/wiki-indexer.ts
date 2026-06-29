@@ -12,9 +12,12 @@ import {
   loadSessionArchiveEntries,
   loadVirtualEntries,
   loadVirtualJsonEntries,
+  loadClaudeCodeSessions,
+  loadCodexSessions,
+  cwdToClaudeProjectSlug,
 } from './virtual-wiki-adapters.js';
 import { homedir } from 'node:os';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import type {
   WikiEntry,
   WikiFilters,
@@ -63,6 +66,7 @@ export class WikiIndexer {
   private searchCache: InvertedIndex | null = null;
   private embeddingCache: EmbeddingIndex | null = null;
   private embeddingInflight: Promise<EmbeddingIndex | null> | null = null;
+  private embeddingGeneration = 0;
   private inflight: Promise<WikiIndex> | null = null;
   private mtimeSnapshot: Map<string, number> = new Map();
 
@@ -87,6 +91,9 @@ export class WikiIndexer {
       this.searchCache = null;
       this.embeddingCache = null;
     }
+    if (await this.tryLoadSearchCache()) {
+      return this.cache!;
+    }
     return this.rebuild();
   }
 
@@ -104,6 +111,16 @@ export class WikiIndexer {
       if (lw.shareTypes.has('domain')) dirs.push(join(lw.workflowRoot, 'domain'));
       if (lw.shareTypes.has('codebase')) dirs.push(join(lw.workflowRoot, 'codebase'));
     }
+
+    // Monitor CLI session directories for new session detection
+    const home = homedir();
+    const projectCwd = dirname(this.workflowRoot);
+    const projectSlug = cwdToClaudeProjectSlug(projectCwd);
+    const claudeProjectDir = join(home, '.claude', 'projects', projectSlug);
+    if (existsSync(claudeProjectDir)) dirs.push(claudeProjectDir);
+    const codexSessionsDir = join(home, '.codex', 'sessions');
+    if (existsSync(codexSessionsDir)) dirs.push(codexSessionsDir);
+
     const singletons = [
       join(this.workflowRoot, 'project.md'),
       join(this.workflowRoot, 'roadmap.md'),
@@ -114,22 +131,16 @@ export class WikiIndexer {
   private async hasSourceChanges(): Promise<boolean> {
     if (this.mtimeSnapshot.size === 0) return true;
     const { singletons, dirs } = this.getSourcePaths();
-    for (const p of singletons) {
-      try {
-        const st = await stat(p);
+    const allPaths = [...singletons, ...dirs];
+    const results = await Promise.allSettled(allPaths.map(p => stat(p)));
+    for (let i = 0; i < allPaths.length; i++) {
+      const p = allPaths[i];
+      const result = results[i];
+      if (result.status === 'fulfilled') {
         const prev = this.mtimeSnapshot.get(p);
-        if (prev === undefined || st.mtimeMs !== prev) return true;
-      } catch {
+        if (prev === undefined || result.value.mtimeMs !== prev) return true;
+      } else {
         if (this.mtimeSnapshot.has(p)) return true;
-      }
-    }
-    for (const dir of dirs) {
-      try {
-        const st = await stat(dir);
-        const prev = this.mtimeSnapshot.get(dir);
-        if (prev === undefined || st.mtimeMs !== prev) return true;
-      } catch {
-        if (this.mtimeSnapshot.has(dir)) return true;
       }
     }
     return false;
@@ -138,21 +149,82 @@ export class WikiIndexer {
   private async captureMtimeSnapshot(): Promise<Map<string, number>> {
     const snap = new Map<string, number>();
     const { singletons, dirs } = this.getSourcePaths();
-    for (const p of singletons) {
-      try { snap.set(p, (await stat(p)).mtimeMs); } catch { /* missing is fine */ }
-    }
-    for (const dir of dirs) {
-      try { snap.set(dir, (await stat(dir)).mtimeMs); } catch { /* missing */ }
+    const allPaths = [...singletons, ...dirs];
+    const results = await Promise.allSettled(allPaths.map(p => stat(p)));
+    for (let i = 0; i < allPaths.length; i++) {
+      if (results[i].status === 'fulfilled') {
+        const st = (results[i] as PromiseFulfilledResult<Awaited<ReturnType<typeof stat>>>).value;
+        snap.set(allPaths[i], Number(st.mtimeMs));
+      }
     }
     return snap;
+  }
+
+  private async tryLoadSearchCache(): Promise<boolean> {
+    const cachePath = join(this.workflowRoot, 'search-cache.json');
+    if (!existsSync(cachePath)) return false;
+
+    try {
+      const raw = await readFile(cachePath, 'utf-8');
+      const cached = JSON.parse(raw);
+      if (cached.version !== 1 || !Array.isArray(cached.entries)) return false;
+
+      const snapshot = new Map<string, number>(cached.mtimeSnapshot);
+      this.mtimeSnapshot = snapshot;
+      if (await this.hasSourceChanges()) {
+        this.mtimeSnapshot = new Map();
+        return false;
+      }
+
+      const entries: WikiEntry[] = cached.entries;
+      const byId: Record<string, WikiEntry> = {};
+      const byType = {
+        project: [], roadmap: [], spec: [], issue: [],
+        knowhow: [], note: [], domain: [],
+      } as Record<WikiNodeType, WikiEntry[]>;
+
+      for (const d of entries) {
+        byId[d.id] = d;
+        byType[d.type].push(d);
+      }
+
+      const backlinks = this.buildBacklinks(entries, byId);
+      this.cache = { entries, byId, byType, backlinks, generatedAt: cached.generatedAt };
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private persistSearchCache(index: WikiIndex): void {
+    const entries = index.entries.map(e => ({
+      id: e.id, type: e.type, title: e.title, summary: e.summary,
+      tags: e.tags, status: e.status, created: e.created, updated: e.updated,
+      related: e.related, source: e.source, body: e.body, ext: e.ext,
+      scope: e.scope, category: e.category, specCategory: e.specCategory,
+      createdBy: e.createdBy, sourceRef: e.sourceRef, parent: e.parent,
+    }));
+    try {
+      const target = join(this.workflowRoot, 'search-cache.json');
+      const data = JSON.stringify({
+        version: 1,
+        generatedAt: index.generatedAt,
+        mtimeSnapshot: [...this.mtimeSnapshot.entries()],
+        entries,
+      });
+      writeFile(target, data, 'utf-8').catch(() => {});
+    } catch { /* best-effort */ }
   }
 
   async rebuild(): Promise<WikiIndex> {
     if (this.inflight) return this.inflight;
     this.inflight = (async () => {
-      const fileEntries = await this.scanFiles();
-      const virtualEntries = await this.scanVirtual();
-      const linkedEntries = await this.scanLinkedWorkspaces();
+      // Parallel: file scan + virtual entries + linked workspaces
+      const [fileEntries, virtualEntries, linkedEntries] = await Promise.all([
+        this.scanFiles(),
+        this.scanVirtual(),
+        this.scanLinkedWorkspaces(),
+      ]);
       const entries = [...fileEntries, ...virtualEntries, ...linkedEntries];
 
       // Stable collision suffix — use original id for counting so the
@@ -213,6 +285,7 @@ export class WikiIndexer {
 
       // Persist lightweight index to disk (fire-and-forget).
       this.persistIndex(index).catch(() => {});
+      this.persistSearchCache(index);
 
       return index;
     })();
@@ -228,6 +301,9 @@ export class WikiIndexer {
     this.cache = null;
     this.graphCache = null;
     this.searchCache = null;
+    this.embeddingCache = null;
+    this.embeddingInflight = null;
+    this.embeddingGeneration++;
   }
 
   async query(filters: WikiFilters): Promise<WikiEntry[]> {
@@ -280,16 +356,20 @@ export class WikiIndexer {
     return (await this.searchWithMeta(query, limit)).results;
   }
 
-  async searchWithMeta(query: string, limit = 50): Promise<{
+  async searchWithMeta(query: string, limit = 50, options?: { skipEmbedding?: boolean }): Promise<{
     results: Array<{ entry: WikiEntry; score: number }>;
     embeddingUsed: boolean;
     embeddingDocs: number;
   }> {
     const index = await this.get();
-    const bm25 = await this.getSearchIndex();
+
+    // Parallel: BM25 index build + embedding index load
+    const [bm25, embIdx] = await Promise.all([
+      this.getSearchIndex(),
+      options?.skipEmbedding ? null : this.getEmbeddingIndex(),
+    ]);
     const bm25Results = searchBM25Planned(bm25, query, limit * 2);
 
-    const embIdx = await this.getEmbeddingIndex();
     if (embIdx && embIdx.docIds.length > 0) {
       try {
         const { embedQuery, vectorSearch, mergeHybrid } = await import('./embedding.js');
@@ -323,10 +403,13 @@ export class WikiIndexer {
     if (this.embeddingCache) return this.embeddingCache;
     if (this.embeddingInflight) return this.embeddingInflight;
 
+    const gen = this.embeddingGeneration;
     this.embeddingInflight = this.loadOrBuildEmbeddings();
     const result = await this.embeddingInflight;
-    this.embeddingInflight = null;
-    this.embeddingCache = result;
+    if (this.embeddingGeneration === gen) {
+      this.embeddingInflight = null;
+      this.embeddingCache = result;
+    }
     return result;
   }
 
@@ -343,43 +426,99 @@ export class WikiIndexer {
 
       const cached = loadEmbeddingIndex(this.workflowRoot);
       const index = await this.get();
-      // Only embed knowledge docs — KG code nodes are noise for semantic search
-      const KG_VIRTUAL_KINDS = new Set(['kg-node', 'kg-layer', 'kg-tour-step']);
+
+      // KG nodes: include high/medium semantic density types, skip low-density bulk
+      const KG_EMBED_NODE_TYPES = new Set(['module', 'class', 'kg-layer', 'kg-tour-step']);
+      const KG_SKIP_NODE_TYPES = new Set(['file', 'function', 'interface', 'type', 'const', 'enum']);
+
       const docs = index.entries
-        .filter(e => !KG_VIRTUAL_KINDS.has(e.ext?.virtualKind as string))
-        .map(e => ({
-          id: e.id,
-          title: e.title,
-          summary: e.summary,
-          tags: e.tags,
-          body: e.body,
-        }));
+        .filter(e => {
+          const vk = e.ext?.virtualKind as string | undefined;
+          if (vk !== 'kg-node' && vk !== 'kg-layer' && vk !== 'kg-tour-step') return true;
+          if (vk === 'kg-layer' || vk === 'kg-tour-step') return true;
+          const nt = e.ext?.nodeType as string | undefined;
+          if (nt && KG_SKIP_NODE_TYPES.has(nt)) return false;
+          return nt ? KG_EMBED_NODE_TYPES.has(nt) : false;
+        })
+        .map(e => {
+          const vk = e.ext?.virtualKind as string | undefined;
+          if (vk === 'kg-node' || vk === 'kg-layer' || vk === 'kg-tour-step') {
+            return this.enrichKgDocForEmbedding(e, index);
+          }
+          return { id: e.id, title: e.title, summary: e.summary, tags: e.tags, body: e.body };
+        });
 
-      const { DEFAULT_MODEL_ID, hashDocContent } = await import('./embedding.js');
-      const modelMatch = cached && cached.modelId === DEFAULT_MODEL_ID;
-      const currentHashes = docs.map(hashDocContent);
-      const cachedHashMap = new Map<string, string>();
-      if (cached?.contentHashes) {
-        for (let i = 0; i < cached.docIds.length; i++) {
-          cachedHashMap.set(cached.docIds[i], cached.contentHashes[i] ?? '');
+      const { getModelId, hashDocContent } = await import('./embedding.js');
+      const activeModel = getModelId();
+      const modelMatch = cached && cached.modelId === activeModel;
+      const currentHashes = modelMatch ? docs.map(hashDocContent) : undefined;
+
+      if (currentHashes && cached) {
+        const cachedHashMap = new Map<string, string>();
+        if (cached.contentHashes) {
+          for (let i = 0; i < cached.docIds.length; i++) {
+            cachedHashMap.set(cached.docIds[i], cached.contentHashes[i] ?? '');
+          }
         }
+        const unchanged = cached.docIds.length === docs.length
+          && cachedHashMap.size > 0
+          && docs.every((d, i) => cachedHashMap.get(d.id) === currentHashes[i]);
+        if (unchanged) return cached;
       }
-      const unchanged = modelMatch
-        && cached!.docIds.length === docs.length
-        && cachedHashMap.size > 0
-        && docs.every((d, i) => cachedHashMap.get(d.id) === currentHashes[i]);
 
-      if (cached && unchanged) return cached;
-
-      const embIdx = await buildEmbeddingIndex(docs, cached);
-      saveEmbeddingIndex(embIdx, this.workflowRoot);
-      return embIdx;
+      try {
+        const embIdx = await buildEmbeddingIndex(docs, cached, currentHashes);
+        saveEmbeddingIndex(embIdx, this.workflowRoot);
+        return embIdx;
+      } catch (buildErr: unknown) {
+        if (process.env.DEBUG || process.env.MAESTRO_DEBUG) {
+          console.error(`[embedding] build failed: ${buildErr instanceof Error ? buildErr.message : buildErr}`);
+        }
+        if (cached) return cached;
+        return null;
+      }
     } catch (e: unknown) {
       if (process.env.DEBUG || process.env.MAESTRO_DEBUG) {
-        console.error(`[embedding] build failed: ${e instanceof Error ? e.message : e}`);
+        console.error(`[embedding] unavailable: ${e instanceof Error ? e.message : e}`);
       }
       return null;
     }
+  }
+
+  private enrichKgDocForEmbedding(
+    e: WikiEntry,
+    index: WikiIndex,
+  ): { id: string; title: string; summary: string; tags: string[]; body: string } {
+    const parts: string[] = [];
+    const nt = (e.ext?.nodeType as string) || (e.ext?.virtualKind as string) || '';
+    const fp = e.ext?.filePath as string | undefined;
+
+    if (nt) parts.push(`[${nt}]`);
+    parts.push(e.title);
+    if (e.summary) parts.push(e.summary);
+    if (fp) parts.push(`file: ${fp}`);
+
+    const edges = (e.ext?.kgEdges as Array<{ target: string; type: string }>) ?? [];
+    if (edges.length > 0) {
+      const edgeDescs = edges.slice(0, 8).map(edge => {
+        const target = index.byId[edge.target];
+        return target ? `${edge.type} → ${target.title}` : null;
+      }).filter(Boolean);
+      if (edgeDescs.length > 0) parts.push('relations: ' + edgeDescs.join(', '));
+    }
+
+    if (e.tags.length > 0) {
+      const meaningful = e.tags.filter(t => !t.startsWith('kg:') && t !== 'kg');
+      if (meaningful.length > 0) parts.push('tags: ' + meaningful.join(', '));
+    }
+
+    return {
+      id: e.id,
+      title: e.title,
+      summary: e.summary,
+      tags: e.tags,
+      body: parts.join('. '),
+    };
   }
 
   async search(query: string, limit = 50): Promise<WikiEntry[]> {
@@ -765,7 +904,33 @@ export class WikiIndexer {
       }
     }
 
+    // CLI sessions: Claude Code (~/.claude/) and Codex (~/.codex/)
+    out.push(...(await this.scanCliSessions()));
+
     return out;
+  }
+
+  private async scanCliSessions(): Promise<WikiEntry[]> {
+    const projectCwd = dirname(this.workflowRoot);
+    const home = homedir();
+    const maxAgeDays = 90;
+    const maxFiles = 100;
+
+    // Parallel: Claude Code + Codex session loading
+    const projectSlug = cwdToClaudeProjectSlug(projectCwd);
+    const claudeProjectDir = join(home, '.claude', 'projects', projectSlug);
+    const codexRoot = join(home, '.codex');
+
+    const [claudeEntries, codexEntries] = await Promise.all([
+      existsSync(claudeProjectDir)
+        ? loadClaudeCodeSessions(claudeProjectDir, projectSlug, maxAgeDays, maxFiles).catch(() => [] as WikiEntry[])
+        : [] as WikiEntry[],
+      existsSync(join(codexRoot, 'sessions'))
+        ? loadCodexSessions(codexRoot, projectCwd, maxAgeDays, maxFiles).catch(() => [] as WikiEntry[])
+        : [] as WikiEntry[],
+    ]);
+
+    return [...claudeEntries, ...codexEntries];
   }
 
   private async scanSessionArchives(root: string): Promise<WikiEntry[]> {

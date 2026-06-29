@@ -52,7 +52,7 @@ Pipeline (Quick mode):
 ## Pre-load (coordinator, before dispatch)
 
 1. **Codebase docs**: If `.workflow/codebase/ARCHITECTURE.md` exists, read for module boundaries
-2. **Specs (arch)**: `maestro spec load --category arch` — load arch constraints as shared context
+2. **Specs (arch)**: `maestro load --type spec --category arch` — load arch constraints as shared context
 3. **Wiki knowledge**: `maestro search "analysis investigation deep-dive" --json` — top 5 entries as prior context
 4. All optional — proceed without if unavailable
 ## Role Router
@@ -167,7 +167,7 @@ AskUserQuestion({
 | Unknown --role value | Error with role registry list |
 | Role file not found | Error with expected path (roles/{name}/role.md) |
 | Discussion loop stuck >5 rounds | Force synthesis, offer continuation |
-| CLI tool unavailable | Fallback chain: gemini -> codex -> manual analysis |
+| CLI tool unavailable | Fallback chain: agy -> codex -> manual analysis |
 | Explorer agent fails | Continue with available context, note limitation |
 | Fast-advance conflict | Coordinator reconciles on next callback |
 | Completion action fails | Default to Keep Active |

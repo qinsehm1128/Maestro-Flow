@@ -1,8 +1,9 @@
 // src/graph/kg/extraction/knowledge/domain-extractor.ts
-// 从 .workflow/domain/glossary.json 提取 domain_term nodes + relates_to edges + aliases edges
+// 从 .workflow/domain/glossary.yaml (或 .json 回退) 提取 domain_term nodes + relates_to edges + aliases edges
 
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve, join } from 'node:path';
+import YAML from 'yaml';
 import { makeNodeId } from '../../db/connection.js';
 import type {
   UnifiedNode, UnifiedEdge, FileRecord, ExtractionResult,
@@ -37,7 +38,8 @@ export function extractDomain(
     return { nodes, edges, fileRecord: createEmptyFileRecord(glossaryPath) };
   }
 
-  const glossary: DomainGlossary = JSON.parse(readFileSync(glossaryPath, 'utf-8'));
+  const raw = readFileSync(glossaryPath, 'utf-8');
+  const glossary: DomainGlossary = glossaryPath.endsWith('.yaml') ? YAML.parse(raw) : JSON.parse(raw);
   const now = Date.now();
 
   for (const term of glossary.terms) {

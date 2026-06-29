@@ -1,4 +1,4 @@
-import { describe, it, beforeEach, afterEach } from 'node:test';
+import { describe, it, beforeEach, afterEach } from 'vitest';
 import assert from 'node:assert';
 import { mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -56,7 +56,8 @@ describe('loadSpecs — single directory (no uid)', () => {
     const result = loadSpecs(TEST_DIR, undefined, undefined, undefined, undefined, TEST_OPTS);
     assert.ok(result.content.includes('Coding Conventions'));
     assert.ok(result.content.includes('Learnings'));
-    assert.strictEqual(result.totalLoaded, 2);
+    // 3 = baseline coding-conventions + baseline learnings + global seed learnings
+    assert.strictEqual(result.totalLoaded, 3);
   });
 
   it('filters by category', () => {

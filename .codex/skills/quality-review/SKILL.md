@@ -149,9 +149,9 @@ Each wave generates `wave-{N}.csv` with extra `prev_context` column.
 3. **CSV is Source of Truth**: Master tasks.csv holds all state
 4. **Context Propagation**: prev_context built from master CSV, not from memory
 5. **Discovery Board is Append-Only**: Never clear, modify, or recreate discoveries.ndjson
-6. **Skip on Failure**: If all dimension agents failed, skip aggregation
+6. **Skip on Failure**: If all dimension agents failed, skip aggregation and flag all downstream outputs as LOW CONFIDENCE. Record `degradation_event` in discoveries.ndjson. **Note**: timed-out workers that report `completed` with empty findings are treated as effectively failed for degradation purposes if `severity_counts` is all-zero AND `findings` is empty. This is a defined degradation path, not a violation of invariant 2.
 7. **Cleanup Temp Files**: Remove wave-{N}.csv and wave-{N}-results.csv after results are merged
-8. **DO NOT STOP**: Continuous execution until all waves complete
+8. **Pipeline continuity**: Continuous execution until all waves complete. When invariant 6 (skip on failure) activates, the pipeline continues in degraded mode.
 </invariants>
 
 <execution>
@@ -197,7 +197,7 @@ Session folder: `.workflow/.csv-wave/{sessionId}/` — create via `mkdir -p`
 
 If `--dimensions` flag provided, override with explicit list.
 
-6. **Specs loading**: Run `maestro spec load --category review` to load review standards, checklists, AND discoverable knowhow tools (unless `--skip-specs`). Also run `maestro spec conflict list` to load existing conflict markers (review should prioritize verifying contested entries against code)
+6. **Specs loading**: Run `maestro load --type spec --category review` to load review standards, checklists, AND discoverable knowhow tools (unless `--skip-specs`). Also run `maestro spec conflict list` to load existing conflict markers (review should prioritize verifying contested entries against code)
 7. **CSV generation**: One row per dimension + one aggregation row
 
 **Wave computation**: Simple 2-wave -- all dimension tasks = wave 1, aggregation = wave 2.
@@ -275,9 +275,9 @@ CONSTRAINTS:
 
 #### Wave 2: Aggregation + Deep-Dive
 
-Filter master `tasks.csv` for `wave == 2 AND status == pending`. If all wave 1 tasks failed, skip aggregation.
+Filter master `tasks.csv` for `wave == 2 AND status == pending`. If all wave 1 tasks failed, skip aggregation (invariant 6).
 
-Build `prev_context` from wave 1 findings (format: `[Task N: Title] summary...` per task).
+Build `prev_context` from wave 1 findings (format: `[Task N: Title] summary...` per task). **Failed-dependency handling**: exclude failed task IDs from prev_context. If SOME wave 1 tasks failed, append gap_note listing missing dimensions so the aggregation agent knows its coverage is incomplete.
 Write `wave-2.csv` with `prev_context` column → execute `spawn_agents_on_csv` with `REVIEW_AGGREGATION_INSTRUCTION` (same termination contract; output_schema returns `result_status` enum [completed|failed], findings, plus `verdict` enum [PASS|WARN|BLOCK]) → merge results into master `tasks.csv` (map `result_status` → master `status` column) → delete both `wave-2.csv` and `wave-2-results.csv`.
 
 ### Phase 3: Results Aggregation
@@ -344,7 +344,14 @@ Generate `context.md`:
 | Medium findings > 5 | WARN |
 | Otherwise | PASS |
 
-**Issue creation** by level threshold:
+**Side-effect confirmation gate** (skip when `-y/--yes`):
+Before writing to external stores, present a summary to the user via `request_user_input`:
+- Issues to create (count + severity + titles)
+- Phase index update (artifact dir)
+- Artifact registration in state.json
+The user can approve all, selectively exclude, or skip entirely.
+
+**Issue creation** (approved items only) by level threshold:
 
 | Level | Create Issues For |
 |-------|------------------|
@@ -354,11 +361,11 @@ Generate `context.md`:
 
 **Spec conflict check**: If any finding directly contradicts a loaded spec entry (code behavior ≠ spec rule), suggest `maestro spec conflict mark <file> <line> --note "<evidence>"` on the spec entry. Code is the single source of truth. Log spec conflicts in review.json as `spec_conflicts[]`.
 
-**Phase index update**: Update `{artifact_dir}/index.json` with review status.
+**Phase index update** (after confirmation): Update `{artifact_dir}/index.json` with review status.
 
-**Register artifact**: Append to `state.json.artifacts[]` with `type: "review"`, `id: REV-NNN`, `path: "scratch/{YYYYMMDD}-review-P{N}-{slug}"`, `depends_on: exec_art.id`. Output directory is independent scratch, not shared with plan.
+**Register artifact** (after confirmation): Append to `state.json.artifacts[]` with `type: "review"`, `id: REV-NNN`, `path: "scratch/{YYYYMMDD}-review-P{N}-{slug}"`, `depends_on: exec_art.id`. Output directory is independent scratch, not shared with plan.
 
-Display summary. If spec conflicts detected, suggest: `maestro spec conflict list` → `$manage-knowledge-audit --scope spec`.
+Display summary. **Next-step suggestion** (suggest only, NEVER auto-execute): if spec conflicts detected, suggest `maestro spec conflict list` → `$manage-knowledge-audit --scope spec`. The user decides whether to proceed.
 
 ### Shared Discovery Board Protocol
 
@@ -410,8 +417,8 @@ echo '{"ts":"<ISO>","worker":"{id}","type":"vulnerability","data":{"location":"s
 - [ ] Aggregation + deep-dive executed (wave 2)
 - [ ] review.json produced with verdict and severity distribution
 - [ ] context.md produced with full review report
-- [ ] Issues auto-created for qualifying severity findings
-- [ ] Phase index.json updated with review status
+- [ ] Issues created for qualifying severity findings (after user confirmation in interactive mode; auto in -y mode)
+- [ ] Phase index.json updated with review status (after user confirmation in interactive mode; auto in -y mode)
 - [ ] discoveries.ndjson append-only throughout
 - [ ] Ralph-invoked: `maestro ralph complete <idx> --status {STATUS}` called with correct verdict
 </success_criteria>

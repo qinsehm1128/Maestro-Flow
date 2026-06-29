@@ -1,9 +1,5 @@
 # Workflow: merge
 
-Two-phase merge of a completed milestone worktree branch back into main. Phase 1: git merge (source code). Phase 2: artifact sync (workflow state). Artifact sync only proceeds after successful git merge.
-
-Merges operate at the **milestone level** — one worktree per milestone, all phases merged together.
-
 ---
 
 ## Step 1: Parse Arguments and Flags

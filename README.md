@@ -65,7 +65,7 @@ npm install -g maestro-flow
 maestro install
 ```
 
-**Prerequisites**: Node.js ≥ 18, Claude Code CLI. Optional: Codex CLI, Gemini CLI for multi-agent workflows.
+**Prerequisites**: Node.js ≥ 18, Claude Code CLI. Optional: Codex CLI, agy (Antigravity) CLI for multi-agent workflows.
 
 `maestro install` provides an interactive component selector — choose which assets (commands, hooks, MCP, agents) to install. Use `maestro workspace link` to share knowledge (specs, knowhow, domain) across multiple projects.
 
@@ -96,6 +96,23 @@ Ralph automatically determines where you are (brainstorm → plan → execute �
 | `/maestro "..."` | Describe intent, let AI route to the optimal command chain |
 | `/maestro-quick` | Quick fixes, small features (analyze → plan → execute) |
 | `/maestro-*` | Step-by-step: brainstorm, blueprint, analyze, plan, execute, verify |
+
+### Knowledge Management
+
+```bash
+# Search across wiki + code (BM25F ranking)
+maestro search "user authentication"
+
+# Load specific knowledge types
+maestro load --type spec --category coding
+maestro load --type knowhow --list
+
+# Explore codebase via API endpoints
+maestro explore "Find all database query patterns"
+
+# Manage domain terminology
+maestro domain add "API Gateway" "Unified entry point for all API requests"
+```
 
 ### Odyssey — Long-Running Iterative Cycles
 
@@ -243,15 +260,15 @@ Built with React 19, Zustand, Tailwind CSS 4, Framer Motion, Hono, WebSocket.
 
 | Metric | Count |
 |--------|-------|
-| Source files (TypeScript) | 454 |
-| Lines of code | ~111,000 |
+| Source files (TypeScript) | 333 |
+| Lines of code | ~80,700 |
 | Slash commands | 64 |
 | Workflow definitions | 115 |
 | Skill packages | 45 |
 | Agent definitions | 23 |
-| CLI commands | 32 |
+| CLI commands | 35+ |
 | Templates | 92 |
-| Guides (bilingual) | 67 |
+| Guides (bilingual) | 76 |
 
 ### Tech Stack
 
@@ -262,7 +279,7 @@ Built with React 19, Zustand, Tailwind CSS 4, Framer Motion, Hono, WebSocket.
 | Knowledge Graph | better-sqlite3, Drizzle ORM, web-tree-sitter |
 | Frontend | React 19, Zustand, Tailwind CSS 4, Framer Motion, Radix UI |
 | Backend | Hono, WebSocket, SSE |
-| Agents | Claude Agent SDK, Codex CLI, Gemini CLI, OpenCode |
+| Agents | Claude Agent SDK, Codex CLI, agy (Antigravity) CLI, OpenCode |
 | Build | Vite 6, TypeScript 5.7, Vitest |
 
 ### Architecture
@@ -271,7 +288,7 @@ Built with React 19, Zustand, Tailwind CSS 4, Framer Motion, Hono, WebSocket.
 maestro/
 ├── bin/                     # CLI entry points
 ├── src/                     # Core CLI (Commander.js + MCP SDK)
-│   ├── commands/            # 32 CLI commands
+│   ├── commands/            # 35+ CLI commands
 │   ├── mcp/                 # MCP server (stdio transport)
 │   ├── graph/               # Knowledge Graph (SQLite + tree-sitter)
 │   └── core/                # Tool registry, extension loader
@@ -300,7 +317,7 @@ maestro/
 
 **Workflow**
 - **[Command Usage Guide](guide/command-usage-guide.en.md)** — All 64 commands with workflow diagrams and pipeline chaining
-- **[CLI Commands Reference](guide/cli-commands-guide.en.md)** — All 32 terminal commands
+- **[CLI Commands Reference](guide/cli-commands-guide.en.md)** — All 35+ terminal commands
 - **[Workflow Structure Guide](guide/workflow-structure-guide.en.md)** — Command topology, chain composition
 - **[Quality Pipeline Guide](guide/quality-pipeline-guide.en.md)** — Verify, review, test pipeline
 - **[Maestro Coordinator Guide](guide/maestro-coordinator-guide.en.md)** — Multi-agent coordination patterns

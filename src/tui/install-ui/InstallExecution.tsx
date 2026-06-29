@@ -46,8 +46,8 @@ function StepRow({ step }: { step: ExecutionStep }) {
       ) : (
         <Text color={color}>{icon}</Text>
       )}
-      <Text color={color}> {step.label.padEnd(20)}</Text>
-      <Text dimColor>{step.detail}</Text>
+      <Text color={color}> {step.label.padEnd(16)}</Text>
+      <Text color={C.neutral}>{step.detail}</Text>
     </Box>
   );
 }
@@ -146,18 +146,19 @@ export function InstallExecution({ config, pkgRoot, version, onComplete }: Insta
 
   const barWidth = 30;
   const filled = Math.round(barWidth * percent / 100);
-  const bar = '█'.repeat(filled) + '░'.repeat(barWidth - filled);
+  const remaining = barWidth - filled;
 
   return (
     <Box flexDirection="column" paddingX={1}>
-      <Box>
+      <Box gap={2}>
         <Text bold color={C.primary}>{t.install.execTitle}</Text>
-        <Text dimColor>{'  '}{timeStr}</Text>
+        <Text dimColor>{timeStr}</Text>
+        <Text bold color={percent === 100 ? C.success : C.primary}>{percent}%</Text>
       </Box>
 
       <Box marginTop={1}>
-        <Text color={C.primary}>[{bar}]</Text>
-        <Text bold> {percent}%</Text>
+        <Text color={C.success}>{'█'.repeat(filled)}</Text>
+        <Text color={C.neutral}>{'░'.repeat(remaining)}</Text>
       </Box>
 
       <Box flexDirection="column" marginTop={1}>

@@ -43,7 +43,7 @@ For each PLAN_DIR in PLAN_DIRS (sequential):
 | `--executor <tool>` | Default CLI tool: gemini\|codex\|qwen\|opencode\|claude (default: first enabled in cli-tools.json) |
 | `--dir <path>` | Use arbitrary directory instead of phase resolution (skip roadmap validation) |
 | `--skip-verify` | Skip E2.7 verification gate (trust execution output) |
-| `-y` | Auto-approve execution options (skip confirmation prompt) |
+| `-y` | Auto mode — skip ALL interactive questions (E0.5 options, inter-wave confirmations, blocked-task prompts) |
 
 ---
 
@@ -51,7 +51,7 @@ For each PLAN_DIR in PLAN_DIRS (sequential):
 
 ### Skip conditions
 
-- `-y` flag → use resolved defaults, skip prompt
+- `-y` flag → use resolved defaults, skip prompt (applies to ALL interactive questions throughout execution, not just E0.5)
 - `executionContext.executionMethod` already set → skip (confirmed in /maestro-plan)
 
 ### Pre-step: Load tool config
@@ -193,6 +193,7 @@ Build execution_queue from plan.json.waves, including only waves with pending (n
 ## E1.5: Load Project Specs
 
 ```
+# MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep
 specs_content = maestro spec load --category coding
 ```
 
@@ -300,7 +301,8 @@ For each wave in execution_queue (sequential):
     Clear state.json.current_task_id
 
   Wait for all wave tasks; update index.json (tasks_completed, commits)
-  If any blocked: prompt user to continue or stop
+  If any blocked AND NOT -y flag: prompt user to continue or stop
+  Else: continue to next wave automatically (NEVER ask for confirmation between waves)
 ```
 
 ### Parallel Dispatch Rules
@@ -316,7 +318,7 @@ Each task = one independent dispatch (never merge tasks into one delegate prompt
 ```
 Max 3 auto-fix attempts per task:
   Agent path: handled internally by workflow-executor agent
-  CLI path: 1) --resume ${fixedId} → 2) simplified prompt → 3) fallback to agent
+  CLI path: 1) --resume ${fixedId} → 2) simplified prompt → 3) fallback to agent; flag task as [LOW CONFIDENCE] (agent fallback used)
 
 If all 3 fail: mark "blocked" with checkpoint in .task/${task_id}.json.meta.checkpoint
   { attempt: 3, last_error, partial_files, executor, delegate_id: fixedId }
@@ -528,7 +530,7 @@ If config.json.codebase.auto_sync_after_execute == true:
     3. Update affected entries
     4. Refresh tech-registry and feature-maps as needed
 Else:
-  Log "Auto-sync disabled. Run /workflow:sync manually if needed."
+  Log "Auto-sync disabled. MUST run /workflow:sync manually."
 ```
 
 ---
@@ -589,6 +591,13 @@ Append unique entries to .workflow/specs/learnings.md using <spec-entry> closed-
   category="learning", keywords (3-5 terms), date, source="execute"
 
 Mark artifact.harvested = true; write state.json (atomic)
+
+// Domain knowledge note:
+// E5 仅提取 incremental learnings (spec category=learning)。
+// 完整的知识提取（constraints → spec, decisions → knowhow, terminology → domain glossary）
+// 由 chain 末尾的 manage-harvest --auto 触发 finish-work 统一处理。
+// Domain compact/expanded 注入是 hook 自动行为，execute 期间无需手动加载——
+// 已注册术语通过 keyword-spec-injector 自动注入到 agent context 中。
 ```
 
 ---
@@ -601,8 +610,8 @@ Mark artifact.harvested = true; write state.json (atomic)
 | Plan directory not found | Abort: "Plan dir not found." |
 | Task file missing | Skip task, log error, continue wave |
 | Agent spawn fails | Retry once, then mark task as "blocked" |
-| Delegate fails | Resume with `--resume ${fixedId}`, then fallback to agent |
-| Git commit fails | Log warning, continue (task still marked completed) |
+| Delegate fails | Resume with `--resume ${fixedId}`, then fallback to agent; flag task as [LOW CONFIDENCE] (fallback agent) |
+| Git commit fails | Log W0xx, mark task [LOW CONFIDENCE] (commit failed); do NOT mark fully completed until commit succeeds |
 | All tasks in wave blocked | Stop execution, report blocked wave |
 
 ---

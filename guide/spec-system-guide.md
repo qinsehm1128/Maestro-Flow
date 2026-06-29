@@ -310,9 +310,10 @@ WikiIndexer 将 `<spec-entry>` 和 `<knowhow-entry>` 解析为独立的 WikiEntr
 
 | Agent 类型 | 注入 Category |
 |-----------|--------------|
-| code-developer, tdd-developer | coding, learning |
+| code-developer | coding, learning, ui |
+| tdd-developer | coding, test |
 | workflow-planner, action-planning-agent | arch |
-| workflow-reviewer | review |
+| workflow-reviewer | review, coding |
 | debug-explore-agent, workflow-debugger | debug |
 
 **Wiki 注入**：同时从索引加载 category 相关 wiki（title + summary），受 context budget 控制（full/reduced/minimal/skip）。

@@ -38,6 +38,7 @@ export interface ClaudeSettings {
     PostToolUse?: HookGroup[];
     UserPromptSubmit?: HookGroup[];
     Notification?: HookGroup[];
+    SessionStart?: HookGroup[];
     [key: string]: unknown;
   };
   statusLine?: { type: string; command: string };
@@ -49,7 +50,7 @@ export interface ClaudeSettings {
 // ---------------------------------------------------------------------------
 
 interface HookDef {
-  event: 'PreToolUse' | 'PostToolUse' | 'UserPromptSubmit' | 'Notification' | 'Stop';
+  event: 'PreToolUse' | 'PostToolUse' | 'UserPromptSubmit' | 'Notification' | 'SessionStart' | 'Stop';
   matcher?: string;
   /** Minimum level required to install this hook */
   level: HookLevel;
@@ -71,7 +72,7 @@ export const HOOK_LEVELS: readonly HookLevel[] = ['none', 'minimal', 'standard',
 export const HOOK_LEVEL_DESCRIPTIONS: Record<HookLevel, string> = {
   none: 'No hooks',
   minimal: 'Statusline + spec-injector',
-  standard: '+ delegate-monitor + team/telemetry/coordinator(Stop) + session-context + skill-context + kg-sync + kg-auto-init + kg-context-injector + kg-unified-injector (opt-in)',
+  standard: '+ session-context + search-daemon + kg-auto-init (SessionStart) + delegate-monitor + team/telemetry/coordinator(Stop) + skill-context + kg-sync + kg-context-injector + kg-unified-injector (opt-in) + search-cache-invalidator',
   full: '+ workflow-guard (PreToolUse) + prompt-guard (UserPromptSubmit)',
 };
 
@@ -80,17 +81,19 @@ export const HOOK_DEFS: Record<string, HookDef> = {
   'delegate-monitor': { event: 'PostToolUse', matcher: 'Bash|Agent', level: 'standard' },
   'team-monitor': { event: 'Stop', level: 'standard' },
   'telemetry': { event: 'Stop', level: 'standard' },
-  'session-context': { event: 'Notification', level: 'standard' },
+  'session-context': { event: 'SessionStart', matcher: 'startup|resume', level: 'standard', requiresWorkspace: true },
   'skill-context': { event: 'UserPromptSubmit', level: 'standard', requiresWorkspace: true },
   'coordinator-tracker': { event: 'Stop', level: 'standard', requiresWorkspace: true },
   'preflight-guard': { event: 'PreToolUse', matcher: 'Bash|Write|Edit|Agent', level: 'standard', requiresWorkspace: true },
   'spec-validator': { event: 'PreToolUse', matcher: 'Write|Edit', level: 'standard', requiresWorkspace: true },
   'keyword-spec-injector': { event: 'UserPromptSubmit', level: 'standard', requiresWorkspace: true },
   'kg-sync': { event: 'UserPromptSubmit', level: 'standard', requiresWorkspace: true },
-  'kg-auto-init': { event: 'UserPromptSubmit', level: 'standard', requiresWorkspace: true },
+  'kg-auto-init': { event: 'SessionStart', matcher: 'startup', level: 'standard', requiresWorkspace: true },
   'kg-context-injector': { event: 'PreToolUse', matcher: 'Agent', level: 'standard', requiresWorkspace: true },
   'kg-unified-injector': { event: 'UserPromptSubmit', level: 'standard', requiresWorkspace: true },
   'kg-unified-injector-agent': { event: 'PreToolUse', matcher: 'Agent', level: 'standard', requiresWorkspace: true },
+  'search-cache-invalidator': { event: 'PostToolUse', matcher: 'Write|Edit', level: 'standard', requiresWorkspace: true },
+  'search-daemon-start': { event: 'SessionStart', matcher: 'startup', level: 'standard', requiresWorkspace: true },
   'workflow-guard': { event: 'PreToolUse', matcher: 'Bash|Write|Edit', level: 'full', requiresWorkspace: true },
   'prompt-guard': { event: 'UserPromptSubmit', level: 'full', requiresWorkspace: false },
 };
@@ -124,6 +127,8 @@ export const CODEX_HOOK_DEFS: Record<string, CodexHookDef> = {
   'spec-validator':        { event: 'PreToolUse', matcher: 'Write|Edit', level: 'standard', requiresWorkspace: true, statusMessage: 'Validating against specs' },
   'kg-unified-injector':   { event: 'UserPromptSubmit', level: 'standard', requiresWorkspace: true },
   'kg-unified-injector-agent': { event: 'PreToolUse', matcher: 'Agent', level: 'standard', requiresWorkspace: true },
+  'search-daemon-start':   { event: 'SessionStart', matcher: 'startup', level: 'standard', requiresWorkspace: true, statusMessage: 'Starting search daemon' },
+  'search-cache-invalidator': { event: 'PostToolUse', matcher: 'Write|Edit', level: 'standard', requiresWorkspace: true },
   'workflow-guard':        { event: 'PreToolUse', matcher: 'Bash', level: 'full', requiresWorkspace: true, statusMessage: 'Checking command safety' },
   'prompt-guard':          { event: 'UserPromptSubmit', level: 'full', requiresWorkspace: false },
 };
@@ -131,7 +136,7 @@ export const CODEX_HOOK_DEFS: Record<string, CodexHookDef> = {
 export const CODEX_HOOK_LEVEL_DESCRIPTIONS: Record<HookLevel, string> = {
   none: 'No hooks',
   minimal: 'Session context (SessionStart)',
-  standard: '+ spec/keyword-injector + skill-context + kg-sync + kg-auto-init(SessionStart) + kg-context-injector + delegate-monitor + coordinator/team/telemetry(Stop) + preflight/spec guards + kg-unified-injector (opt-in)',
+  standard: '+ spec/keyword-injector + skill-context + kg-sync + kg-auto-init(SessionStart) + kg-context-injector + delegate-monitor + coordinator/team/telemetry(Stop) + preflight/spec guards + kg-unified-injector (opt-in) + search-daemon-start(SessionStart) + search-cache-invalidator',
   full: '+ workflow-guard (PreToolUse, Bash only) + prompt-guard (UserPromptSubmit)',
 };
 
@@ -212,7 +217,7 @@ export function removeMaestroHooks(settings: ClaudeSettings, hookNames?: string[
     ? new Set(hookNames.map((n) => `hooks run ${n}`))
     : null;
 
-  for (const eventKey of ['PreToolUse', 'PostToolUse', 'UserPromptSubmit', 'Notification', 'Stop'] as const) {
+  for (const eventKey of ['PreToolUse', 'PostToolUse', 'UserPromptSubmit', 'Notification', 'SessionStart', 'Stop'] as const) {
     const groups = settings.hooks[eventKey] as HookGroup[] | undefined;
     if (!groups) continue;
     for (const group of groups) {
@@ -279,7 +284,7 @@ function countHookEntries(hooks: Record<string, HookGroup[]> | undefined): numbe
 
 function findHookInSettings(settings: ClaudeSettings, hookName: string): boolean {
   if (!settings.hooks) return false;
-  for (const eventKey of ['PreToolUse', 'PostToolUse', 'UserPromptSubmit', 'Notification', 'Stop'] as const) {
+  for (const eventKey of ['PreToolUse', 'PostToolUse', 'UserPromptSubmit', 'Notification', 'SessionStart', 'Stop'] as const) {
     const groups = settings.hooks[eventKey] as HookGroup[] | undefined;
     if (!groups) continue;
     if (groups.some((g) => g.hooks.some((h) => h.command.includes(`hooks run ${hookName}`) || h.command.includes(`hook-runner.js") ${hookName}`) || h.command.includes(`hook-runner.js" ${hookName}`)))) {
@@ -603,6 +608,8 @@ export const AGY_HOOK_DEFS: Record<string, AgyHookDef> = {
 
   'kg-unified-injector':   { event: 'PreInvocation', level: 'standard', requiresWorkspace: true },
   'kg-unified-injector-agent': { event: 'PreToolUse', matcher: 'invoke_subagent', level: 'standard', requiresWorkspace: true },
+  'search-daemon-start':   { event: 'PreInvocation', level: 'standard', requiresWorkspace: true },
+  'search-cache-invalidator': { event: 'PostToolUse', matcher: 'write_to_file|replace_file_content|multi_replace_file_content', level: 'standard', requiresWorkspace: true },
 
   // Full — guards
   'preflight-guard':       { event: 'PreToolUse', matcher: 'run_command|write_to_file|replace_file_content|multi_replace_file_content|invoke_subagent', level: 'standard', requiresWorkspace: true },
@@ -614,7 +621,7 @@ export const AGY_HOOK_DEFS: Record<string, AgyHookDef> = {
 export const AGY_HOOK_LEVEL_DESCRIPTIONS: Record<HookLevel, string> = {
   none: 'No hooks',
   minimal: 'spec-injector (PreToolUse on invoke_subagent)',
-  standard: '+ session/skill/keyword context (PreInvocation) + delegate-monitor (PostToolUse) + team/telemetry/coordinator (Stop) + preflight/spec guards + kg-unified-injector (opt-in)',
+  standard: '+ session/skill/keyword context (PreInvocation) + delegate-monitor (PostToolUse) + team/telemetry/coordinator (Stop) + preflight/spec guards + kg-unified-injector (opt-in) + search-daemon-start(PreInvocation) + search-cache-invalidator',
   full: '+ workflow-guard (PreToolUse on shell/file writes) + prompt-guard (PreInvocation)',
 };
 
@@ -1211,6 +1218,63 @@ const HOOK_RUNNERS: Record<string, HookRunner> = {
     if (!bridgeData) return;
     bridgeData.session_id = sessionId;
     writeCoordBridge(sessionId, bridgeData);
+  },
+
+  'search-cache-invalidator': async () => {
+    const config = loadHooksConfig();
+    if (config.toggles['searchCacheInvalidator'] === false) return;
+
+    const raw = await readStdin();
+    const data = JSON.parse(raw);
+    const toolInput = data.tool_input ?? {};
+    const filePath: string = toolInput.file_path ?? '';
+    if (!filePath) return;
+
+    const normalized = filePath.replace(/\\/g, '/');
+    const isKnowledgeFile = /\.workflow\/(specs|knowhow|issues|domain|scratch)\//.test(normalized)
+      || normalized.endsWith('.workflow/project.md')
+      || normalized.endsWith('.workflow/roadmap.md');
+    if (!isKnowledgeFile) return;
+
+    const projectRoot = resolveWorkspace(data);
+    if (!projectRoot) return;
+
+    const workflowRoot = join(projectRoot, '.workflow');
+
+    // Notify daemon to invalidate (rebuilds wiki + BM25 + embedding in the long-lived process)
+    const { readDaemonInfo, isDaemonAlive, queryDaemon } = await import('../search/daemon-client.js');
+    const daemonInfo = readDaemonInfo(workflowRoot);
+    if (daemonInfo && isDaemonAlive(daemonInfo)) {
+      const resp = await queryDaemon(daemonInfo.port, { action: 'invalidate' }).catch(() => null);
+      if (resp?.ok) return;
+    }
+
+    // No daemon running — rebuild index directly so disk cache is fresh for next search
+    const { WikiIndexer } = await import('#maestro-dashboard/wiki/wiki-indexer.js');
+    const { loadWorkspaceConfig, resolveWorkspaceLinks } = await import('../config/index.js');
+    const wsConfig = loadWorkspaceConfig(projectRoot);
+    const resolved = resolveWorkspaceLinks(projectRoot, wsConfig);
+    const linkedWorkspaces = resolved
+      .filter((lw: { valid: boolean }) => lw.valid)
+      .map((lw: { name: string; workflowRoot: string; share: Array<'spec' | 'knowhow' | 'domain' | 'codebase'> }) => ({ name: lw.name, workflowRoot: lw.workflowRoot, shareTypes: lw.share }));
+    const indexer = new WikiIndexer({ workflowRoot, linkedWorkspaces });
+    await indexer.rebuild();
+  },
+
+  'search-daemon-start': async () => {
+    const config = loadHooksConfig();
+    if (config.toggles['searchDaemonStart'] === false) return;
+
+    const raw = await readStdin();
+    const data = raw ? JSON.parse(raw) : {};
+    const cwd: string = data.cwd ?? process.cwd();
+
+    const workspace = resolveWorkspace({ cwd });
+    if (!workspace) return;
+
+    const workflowRoot = join(workspace, '.workflow');
+    const { spawnDaemon } = await import('../search/daemon-client.js');
+    await spawnDaemon(workflowRoot);
   },
 };
 

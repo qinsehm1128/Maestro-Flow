@@ -1,7 +1,5 @@
 # Workflow: finish-work
 
-Last step of session commands. Inline-extracts spec/knowhow from this single session, then writes `archive.json` so the session enters `wiki search` (strategy 2: only sealed/archived sessions are indexed).
-
 ## Inputs
 
 Caller passes: `SESSION_DIR`, `SESSION_TYPE` (grill | brainstorm | analyze | blueprint | plan | execute | verify), `SESSION_ID`, `LINKED_MILESTONE` (optional).
@@ -10,7 +8,7 @@ Caller passes: `SESSION_DIR`, `SESSION_TYPE` (grill | brainstorm | analyze | blu
 
 ### 1. Detect outputs
 
-Scan `SESSION_DIR` for any of these files (any absent → skip silently):
+Scan `SESSION_DIR` for any of these files; if absent: log W0xx "<file> missing" and continue; flag harvest as [LOW CONFIDENCE] (partial fragments):
 
 | File | Source | Used for |
 |------|--------|----------|
@@ -48,7 +46,7 @@ Iterate detected files; build a `fragments[]` array. Each fragment: `{ kind, cat
 
 **Keyword extraction**: take 3-5 lowercased domain terms (filter stop words, take frequency-ranked nouns/identifiers from content).
 
-**Deduplication**: hash `(kind, content[:100])` — skip if any existing spec/knowhow entry has matching hash (check via `maestro spec list --json` + `maestro knowhow list --json`).
+**Deduplication**: hash `(kind, content[:100])` — skip if any existing spec/knowhow entry has matching hash (MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: check via `maestro spec list --json` + `maestro knowhow list --json`).
 
 ### 3. Route fragments
 
@@ -60,10 +58,10 @@ Apply? (auto | spec-only | knowhow-only | skip)
 
 Then for each fragment in approved buckets:
 
-- **spec**: `maestro spec add <category> "<title>" "<content>" --keywords {csv} --description "<one-line summary>" --source finish-work` (capture returned id into `extracted_spec_ids[]`)
-- **knowhow**: `maestro knowhow add --type {DCS|RCP|REF|KNW} --title "{title}" --body "{content}" --keywords {csv}` (capture id into `extracted_knowhow_ids[]`)
+- **spec**: MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: `maestro spec add <category> "<title>" "<content>" --keywords {csv} --description "<one-line summary>" --source finish-work` (capture returned id into `extracted_spec_ids[]`)
+- **knowhow**: MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: `maestro knowhow add --type {DCS|RCP|REF|KNW} --title "{title}" --body "{content}" --keywords {csv}` (capture id into `extracted_knowhow_ids[]`)
 - Below confidence threshold: increment `skipped_count`, do nothing
-- CLI failure: log W002, continue with remaining fragments
+- CLI failure: log W002, continue with remaining fragments; flag harvest as [LOW CONFIDENCE] (CLI failure)
 
 ### 3.5 Domain Term Extraction (interactive, conditional)
 
@@ -78,10 +76,10 @@ Source priority:
 
 Process:
   1. 从 session 产物中收集术语候选
-  2. 过滤已注册的 `glossary.json` terms
+  2. 过滤已注册的 `glossary.yaml` terms
   3. 0 个新候选 → 跳过（静默）
   4. ≥ 1 个新候选 → 交互确认（domain 注册始终需要用户确认，`-y` 对 domain 无效）
-  5. 确认的术语写入 `glossary.json` via `maestro domain add`
+  5. MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: 确认的术语写入 `glossary.yaml` via `maestro domain add`
   6. 记录到 `archive.json` 的 `extraction.domain_ids[]`
 
 Skip conditions:
@@ -129,8 +127,6 @@ Next: /maestro-milestone-complete will flip lifecycle.status → archived and pr
 ```
 
 ## Idempotency
-
-Re-running on same session: archive.json overwritten with fresh timestamps. Steps 2-3 skipped when existing `archive.json.extraction.harvested == true` (avoids duplicate spec/knowhow). Force re-extract: delete `archive.json` first.
 
 ## Boundary
 

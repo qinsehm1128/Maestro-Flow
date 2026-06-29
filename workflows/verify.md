@@ -405,7 +405,7 @@ For each success criterion / must-have truth:
 
 ### Step 4: Spawn Auditor Agent (if gaps found)
 
-Spawn workflow-nyquist-auditor agent with gap list, test infrastructure, and phase context.
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Spawn workflow-nyquist-auditor agent with gap list, test infrastructure, and phase context.
 Agent generates missing tests and returns:
 - GAPS FILLED -> record new tests
 - PARTIAL -> record resolved, escalate remainder
@@ -540,10 +540,10 @@ Next steps:
 |-------|--------|
 | Phase directory not found | Abort: "Phase {phase} not found." |
 | No execution results | Abort: "No completed tasks found. Run /workflow:execute first." |
-| No summaries found | Warn, proceed with task file analysis only |
+| No summaries found | Warn, proceed with task file analysis only; flag verification.json as [LOW CONFIDENCE] (partial, summaries missing) |
 | Test framework not detected | Skip coverage calculation, warn user |
-| Coverage command fails | Log error, proceed with requirement mapping only |
-| Verifier agent fails | Retry once, then write partial verification.json |
+| Coverage command fails | Log error, proceed with requirement mapping only; flag validation.json coverage as [LOW CONFIDENCE] (partial, coverage command failed) |
+| Verifier agent fails | Retry once, then write partial verification.json; flag verification.json as [LOW CONFIDENCE] (partial, verifier agent failed) |
 
 ---
 

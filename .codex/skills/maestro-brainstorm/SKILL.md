@@ -36,8 +36,8 @@ When `--from` is absent, auto-discover from state.json: latest `type=grill` arti
 **9 valid roles**: data-architect, product-manager, product-owner, scrum-master, subject-matter-expert, system-architect, test-strategist, ui-designer, ux-expert
 
 ### Pre-load
-1. **Architecture specs**: `maestro spec load --category arch` — load architecture constraints as context for multi-role design (roles respect documented decisions).
-2. **Role Knowledge**: `maestro search --category arch` → identify relevant entries → `maestro wiki load <id1> [id2...]`
+1. **Architecture specs**: `maestro load --type spec --category arch` — load architecture constraints as context for multi-role design (roles respect documented decisions).
+2. **Role Knowledge**: `maestro search --category arch` → identify relevant entries → `maestro load --type knowhow --id <id1> [id2...]`
 3. **Project context**: Read `.workflow/project.md` (if exists) → Validated requirements (already shipped) as constraints, Active requirements as current scope. Read `state.json.accumulated_context` → deferred items as brainstorming seeds, key_decisions as locked constraints.
 4. All optional — proceed without if unavailable.
 
@@ -54,10 +54,10 @@ When `--from` is absent, auto-discover from state.json: latest `type=grill` arti
 </context>
 
 <interview_protocol>
-Interview the user relentlessly until shared understanding is reached. Active only in interactive mode; skip when `-y/--yes`, `--skip-questions`, `--continue` (existing session), or input is already specific.
+Interview the user relentlessly until shared understanding is reached. Active only in interactive mode; skip ONLY when `-y/--yes`, `--skip-questions`, or `--continue` (existing session) is set. Text topics always require at least mode + role confirmation — never auto-classify input as "specific enough" to skip.
 
 - One decision per turn via request_user_input with 2–4 options + a (Recommended) default. The user controls termination — keep interviewing until convergence; they can interrupt naturally at any time.
-- Search-first when uncertain: before asking, resolve via `state.json`, the session directory, `maestro spec load`, `maestro search`, Glob/Grep/Read, or — for open-ended multi-file scans — `maestro delegate ... --role explore`. Never ask what code or memory can verify; never bounce your own ambiguity back to the user — search first, then ask only what truly needs human judgment.
+- Search-first when uncertain: before asking, resolve via `state.json`, the session directory, `maestro load --type spec`, `maestro search`, `maestro explore` (preferred, fallback Glob/Grep/Read). Never ask what code or memory can verify; never bounce your own ambiguity back to the user — search first, then ask only what truly needs human judgment.
 - Writeback cadence: each time a decision settles, immediately append/update its row in `guidance-specification.md` §11 (create the section if absent). Do NOT batch writeback to the end — partial decisions must already be on disk before the next question.
 - Branch jumps allowed: the user may switch freely between mode / role / upstream / sub-pipeline branches; sequence is not enforced, but every decision point must end with a definite answer.
 - Scope guard: only ask about decisions owned by `brainstorm`. Do not pre-resolve roadmap/plan choices.
@@ -223,12 +223,12 @@ CONSTRAINTS:
 1. **Wave order sacred**: Guidance (W1) MUST complete before role design (W2); review (W3) MUST run only after all W2 rows complete.
 2. **CSV source of truth**: Master tasks.csv holds all state.
 3. **Discovery board append-only**: Never modify/delete discoveries.ndjson.
-4. **Skip on failure**: Guidance fails → abort. All W2 roles fail → skip review.
+4. **Skip on failure**: Guidance fails → abort. All W2 roles fail → skip review, flag all downstream LOW CONFIDENCE.
 5. **9 valid roles only**: data-architect, product-manager, product-owner, scrum-master, subject-matter-expert, system-architect, test-strategist, ui-designer, ux-expert
 6. **Wave 3 is read-only at the agent boundary**: the reviewer emits structured findings (conflicts / gaps / synergies with `patch_targets[]`). The orchestrator (not the agent) applies the patches via Edit.
-7. **DO NOT STOP**: Continuous until all waves complete; only pause at [CHECKPOINT] (skipped with -y).
-8. **Invariant violation = BLOCK** — violating any invariant above blocks the current operation. Do NOT bypass for "efficiency" or "clear intent" reasons.
-9. **Evidence required** — role analysis findings in {role}/analysis.md §2 Decision Digest MUST cite concrete evidence: code references (file:line), API endpoints, data models from codebase exploration. Decisions without evidence are flagged LOW CONFIDENCE.
+7. **Pipeline continuity**: Continuous until all waves complete; only pause at [CHECKPOINT] (skipped with -y). When invariant 4 (skip on failure) activates, the pipeline continues in degraded mode — this is NOT a violation of invariant 8 but a defined degradation path.
+8. **Invariant violation = BLOCK** — violating any invariant above blocks the current operation. Do NOT bypass for "efficiency" or "clear intent" reasons. Defined degradation paths (invariant 4) are not violations.
+9. **Evidence required** — role analysis findings in {role}/analysis.md §2 Decision Digest MUST cite concrete evidence: code references (file:line), API endpoints, data models from codebase exploration. Decisions without evidence are flagged LOW CONFIDENCE. **Degradation exception**: when invariant 4 activates and evidence is unavailable due to upstream failure, decisions MAY proceed but MUST inherit LOW CONFIDENCE flag.
 10. **Artifact verification before completion** — before reporting completion, verify ALL expected artifacts exist: guidance-specification.md, {role}/analysis.md (per selected role), {role}/analysis-F-*.md (per feature). If any missing: DO NOT report completion.
 </invariants>
 
@@ -308,16 +308,24 @@ S_CHECK_1 → END        WHEN: user "Abort"
 
 S_DESIGN → S_WAVE_2    WHEN: DESIGN.md exists OR explore completed    DO: A_DESIGN_EXPLORE
 S_DESIGN → S_WAVE_2    WHEN: DESIGN.md already exists (skip explore)
-S_DESIGN → S_WAVE_2    WHEN: explore failed → W004 → retry once. If still fails: flag downstream outputs as LOW CONFIDENCE, continue without
+S_DESIGN → S_WAVE_2    WHEN: explore failed → W004 → retry once. If still fails: set session.design_degraded=true, record degradation_event in discoveries.ndjson, continue without. W2 ui-designer agent receives gap_note="DESIGN.md unavailable, design evidence incomplete" and outputs inherit LOW CONFIDENCE flag.
 
-S_WAVE_2 → S_CHECK_2   DO: spawn wave-2 (parallel), merge results — each agent writes {role}/analysis.md + sub-files
-S_WAVE_2 → S_AGGREGATE WHEN: all failed       DO: skip review
+S_WAVE_2 → S_CHECK_2   WHEN: 1+ completed     DO: spawn wave-2 (parallel), merge results — each agent writes {role}/analysis.md + sub-files
+S_WAVE_2 → S_WAVE_2    WHEN: all failed, retry available   DO: retry once
+S_WAVE_2 → S_AGGREGATE WHEN: all failed, retry exhausted   DO: skip review, flag LOW CONFIDENCE on all downstream
 
 S_CHECK_2 → S_WAVE_3   WHEN: -y OR user "Proceed"
 S_CHECK_2 → S_WAVE_2   WHEN: user "Add Roles"  DO: add new role rows, spawn only new
 
-S_WAVE_3 → S_RESOLVE   DO: spawn wave-3, capture review_findings (conflicts/gaps/synergies with patch_targets)
-S_WAVE_3 → S_AGGREGATE WHEN: zero findings    DO: log "No cross-role issues detected", skip resolve
+S_WAVE_3 → S_BOUNDARY_GRILL  WHEN: completed    DO: spawn wave-3, capture review_findings (conflicts/gaps/synergies with patch_targets)
+S_WAVE_3 → S_AGGREGATE      WHEN: zero findings    DO: log "No cross-role issues detected", skip resolve
+S_WAVE_3 → S_WAVE_3         WHEN: failed, retry available   DO: retry once
+S_WAVE_3 → S_AGGREGATE      WHEN: failed, retry exhausted   DO: use analysis files directly, no resolution writeback, flag LOW CONFIDENCE
+
+S_BOUNDARY_GRILL:
+  → S_RESOLVE     WHEN: no boundary conflicts detected     DO: —
+  → S_RESOLVE     WHEN: conflicts detected + resolved      DO: A_BOUNDARY_GRILL
+  GUARD: max 3 conflicts × 3 questions; non-blocking (see boundary-grill.md)
 
 S_RESOLVE → S_AGGREGATE  DO: A_APPLY_RESOLUTIONS (orchestrator iterates patch_targets and applies Edits)
 
@@ -382,6 +390,13 @@ When ui-designer is among selected roles, establish visual direction before Wave
 explore generates multi-style HTML prototypes, visual comparison, user selection/mix, and produces DESIGN.md.
 ui-designer agents in Wave 2 then focus on UX/visual design referencing DESIGN.md.
 
+### A_BOUNDARY_GRILL
+
+Run boundary grill per `~/.maestro/workflows/boundary-grill.md` after cross-role review, before resolution application.
+Input: reviewer findings + role Decision Digests. Scope guard: "only brainstorm decisions; do not pre-resolve roadmap/plan choices".
+IF conflicts → results to `guidance-specification.md` §12.5 Boundary Grill Results + feed into S_RESOLVE.
+Non-blocking: conflicts produce warnings, pipeline continues.
+
 ### A_APPLY_RESOLUTIONS
 
 For each finding in `review_findings`:
@@ -403,7 +418,7 @@ If zero findings, S_RESOLVE is bypassed and `guidance §12` is unchanged.
 2. Generate context.md (summary, guidance, per-role analyses, review_findings_count, resolutions_applied, patches_skipped, next steps)
 3. Confidence scoring: 5 dimensions (role_coverage, cross_role_consistency, feature_completeness, spec_quality, design_feasibility). Quality gate: cross_role_consistency < 0.4 → warn.
 4. Copy artifacts to target session directory (preserve `{role}/` subdirs).
-5. Next-step routing: DESIGN.md established → `maestro-impeccable build <feature>`; else UI features detected → `maestro-impeccable build <feature>`; else → maestro-analyze / maestro-plan / maestro-roadmap
+5. **Next-step suggestion** (suggest only, NEVER auto-execute): Display the recommended next command. DESIGN.md established → `maestro-impeccable build <feature>`; else UI features detected → `maestro-impeccable build <feature>`; else → maestro-analyze / maestro-plan / maestro-roadmap. The user decides whether to proceed.
 
 </actions>
 </state_machine>
@@ -442,6 +457,8 @@ Protocol: read before analysis, append-only, dedup by type+key.
 - [ ] system-architect/analysis.md §3 includes Data Model + State Machine when system-architect selected
 - [ ] Each {role}/analysis.md §2 Decisions table has ≥ 1 row per feature
 - [ ] Cross-role review (W3) executed; reviewer output includes `patch_targets[]` for every finding
+- [ ] Boundary grill executed after cross-role review (skip if no conflicts detected)
+- [ ] Boundary grill results written to guidance-specification.md §12.5 (if conflicts found)
 - [ ] If findings: resolutions applied via Edit AND logged in guidance §12 "Cross-Role Resolutions"
 - [ ] If zero findings: final report explicitly notes "No cross-role issues detected"; guidance §12 unchanged
 - [ ] Heading-drift patch failures surfaced (not silently dropped)

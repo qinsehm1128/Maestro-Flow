@@ -7,12 +7,11 @@ allowed-tools: Read, Write, Edit, Bash, Glob, Grep, request_user_input
 <purpose>
 Socratic stress-testing of a plan, idea, or requirement against codebase reality. Walks every branch of the decision tree one question at a time — challenging vague terminology against existing code, probing edge cases with concrete scenarios, and verifying assumptions with code evidence. Produces a verified context package (grill-report.md + terminology.md + context-package.json) for downstream brainstorm/analyze/roadmap consumption.
 
-Positioned BEFORE brainstorm in the pipeline: grill stress-tests and sharpens; brainstorm generates and elaborates.
 
 Codex specifics:
-- **No agent spawning** — codebase exploration runs directly via Glob/Grep/Read in coordinator context.
+- **No agent spawning** — codebase exploration via `maestro explore` (preferred, fallback Glob/Grep/Read).
 - **request_user_input** replaces request_user_input for Socratic Q&A.
-- **CLI delegation** for auto mode: `exec_command("maestro delegate ... --role analyze --mode analysis")`.
+- **CLI delegation** for auto mode: `shell_exec("maestro delegate ... --role analyze --mode analysis")`.
 </purpose>
 
 <required_reading>
@@ -43,7 +42,7 @@ $ARGUMENTS -- topic/plan text for interactive mode, or --from source for upstrea
 
 ### Role Knowledge
 `maestro search "{topic keywords}"` → load relevant entries before grilling.
-`maestro spec load --category arch` → load architecture constraints.
+`maestro load --type spec --category arch` → load architecture constraints.
 </context>
 
 <interview_protocol>
@@ -71,22 +70,23 @@ Exit: When all depth-selected branches are fully walked (every question answered
 <execution>
 Follow '~/.maestro/workflows/grill.md' completely.
 
-**Next-step routing on completion:**
+**Next-step suggestion** (suggest only, NEVER auto-execute):
+Display the recommended next command based on grill outcomes. The user decides whether to proceed.
 
-Standard routing:
-- Need multi-role elaboration → `$maestro-brainstorm "{topic}" --from grill:{artifact_id}`
-- Need deep technical analysis → `$maestro-analyze "{topic}" --from grill:{artifact_id}`
-- Scope is clear, ready for roadmap → `$maestro-roadmap --from grill:{artifact_id}`
-- Need formal spec package → `$maestro-blueprint --from grill:{artifact_id}`
-
-Resume routing:
-- More branches to walk → `$maestro-grill "{topic}" -c`
+| Condition | Suggested |
+|-----------|-----------|
+| Need multi-role elaboration | `$maestro-brainstorm "{topic}" --from grill:{artifact_id}` |
+| Need deep technical analysis | `$maestro-analyze "{topic}" --from grill:{artifact_id}` |
+| Scope is clear, ready for roadmap | `$maestro-roadmap --from grill:{artifact_id}` |
+| Need formal spec package | `$maestro-blueprint --from grill:{artifact_id}` |
+| More branches to walk | `$maestro-grill "{topic}" -c` |
 </execution>
 
 <invariants>
 1. **Invariant violation = BLOCK** — violating any invariant above blocks the current operation.
 2. **Code-grounded questions required** — grill questions MUST reference specific code (file:line) when challenging the user's proposal. Generic questions without code grounding are INVALID. If codebase scan failed, flag ALL locked decisions as LOW CONFIDENCE.
-3. **Artifact verification before completion** — verify grill-report.md (with Branch Log + Q&A + synthesis), terminology.md (≥5 terms), and context-package.json all exist before reporting completion. If any missing: DO NOT report completion.
+3. **Auto mode decisions are advisory** — in auto mode (`-y`), delegate-generated answers are recorded as decisions but MUST be tagged `source: "auto/delegate"` (not `source: "user"`). Downstream consumers SHOULD treat auto-sourced locked decisions with lower confidence than user-confirmed ones. The `context-package.json` MUST include `auto_mode: true` flag so downstream skills can distinguish.
+4. **Artifact verification before completion** — verify grill-report.md (with Branch Log + Q&A + synthesis), terminology.md (≥5 terms), and context-package.json all exist before reporting completion. If any missing: DO NOT report completion.
 </invariants>
 
 <error_codes>

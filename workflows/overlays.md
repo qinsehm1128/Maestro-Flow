@@ -1,7 +1,5 @@
 # Command Overlays — Format & Contract
 
-Overlays are non-invasive patches for `.claude/commands/*.md` files. They let users and operators inject additional steps, reading requirements, or gating rules into any slash command without editing the pristine source files shipped by the `maestro` package. Every `maestro install` run reapplies them automatically.
-
 ## File format
 
 Each overlay is a JSON file at `~/.maestro/overlays/<name>.json`:
@@ -83,10 +81,6 @@ On apply, each patch's `content` is wrapped in hashed markers:
 2. Restore `.md.disabled` state from the prior install
 3. **Apply overlays** — reads `~/.maestro/overlays/*.json`, applies each enabled one to the just-installed commands, writes `~/.maestro/manifests/overlays-<scope>.json`
 
-Because step 1 always overwrites commands with pristine content, the apply in step 3 is always clean — no drift, no stacking across reinstalls.
-
-Users can also run `maestro overlay apply` standalone between installs — it's idempotent and safe to call any number of times.
-
 ## CLI reference
 
 ```bash
@@ -95,10 +89,6 @@ maestro overlay apply                       # reapply to all known install scope
 maestro overlay add <file.json>             # validate, install, apply
 maestro overlay remove <name>               # strip markers, delete overlay file
 ```
-
-## Authoring via the `/maestro-overlay` skill
-
-Users rarely write overlay JSON by hand. The `/maestro-overlay` skill takes natural-language intent, reads the pristine target command to find the right section, drafts the overlay JSON, and runs `maestro overlay add` for you. See `.claude/commands/maestro-overlay.md`.
 
 ## Edge cases
 

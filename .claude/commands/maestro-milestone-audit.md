@@ -36,14 +36,14 @@ Milestone: $ARGUMENTS (optional -- defaults to current_milestone from state.json
 ### Pre-load
 
 1. **Codebase docs**: IF `.workflow/codebase/doc-index.json` exists → Read ARCHITECTURE.md for integration checks
-2. **Specs**: `maestro spec load --category review` — load review standards for audit
+2. **Specs**: `maestro load --type spec --category review` — load review standards for audit
 3. All optional — proceed without if unavailable
 
 ### Role Knowledge
 
 1. Browse: `maestro search --category review`
 2. Select entries relevant to milestone integration audit
-3. Load: `maestro wiki load <id1> [id2...]`
+3. Load: `maestro load --type knowhow --id <id1> [id2...]`
 </context>
 
 <execution>
@@ -69,21 +69,6 @@ Audit checklist steps (phase coverage, ad-hoc completeness, execution completene
 - REQUIRED: Clear PASS/FAIL verdict determined with evidence for each check.
 - BLOCKED if missing: integration check not completed — do not write report without cross-artifact verification.
 
-### Artifact Verification (before completion)
-
-```
-REQUIRED_ARTIFACTS = [
-  ".workflow/milestones/{milestone}/audit-report.md"  // Clear PASS/FAIL verdict
-]
-```
-If missing: DO NOT report completion. Write the audit report first.
-
-### Evidence Requirement
-
-Every audit check result MUST cite what was examined and what was found:
-- PASS: "Phase 1 chain complete: ANL-001 → PLN-001 → EXC-001, all tasks completed"
-- FAIL: "Phase 2 missing EXC artifact — PLN-002 exists but no execution found"
-- Do NOT mark checks as PASS without verifying the actual artifact exists and contains expected content.
 </execution>
 
 <completion>

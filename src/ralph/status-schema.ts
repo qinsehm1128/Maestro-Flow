@@ -6,7 +6,7 @@
 // fall back to pre-CLI ralph-execute inline logic.
 // ---------------------------------------------------------------------------
 
-export const RALPH_PROTOCOL_VERSION = '1';
+export const RALPH_PROTOCOL_VERSION = '2';
 
 export type StepStatus = 'pending' | 'running' | 'completed' | 'skipped' | 'failed';
 export type CompletionStatus = 'DONE' | 'DONE_WITH_CONCERNS' | 'NEEDS_RETRY' | 'BLOCKED';
@@ -39,6 +39,10 @@ export interface RalphStep {
   completion_confirmed: boolean;
   completion_status: CompletionStatus | null;
   completion_evidence: string | string[] | null;
+  completion_summary?: string | null;
+  completion_decisions?: string[] | null;
+  completion_caveats?: string | null;
+  completion_deferred?: string[] | null;
   completed_at: string | null;
   concerns?: string | null;
   retried?: boolean;
@@ -53,9 +57,32 @@ export interface RalphTaskDecompositionItem {
   done_when?: string;
   evidence?: string;
   lifecycle?: string[];
-  status: 'pending' | 'done';
+  status: 'pending' | 'done' | 'superseded';
   completion_confirmed?: boolean;
   completed_at?: string | null;
+  superseded_by?: string | null;
+  superseded_at?: string | null;
+  origin?: string | null;          // CHG-xxx that created this goal
+}
+
+export interface GoalChangelogEntry {
+  id: string;                       // CHG-001, CHG-002, ...
+  timestamp: string;
+  change_type: 'modify' | 'add' | 'remove' | 'boundary';
+  reason: string;
+  impact_assessment?: {
+    risk_level: 'low' | 'medium' | 'high';
+    invalidated_steps: number[];
+    new_steps_inserted: number;
+  };
+  before: {
+    goals: Pick<RalphTaskDecompositionItem, 'id' | 'goal' | 'done_when'>[];
+    boundary_snippet?: string;
+  };
+  after: {
+    goals: Pick<RalphTaskDecompositionItem, 'id' | 'goal' | 'done_when'>[];
+    boundary_snippet?: string;
+  };
 }
 
 export interface RalphSessionContext {
@@ -86,6 +113,7 @@ export interface RalphSession {
   platform?: SessionPlatform;       // 'claude' (.claude/) | 'codex' (.codex/); absent → claude
   passed_gates?: string[];
   context?: RalphSessionContext;
+  decomposition_owner?: 'maestro' | 'ralph' | string; // absent → infer from `source`
   steps: RalphStep[];
   waves?: unknown[];
   current_step?: number;
@@ -102,6 +130,7 @@ export interface RalphSession {
   execution_criteria?: string[];
   task_decomposition?: RalphTaskDecompositionItem[];
   task_decomposition_all_done?: boolean;
+  goal_changelog?: GoalChangelogEntry[];
 }
 
 export interface CheckFinding {

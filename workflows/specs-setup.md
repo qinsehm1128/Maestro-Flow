@@ -285,6 +285,8 @@ source: spec-setup
 
 ### Step 7: Summary
 
+Glob created spec/recipe files MUST exist before Step 7 summary; BLOCKED if missing.
+
 Display list of all created files grouped by destination:
 
 ```

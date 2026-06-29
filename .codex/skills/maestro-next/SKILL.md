@@ -19,10 +19,6 @@ Codex specifics:
 - **Skill pool discovery via CLI** — `maestro ralph skills --platform codex --json --quiet`（project `.codex/skills/` 覆盖 global `~/.codex/skills/`）
 - **No session, no status.json, no goal** — 不调 `create_goal` / `update_plan`，由目标 skill 自行管理产出
 
-与 `$maestro` / `$maestro-ralph` 区别：
-- 不创建 session、不构建 chain、不写 status.json
-- 始终只推 1 个 top pick，最多列 2-3 个备选
-- 适用场景：意图清晰且单步即可完成；或需要定向推荐时
 </purpose>
 
 <context>
@@ -48,7 +44,7 @@ $ARGUMENTS — 意图文本 + 可选 flags。
 3. **Skill 发现限定 codex 平台** — 通过 `maestro ralph skills --platform codex --json --quiet` 解析 `command_scope` + `command_path`（project 覆盖 global，限定 `.codex/skills/`）；未命中即 E003
 4. **空 intent 或 "continue/next/go/继续/下一步/接下来"** → 直接采用 lifecycle_position 推断的自然下一步
 5. **字面命中路由表优先** — lifecycle 仅作加分；命中失败时 lifecycle 上升为决定性信号
-6. **In-context invocation** — top pick 以 `$skill-name {args}` 形式在协调器上下文直接调用，**禁止** spawn_agent / spawn_agents_on_csv / exec_command 包装
+6. **In-context invocation** — top pick 以 `$skill-name {args}` 形式在协调器上下文直接调用，**禁止** spawn_agent / spawn_agents_on_csv / shell_exec 包装
 7. **参数传递** — 默认 intent 原文作为第一个 arg；用户可在 S_CONFIRM 修改；`-y` 仅当用户传入时透传到 skill args
 8. **`--list` 模式跳过 lifecycle 推断与评分**，仅按 workflow 簇分组列出全部候选
 </invariants>
@@ -132,7 +128,8 @@ ls -la .workflow/.maestro/ 2>/dev/null | head -5  # 进行中的 session
 | 最新 artifact = plan | execute | `maestro-execute {phase}` |
 | 最新 artifact = execute | review | `quality-review {phase}` |
 | review verdict=PASS | test-gen | `quality-auto-test {phase}` |
-| 测试全绿 | milestone-audit | `maestro-milestone-audit` |
+| 测试全绿 + current_milestone 存在 | milestone-audit | `maestro-milestone-audit` |
+| 测试全绿 + current_milestone=null (standalone) | review-done | 回退到 `quality-review` 或 `manage-status`（无 milestone 上下文时不推荐 milestone 命令） |
 | 当前 milestone 全 phase 完成 | milestone-complete | `maestro-milestone-complete` |
 | 任一 stage 产物含 gaps/failed | debug | `quality-debug {gap}` |
 
@@ -155,6 +152,16 @@ brainstorm → blueprint → init → analyze-macro → roadmap
 | `name` 关键词命中 intent | 中 | intent 含 "test" → quality-test/quality-auto-test 加分 |
 | Workflow 簇匹配 | 中 | intent 涉及学习/知识/issue 等场景触发对应簇 |
 | Recent activity 反向避免 | 低 | 刚完成的 stage 短期内降权 |
+| **前置条件不满足** | **禁止** | 候选 skill 的前置条件未满足时，直接从候选池移除（如 `maestro-milestone-*` 在 `current_milestone=null` 时移除） |
+
+**前置条件检查（评分前执行，不满足则移除候选）：**
+
+| Skill | 前置条件 |
+|-------|---------|
+| `maestro-milestone-audit` | `current_milestone` 存在且非 null |
+| `maestro-milestone-complete` | `current_milestone` 存在且非 null |
+| `maestro-milestone-release` | `current_milestone` 存在且非 null |
+| `maestro-merge` | 存在活跃的 fork 分支 |
 
 **特殊意图处理：**
 
@@ -227,7 +234,7 @@ brainstorm → blueprint → init → analyze-macro → roadmap
 
 ### A_INVOKE_SKILL
 
-在协调器上下文以 `$skill-name {args}` 直接调用（**NO spawn_agent, NO exec_command 包装**）：
+在协调器上下文以 `$skill-name {args}` 直接调用（**NO spawn_agent, NO shell_exec 包装**）：
 
 1. 解析最终 args：
    - 默认：`{intent}`（原文，去除已识别的关键词如 "continue"）
@@ -289,7 +296,7 @@ brainstorm → blueprint → init → analyze-macro → roadmap
 - [ ] `--dry-run` 仅展示，不执行
 - [ ] `-y` 自动执行 top pick；用户传入时透传到 skill args
 - [ ] 非自动模式通过 `request_user_input` 确认或选备选
-- [ ] 选定 skill 在协调器上下文以 `$skill {args}` 直调（NO spawn_agent / NO exec_command 包装）
+- [ ] 选定 skill 在协调器上下文以 `$skill {args}` 直调（NO spawn_agent / NO shell_exec 包装）
 - [ ] 不创建 session / 不生成 status.json / 不调用 create_goal/update_plan / 不触发后续 chain
 - [ ] `--list` 模式按 workflow 簇分组展示，每项标 `[project|global]` scope
 

@@ -203,7 +203,7 @@ echo "  knowhow-manifest.json written to ${package_dir}"
 通过 Skill tool 调用 codify-to-knowhow：
 
 ```javascript
-Skill("codify-to-knowhow", args="${package_dir}")
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Skill("codify-to-knowhow", args="${package_dir}")
 ```
 
 等待 codify-to-knowhow 完成。它将：

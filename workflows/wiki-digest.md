@@ -74,8 +74,8 @@ Synthesize what these entries collectively teach. Focus on the knowledge pattern
 
 ### Key Entries
 Top 3-5 most important entries by:
-- Hub score (in-degree from `maestro wiki hubs`)
-- Backlink count (from `maestro wiki backlinks <id>`)
+- MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Hub score (in-degree from `maestro wiki hubs`)
+- MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Backlink count (from `maestro wiki backlinks <id>`)
 - Recency (recently updated entries weigh more)
 
 ### Gap Detection
@@ -93,7 +93,7 @@ Per-theme health adapted from wiki health formula (entries, connectivity, comple
 
 Search via `maestro wiki search` or parse `.workflow/specs/learnings.md` for keyword matches against each theme. Flag **unlinked insights** — learning entries matching a theme but not referenced by any wiki entry in that theme.
 
-If `learnings.md` not found, skip with W002 warning.
+If `learnings.md` not found, skip with W002 warning; mark digest cross-reference as [LOW CONFIDENCE] (learnings.md missing).
 
 ---
 
@@ -151,6 +151,8 @@ Produce `.workflow/knowhow/KNW-digest-{slug}-{YYYY-MM-DD}.md`:
 ```
 
 ---
+
+GATE Stage 6→7: gaps identified BEFORE issue routing; BLOCKED if no gaps identified in Stage 5
 
 ## Stage 7: Gap → Issue Routing (if --create-issues)
 

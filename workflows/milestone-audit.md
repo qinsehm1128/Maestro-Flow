@@ -46,7 +46,7 @@ For each execute artifact, read `{path}/.task/TASK-*.json` and verify all tasks 
 
 ## Step 5: Integration Check
 
-Spawn `workflow-integration-checker` agent:
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Spawn `workflow-integration-checker` agent:
 
 ```
 Agent({
@@ -104,6 +104,14 @@ CONSTRAINTS: Only check cross-phase boundaries | Ignore intra-phase issues
 ```
 
 **On callback:** Parse result, append to integration checker findings. Critical items surface in Step 6 verdict.
+
+---
+
+## Step 5.9: Artifact & Evidence Verification
+
+Before proceeding to verdict:
+- Verify `audit-report.md` exists at `.workflow/milestones/{milestone}/audit-report.md`. If missing: re-run Step 5.
+- Every audit check result MUST cite what was examined and what was found (e.g., "Phase 1 chain complete: ANL-001 → PLN-001 → EXC-001" or "Phase 2 missing EXC artifact"). Do NOT mark checks as PASS without verifying the actual artifact exists.
 
 ---
 

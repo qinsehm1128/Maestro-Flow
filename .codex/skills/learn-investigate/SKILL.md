@@ -9,9 +9,6 @@ allowed-tools: Read, Write, Edit, Bash, Glob, Grep, request_user_input
 Systematic investigation for understanding questions (not bug-fixing). 4-phase approach
 with scope lock and 3-strike escalation. Produces structured evidence trails and
 understanding documents that persist to the learning system.
-
-Unlike `quality-debug` (fixing bugs during execution), this answers "how does X work?",
-"why does Y happen?", "what would happen if Z?" questions.
 </purpose>
 
 <context>
@@ -28,7 +25,7 @@ $ARGUMENTS — question text and optional flags.
 
 ### Stage 1: Frame the Question
 - Parse question, generate slug, create investigation directory
-- Load debug specs: `maestro spec load --category debug` for known issues and patterns
+- Load debug specs: `maestro load --type spec --category debug` for known issues and patterns
 - Search prior knowledge: `maestro search --category debug`, wiki search, grep .workflow/specs/learnings.md
 - Write initial `understanding.md`
 

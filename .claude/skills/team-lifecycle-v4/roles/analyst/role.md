@@ -39,7 +39,7 @@ Research and codebase exploration for context gathering.
    • List constraints • Identify 3-5 exploration dimensions
    TOPIC: <topic-content>
    MODE: analysis
-   EXPECTED: JSON with: problem_statement, target_users[], domain, constraints[], exploration_dimensions[]" --tool gemini --mode analysis`, run_in_background: false })
+   EXPECTED: JSON with: problem_statement, target_users[], domain, constraints[], exploration_dimensions[]" --tool agy --mode analysis`, run_in_background: false })
    ```
 6. Parse result JSON
 
@@ -50,14 +50,20 @@ Research and codebase exploration for context gathering.
 | package.json / Cargo.toml / pyproject.toml / go.mod exists | Explore |
 | No project files | Skip (codebase_context = null) |
 
-When project detected:
+When project detected — prefer `maestro explore` multi-prompt:
+```bash
+maestro explore \
+  "FIND: tech stack and framework detection
+SCOPE: package.json, Cargo.toml, pyproject.toml, go.mod, src/
+EXPECTED: tech_stack list with versions" \
+  "FIND: architecture patterns and conventions
+SCOPE: src/
+EXCLUDE: tests, node_modules
+EXPECTED: patterns list with file:line evidence" \
+  --max-turns 3 --json
 ```
-Bash({ command: `maestro delegate "PURPOSE: Explore codebase for context
-TASK: • Identify tech stack • Map architecture patterns • Document conventions • List integration points
-MODE: analysis
-CONTEXT: @**/*
-EXPECTED: JSON with: tech_stack[], architecture_patterns[], conventions[], integration_points[]" --tool gemini --mode analysis`, run_in_background: false })
-```
+
+**Fallback**: `maestro delegate "PURPOSE: Explore codebase for context ..." --tool agy --mode analysis`
 
 ### Tech Profile Scan
 

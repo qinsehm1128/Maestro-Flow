@@ -52,6 +52,7 @@ Build affected sets:
 ### Step 3.5: Load Project Specs
 
 ```
+# MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep
 specs_content = maestro spec load --category arch
 ```
 
@@ -61,6 +62,7 @@ Used in Step 4-5 to validate refreshed docs against architectural expectations.
 
 ```
 If .workflow/codebase/knowledge-graph.json exists:
+  # MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep (when KG exists)
   Run: maestro kg diff-wiki --json
   Parse output for affectedWiki entries.
 
@@ -74,7 +76,7 @@ If .workflow/codebase/knowledge-graph.json exists:
     {affectedWiki.length} wiki entries flagged"
 
 If .workflow/codebase/knowledge-graph.json does not exist:
-  Skip silently (KG not generated).
+  Log W0xx "KG not generated — KG impact analysis skipped" and continue; flag KG analysis as [LOW CONFIDENCE] (KG unavailable).
 ```
 
 ---
@@ -91,6 +93,8 @@ If --deep: follow reverse dependency chain to find additional affected component
 
 Report new files matching component naming patterns (do not auto-add).
 ```
+
+**GATE Step 4→5**: REQUIRED affected components re-scanned (symbols[] and last_updated refreshed) before relationship check; BLOCKED if affected components not re-scanned.
 
 ### Step 5: Check Relationship Changes
 
@@ -125,6 +129,8 @@ If entries changed: regenerate tech-registry/_index.md and feature-maps/_index.m
 ```
 Update .workflow/state.json: set codebase_last_refreshed and last_updated timestamps.
 ```
+
+**GATE Step 8→9**: Glob refreshed `tech-registry/{slug}.md` MUST exist before Step 9 report; BLOCKED if missing.
 
 ### Step 9: Report
 

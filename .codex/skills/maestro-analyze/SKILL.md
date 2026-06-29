@@ -14,8 +14,6 @@ Wave 1 (CLI exploration, parallel) -> Wave 2 (6-dimension scoring, parallel) -> 
 **Dual-layer scope (D-003)**:
 - **Macro layer** (text argument, e.g. `analyze "auth refactor"`): broad impact exploration. Produces `scope_verdict ∈ {small, medium, large}` to drive downstream routing (roadmap vs plan).
 - **Phase layer** (numeric argument, e.g. `analyze 1`): phase-scoped deep analysis under `current_milestone`. Milestone resolved via D-007 `phase_slugs` reverse lookup, NEVER direct `current_milestone` read.
-
-Produces context-package.json (standardized cross-command context contract) in all modes.
 </purpose>
 
 <context>
@@ -35,17 +33,20 @@ $ARGUMENTS -- phase number, topic text, and optional flags.
 
 ### Pre-load (runs unconditionally, including -y auto mode)
 1. **Codebase docs**: IF `.workflow/codebase/doc-index.json` exists → Read ARCHITECTURE.md for module boundaries
-2. **Specs**: `maestro spec load --category arch` — load architecture constraints
+2. **Specs**: `maestro load --type spec --category arch` — load architecture constraints
 3. **Wiki search**: `maestro search "{topic keywords}" --json` → top 5-10 entries as prior knowledge
-4. **Role Knowledge**: `maestro search --category debug` → select relevant → `maestro wiki load`
+4. **Role Knowledge**: `maestro search --category debug` → select relevant → `maestro load --type knowhow --id`
 5. All optional — proceed without if unavailable (log warning)
 </context>
 
 <interview_protocol>
-Interview the user relentlessly until shared understanding is reached. Active only in interactive mode; skip when `-y/--yes`, `--continue`, or input is already specific (explicit phase number or unambiguous topic).
+Interview the user relentlessly until shared understanding is reached. Active only in interactive mode; skip ONLY when `-y/--yes` or `--continue` is set.
+
+**Numeric phase argument**: interview still runs but scope is pre-resolved to "phase" — skip the scope decision, start from depth.
+**Text topic**: always interview from scope onward — text topics are never auto-classified as "unambiguous".
 
 - One decision per turn via request_user_input with 2–4 options + a (Recommended) default. The user controls termination — keep interviewing until convergence; they can interrupt naturally at any time.
-- Search-first when uncertain: before asking, resolve via `state.json`, `roadmap.md`, `issues.jsonl`, `maestro spec load`, `maestro search`, Grep, Read, or — for open-ended multi-file scans — `maestro delegate ... --role explore`. Never ask what code or memory can verify; never bounce your own ambiguity back to the user — search first, then ask only what truly needs human judgment.
+- Search-first when uncertain: before asking, resolve via `state.json`, `roadmap.md`, `issues.jsonl`, `maestro load --type spec`, `maestro search`, Grep, Read, or — for open-ended multi-file scans — `maestro delegate ... --role explore`. Never ask what code or memory can verify; never bounce your own ambiguity back to the user — search first, then ask only what truly needs human judgment.
 - Writeback cadence: each settled decision is immediately appended/updated in `context.md` "Interview Decisions" (and mirrored into `analysis.md` in full mode). Do NOT batch writeback to the end — partial decisions must already be on disk before the next question.
 - Walk the decision dependency tree strictly: scope → depth → dimensions → Go/No-Go threshold. Do not open the next branch until the current one is settled.
 - Scope guard: only ask about decisions owned by `analyze`. Do not prejudge plan/execute concerns.
@@ -96,7 +97,7 @@ Available exploration dimensions: architecture, implementation, performance, sec
 9. **D-007 milestone resolution**: numeric scope MUST reverse-lookup `state.json.milestones[].phase_slugs`. NEVER read `current_milestone` directly for phase-scoped artifact registration.
 10. **scope_verdict mandatory** (D-003): macro/adhoc/standalone scopes MUST produce `scope_verdict ∈ {small, medium, large}` in conclusions.json. Drives downstream chain (roadmap vs plan).
 11. **Invariant violation = BLOCK** — violating any invariant above blocks the current operation. Do NOT bypass for "efficiency" or "clear intent" reasons.
-12. **Evidence required on decisions** — every decision in context.md MUST cite evidence from Wave 1 exploration findings or Wave 2 scores. Decisions citing only orchestrator's manual file reading are flagged LOW CONFIDENCE.
+12. **Evidence required on decisions** — every decision in context.md MUST cite evidence from Wave 1 exploration findings or Wave 2 scores. Decisions citing only orchestrator's manual file reading are flagged LOW CONFIDENCE. **Degradation exception**: when invariant 7 activates and evidence is incomplete, decisions MAY proceed but MUST inherit LOW CONFIDENCE flag per invariant 13 — this is not a violation of the MUST, it is the defined degraded behavior.
 13. **Degradation must be marked** — when graceful degradation (invariant 7) activates, ALL downstream outputs inherit a LOW CONFIDENCE flag. Record in discoveries.ndjson: `{ type: "degradation_event", data: { wave, failed_tasks, impact } }`.
 </invariants>
 
@@ -151,7 +152,17 @@ S_WAVE_1:
   -> ERROR        WHEN: all failed
 
 S_WAVE_2:
-  -> S_WAVE_3     DO: A_SPAWN_WAVE_2
+  -> S_BOUNDARY_GRILL   WHEN: 1+ completed                 DO: A_SPAWN_WAVE_2
+  -> S_WAVE_3_DEGRADED   WHEN: all failed, retry exhausted  DO: flag LOW CONFIDENCE on all downstream, record degradation_event
+  -> S_WAVE_2 (retry)    WHEN: all failed, retry available   DO: retry once
+
+S_BOUNDARY_GRILL:
+  -> S_WAVE_3     WHEN: no boundary conflicts detected     DO: —
+  -> S_WAVE_3     WHEN: conflicts detected + resolved      DO: A_BOUNDARY_GRILL
+  GUARD: max 3 conflicts × 3 questions; non-blocking (see boundary-grill.md)
+
+S_WAVE_3_DEGRADED:
+  -> S_AGGREGATE  DO: A_SPAWN_WAVE_3 with degraded=true (decision-only context.md, ALL decisions flagged LOW CONFIDENCE)
 
 S_WAVE_3:
   -> S_AGGREGATE  DO: A_SPAWN_WAVE_3
@@ -212,8 +223,10 @@ Share via discovery board. Merge results -> master tasks.csv (map `result_status
 
 Filter `wave==2 AND status=="pending"` -> build prev_context from wave 1 findings -> write wave-2.csv -> spawn with `SCORING_INSTRUCTION + SHARED_TERMINATION_CONTRACT`.
 
+**Failed-dependency handling**: when building prev_context, skip `context_from` IDs whose status is `failed`/`blocked`. If ALL `context_from` IDs failed, mark the scoring task as `blocked` (do not spawn). Append a `gap_note` to the scoring instruction listing which exploration dimensions are missing so the agent knows its evidence base is incomplete.
+
 **Scoring agent** (6 dimensions: feasibility, impact, risk, complexity, alignment, maintainability):
-Score 0-100 with specific evidence (code refs from exploration). Each score MUST reference exploration findings.
+Score 0-100 with specific evidence (code refs from exploration). Each score MUST reference exploration findings. When exploration gaps exist (gap_note present), score MUST include a `confidence_penalty` and flag `evidence_incomplete=true`.
 
 Merge results -> master tasks.csv (map `result_status` → master `status`).
 
@@ -237,18 +250,35 @@ Write to `conclusions.json.scope_verdict` (all modes that produce conclusions); 
 
 Gray area detection: domain-aware (things users SEE/CALL/RUN/READ), phase-specific (skip prior decided areas).
 
+### A_BOUNDARY_GRILL
+
+Run boundary grill per `~/.maestro/workflows/boundary-grill.md` after Wave 2 scoring, before Wave 3 synthesis.
+Input: Wave 1 exploration findings + Wave 2 dimension scores. Scope guard: "only analyze decisions; do not prejudge plan/execute concerns".
+Detect RSC (scope violations), MOD (module boundary crossings), DEC (upstream locked vs code reality).
+IF conflicts → results to `analysis.md` § Boundary Grill Results + update `context.md` Locked/Free/Deferred.
+Non-blocking: conflicts produce warnings, pipeline continues.
+
 ### A_AGGREGATE_RESULTS
 
 1. Export results.csv
 2. **Confidence scoring** (full mode): factors -- findings_depth(.30), evidence_strength(.25), coverage_breadth(.20), user_validation(.15), consistency(.10). Thresholds: <60% deeper, 60-80% optional, 80-95% converging, >95% converge.
-3. Auto-create issues from Deferred items -> issues.jsonl
-4. Spec enrichment: Locked decisions -> `maestro spec add arch "<title>" "<content>" --keywords <kw> --description "<summary>"`; code patterns -> `maestro spec add coding "<title>" "<content>" --keywords <kw> --description "<summary>"`
-5. Register artifact in state.json (type: analyze, includes context_package field pointing to context-package.json)
-6. Copy outputs to scratchDir, display summary
-7. **Next-step routing** (D-003 §5.3 — macro scope uses `scope_verdict` for downstream chain selection):
+3. Register artifact in state.json (type: analyze, includes context_package field pointing to context-package.json)
+4. Copy outputs to scratchDir, display summary
 
-   | Scope | Condition | Next |
-   |-------|-----------|------|
+5. **Side-effect confirmation gate** (skip when `-y/--yes`):
+   Before writing to external stores, present a summary to the user via `request_user_input` listing:
+   - Deferred items to create as issues (count + titles)
+   - Locked decisions to register as specs (count + titles)
+   The user can approve all, selectively exclude, or skip entirely.
+
+   5a. **Issue creation** (approved items only): Deferred items -> issues.jsonl
+   5b. **Spec enrichment** (approved items only): Locked decisions -> `maestro spec add arch "<title>" "<content>" --keywords <kw> --description "<summary>"`; code patterns -> `maestro spec add coding "<title>" "<content>" --keywords <kw> --description "<summary>"`
+
+6. **Next-step suggestion** (D-003 §5.3 — suggest only, NEVER auto-execute):
+   Display the recommended next command based on scope_verdict. The user decides whether to proceed.
+
+   | Scope | Condition | Suggested |
+   |-------|-----------|-----------|
    | Phase/Milestone | Go + UI work needed | `$maestro-impeccable build {target}` |
    | Phase/Milestone | Go + ready to plan | `$maestro-plan` or `$maestro-plan {phase}` |
    | Phase/Milestone | No-Go | `$maestro-brainstorm {topic}` |
@@ -310,13 +340,15 @@ Protocol: read before analysis, append-only, dedup by type+key.
 - [ ] Decision Recording Protocol applied to all decisions
 - [ ] Confidence scored per dimension with factor-based model (full mode)
 - [ ] Readiness gate checked before synthesis (wave 3)
+- [ ] Boundary grill executed between Wave 2 and Wave 3 (skip if no conflicts detected)
+- [ ] Boundary grill results written to analysis.md § Boundary Grill Results (if conflicts found)
 - [ ] Pressure pass completed ≥ 1 time on highest-risk dimension before synthesis
-- [ ] Deferred items auto-created as issues
+- [ ] Deferred items created as issues (after user confirmation in interactive mode; auto in -y mode)
 - [ ] Scope creep redirected to Deferred section
 - [ ] Artifact registered in state.json (includes context_package field)
 - [ ] Upstream context loaded via `--from` when specified
 - [ ] discoveries.ndjson append-only throughout
-- [ ] Next step routed (plan for Go, brainstorm for No-Go, plan --gaps for Gaps)
+- [ ] Next step suggested to user (plan for Go, brainstorm for No-Go, plan --gaps for Gaps) — never auto-executed
 - [ ] Session sealed via finish-work (archive.json written, optional spec/knowhow extraction)
 - [ ] Ralph-invoked: `maestro ralph complete <idx> --status {STATUS}` called with correct verdict
 </success_criteria>
@@ -332,4 +364,3 @@ Status verdicts: **DONE** (normal), **DONE_WITH_CONCERNS** (caveats; pass `--con
 <on_complete>
 @~/.maestro/workflows/finish-work.md — SESSION_DIR=OUTPUT_DIR, SESSION_TYPE=analyze, SESSION_ID={artifact_id}, LINKED_MILESTONE={target_milestone or null}
 </on_complete>
-</output>

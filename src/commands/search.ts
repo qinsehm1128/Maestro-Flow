@@ -2,25 +2,34 @@
  * Search Command — Unified knowledge search across wiki + code.
  *
  * Default: mixed results (wiki + code interleaved by normalized score).
- * --code: separate section display (backward compat).
+ * --code: code graph results only (no wiki).
  * --wiki-only: wiki results only (no code search).
  *
  * Scoring: multi-signal normalization inspired by codebase-memory-mcp.
  *   Wiki:  BM25F score + type boost (spec > knowhow > note)
  *   Code:  BM25 score + kind boost + name-match bonus
  *   Merge: percentile-aware normalization + source weight
+ *
+ * Per-source caps: session ≤3, scratch ≤3 to prevent low-value source spam.
  */
 
 import type { Command } from 'commander';
 import { resolve, join } from 'node:path';
 
 import { truncate, extractSnippet, highlightTerms } from '../utils/cli-format.js';
-import { WikiIndexer } from '#maestro-dashboard/wiki/wiki-indexer.js';
+import type { WikiIndexer } from '#maestro-dashboard/wiki/wiki-indexer.js';
 import type { WikiEntry, WikiNodeType } from '#maestro-dashboard/wiki/wiki-types.js';
 import { loadWorkspaceConfig, resolveWorkspaceLinks } from '../config/index.js';
+import { tryDaemonSearch, stopDaemon, spawnDaemon, readDaemonInfo, isDaemonAlive, getDaemonPath } from '../search/daemon-client.js';
 
-// Valid type filter values — matches WikiNodeType.
-const VALID_TYPES = ['project', 'roadmap', 'spec', 'issue', 'knowhow', 'note', 'domain'] as const;
+// Valid type filter values — matches WikiNodeType + virtual aliases.
+const VALID_TYPES = ['project', 'roadmap', 'spec', 'issue', 'knowhow', 'note', 'domain', 'session', 'scratch'] as const;
+
+// Per-category result caps — prevents low-value sources from dominating.
+const CATEGORY_CAPS: Record<string, number> = {
+  session: 3,
+  scratch: 3,
+};
 
 /** A single unified search result with BM25 score and snippet. */
 export interface SearchResult {
@@ -55,10 +64,11 @@ export interface UnifiedSearchOptions {
 
 // ── Lazy offline client ────────────────────────────────────────────────
 
-let _indexer: WikiIndexer | null = null;
+let _indexer: InstanceType<typeof import('#maestro-dashboard/wiki/wiki-indexer.js').WikiIndexer> | null = null;
 
-function getIndexer(): WikiIndexer {
+async function getIndexer(): Promise<WikiIndexer> {
   if (!_indexer) {
+    const { WikiIndexer: Cls } = await import('#maestro-dashboard/wiki/wiki-indexer.js');
     const workflowRoot = resolve('.workflow');
     const projectPath = process.cwd();
     const wsConfig = loadWorkspaceConfig(projectPath);
@@ -66,7 +76,7 @@ function getIndexer(): WikiIndexer {
     const linkedWorkspaces = resolved
       .filter(lw => lw.valid)
       .map(lw => ({ name: lw.name, workflowRoot: lw.workflowRoot, shareTypes: lw.share }));
-    _indexer = new WikiIndexer({ workflowRoot, linkedWorkspaces });
+    _indexer = new Cls({ workflowRoot, linkedWorkspaces });
   }
   return _indexer;
 }
@@ -83,17 +93,43 @@ export interface SearchMeta {
 let _lastSearchMeta: SearchMeta = { embeddingUsed: false, embeddingDocs: 0 };
 export function getLastSearchMeta(): SearchMeta { return _lastSearchMeta; }
 
-export async function runUnifiedSearch(q: string, opts: UnifiedSearchOptions): Promise<SearchResult[]> {
+export async function runUnifiedSearch(q: string, opts: UnifiedSearchOptions & { skipEmbedding?: boolean }): Promise<SearchResult[]> {
   const limit = opts.limit > 0 ? opts.limit : 20;
-  const indexer = getIndexer();
-
   const candidateLimit = Math.max(limit * 3, 60);
-  const { results: scored, embeddingUsed, embeddingDocs } = await indexer.searchWithMeta(q, candidateLimit);
+
+  // Try daemon first (warm ONNX model, no cold-start penalty)
+  const workflowRoot = resolve('.workflow');
+  const daemonResult = await tryDaemonSearch(workflowRoot, q, candidateLimit, opts.skipEmbedding);
+  let scored: Array<{ entry: WikiEntry; score: number }>;
+  let embeddingUsed: boolean;
+  let embeddingDocs: number;
+
+  if (daemonResult?.ok && daemonResult.results) {
+    scored = daemonResult.results;
+    embeddingUsed = daemonResult.embeddingUsed ?? false;
+    embeddingDocs = daemonResult.embeddingDocs ?? 0;
+  } else {
+    // Daemon unavailable — use BM25-only to avoid ONNX cold-start (~1800ms).
+    // Spawn daemon in background so future searches get embedding.
+    const indexer = await getIndexer();
+    const result = await indexer.searchWithMeta(q, candidateLimit, { skipEmbedding: true });
+    scored = result.results;
+    embeddingUsed = result.embeddingUsed;
+    embeddingDocs = result.embeddingDocs;
+    spawnDaemon(workflowRoot).catch(() => {});
+  }
   _lastSearchMeta = { embeddingUsed, embeddingDocs };
 
   let filtered = scored;
   if (opts.type) {
-    filtered = filtered.filter(r => r.entry.type === opts.type);
+    // Virtual type aliases: session/scratch map to category filter
+    if (opts.type === 'session') {
+      filtered = filtered.filter(r => r.entry.category === 'session');
+    } else if (opts.type === 'scratch') {
+      filtered = filtered.filter(r => r.entry.category === 'scratch');
+    } else {
+      filtered = filtered.filter(r => r.entry.type === opts.type);
+    }
   }
   if (opts.category) {
     filtered = filtered.filter(r => r.entry.category === opts.category);
@@ -102,10 +138,22 @@ export async function runUnifiedSearch(q: string, opts: UnifiedSearchOptions): P
     filtered = filtered.filter(r => r.entry.source.workspace === opts.workspace);
   }
 
+  // CATEGORY_CAPS only when user didn't explicitly filter by type/category
+  const applyCaps = !opts.type && !opts.category;
   const seen = new Set<string>();
   const deduped: typeof filtered = [];
+  const catCounts = new Map<string, number>();
   for (const r of filtered) {
     if (seen.has(r.entry.id)) continue;
+    if (applyCaps) {
+      const cat = r.entry.category ?? '';
+      const cap = CATEGORY_CAPS[cat];
+      if (cap !== undefined) {
+        const count = catCounts.get(cat) ?? 0;
+        if (count >= cap) continue;
+        catCounts.set(cat, count + 1);
+      }
+    }
     seen.add(r.entry.id);
     deduped.push(r);
     if (deduped.length >= limit) break;
@@ -151,6 +199,42 @@ function incrementSearchHitsAsync(entryIds: string[]): void {
   }).catch(() => {});
 }
 
+/** A KG unified search result from MaestroGraph. */
+export interface KgSearchResult {
+  id: string;
+  sourceType: string;
+  kind: string;
+  name: string;
+  definition: string;
+  filePath: string;
+  score: number;
+}
+
+async function runKgSearch(q: string, limit: number): Promise<{ results: KgSearchResult[]; summary: Record<string, number> }> {
+  try {
+    const { MaestroGraph } = await import('../graph/kg/engine.js');
+    if (!MaestroGraph.isInitialized(resolve('.'))) return { results: [], summary: {} };
+    const mg = await MaestroGraph.open(resolve('.'));
+    try {
+      const output = mg.searchUnified(q, { limit });
+      const results: KgSearchResult[] = output.directMatches.map(r => ({
+        id: r.node.id,
+        sourceType: r.node.sourceType,
+        kind: r.node.kind,
+        name: r.node.name,
+        definition: r.node.definition?.substring(0, 120) || '',
+        filePath: r.node.filePath,
+        score: r.score,
+      }));
+      return { results, summary: output.summary };
+    } finally {
+      mg.close();
+    }
+  } catch {
+    return { results: [], summary: {} };
+  }
+}
+
 /**
  * Search MaestroGraph for code nodes matching the query. Gracefully returns
  * empty when MaestroGraph is not initialized.
@@ -184,53 +268,79 @@ export function registerSearchCommand(program: Command): void {
     .description('Unified knowledge search across wiki + code (mixed by default)')
     .option('--type <type>', `Filter by type: ${VALID_TYPES.join(', ')}`)
     .option('--category <cat>', 'Filter by category (e.g. coding, arch, debug, test, review, learning)')
-    .option('--code', 'Show wiki and code in separate sections (legacy display)')
+    .option('--code', 'Code graph results only (no wiki)')
+    .option('--kg', 'KG unified search (MaestroGraph full-source)')
     .option('--all', 'Alias for default mixed mode (backward compat)')
     .option('--wiki-only', 'Search wiki only, skip code results')
     .option('--workspace <name>', 'Filter results to a specific linked workspace')
+    .option('--no-emb', 'Skip embedding, use BM25 only')
     .option('--limit <n>', 'Max results', '20')
     .option('--json', 'Output as JSON')
     .action(async (queryParts: string[], opts) => {
       const q = queryParts.join(' ');
       const limit = parseInt(opts.limit, 10) || 20;
       const wikiOnly = opts.wikiOnly === true;
-      const separateSections = opts.code === true && !opts.all;
+      const codeOnly = opts.code === true && !opts.all;
+      const kgMode = opts.kg === true;
 
       if (opts.type && !VALID_TYPES.includes(opts.type)) {
         console.error(`Error: --type must be one of ${VALID_TYPES.join(', ')} (got "${opts.type}")`);
         process.exit(1);
       }
 
-      const wikiResults = await runUnifiedSearch(q, { type: opts.type, category: opts.category, workspace: opts.workspace, limit });
-      const codeResults = wikiOnly ? [] : await runCodeSearch(q, limit);
-
-      const meta = getLastSearchMeta();
-      const embTag = meta.embeddingUsed ? `+emb(${meta.embeddingDocs})` : 'bm25';
+      const skipEmbedding = opts.emb === false;
       const isTTY = process.stdout.isTTY === true;
       const qTerms = q.toLowerCase().split(/\s+/).filter(Boolean);
 
-      // --code (without --all): legacy separate-section display
-      if (separateSections) {
+      // --kg: MaestroGraph unified search
+      if (kgMode) {
+        const { results: kgResults, summary } = await runKgSearch(q, limit);
         if (opts.json) {
-          console.log(JSON.stringify({ query: q, wikiCount: wikiResults.length, codeCount: codeResults.length, wikiResults, codeResults }, null, 2));
+          console.log(JSON.stringify({ query: q, engine: 'maestrograph', count: kgResults.length, summary, results: kgResults }, null, 2));
           return;
         }
-        console.log(`Search: "${q}" (${wikiResults.length} wiki + ${codeResults.length} code, ${embTag})`);
-        if (wikiResults.length === 0 && codeResults.length === 0) {
+        const parts: string[] = [];
+        if (summary.codeSymbols) parts.push(`codegraph ${summary.codeSymbols}`);
+        if (summary.domainTerms) parts.push(`domain ${summary.domainTerms}`);
+        if (summary.specRules) parts.push(`spec ${summary.specRules}`);
+        if (summary.knowhowDocs) parts.push(`knowhow ${summary.knowhowDocs}`);
+        const headerSummary = parts.length > 0 ? `${parts.join(' + ')} = ${kgResults.length}` : `${kgResults.length}`;
+        console.log(`Search: "${q}" (${headerSummary}, KG)`);
+        if (kgResults.length === 0) {
           console.log('  No matches found.');
           return;
         }
-        if (wikiResults.length > 0) {
-          console.log('  [Wiki Results]');
-          for (const r of wikiResults) {
-            printWikiResult(r, '    ', isTTY, qTerms);
-          }
+        for (const r of kgResults) {
+          const name = isTTY ? highlightTerms(r.name, qTerms) : r.name;
+          const def = r.definition ? `  ${truncate(r.definition, 70)}` : '';
+          const scoreTag = `  (${r.score.toFixed(1)})`;
+          console.log(`  [${r.sourceType}:${r.kind}]  ${name}${def}${scoreTag}`);
         }
-        if (codeResults.length > 0) {
-          console.log('  [Code Results]');
-          for (const r of codeResults) {
-            printCodeResult(r, '    ', isTTY, qTerms);
-          }
+        return;
+      }
+
+      // Parallel: wiki + code search (skip irrelevant source based on flags)
+      const [wikiResults, codeResults] = await Promise.all([
+        codeOnly ? [] : runUnifiedSearch(q, { type: opts.type, category: opts.category, workspace: opts.workspace, limit, skipEmbedding }),
+        wikiOnly ? [] : runCodeSearch(q, limit),
+      ]);
+
+      const meta = getLastSearchMeta();
+      const embTag = meta.embeddingUsed ? `+emb(${meta.embeddingDocs})` : 'bm25';
+
+      // --code: code graph results only
+      if (codeOnly) {
+        if (opts.json) {
+          console.log(JSON.stringify({ query: q, count: codeResults.length, results: codeResults }, null, 2));
+          return;
+        }
+        console.log(`Search: "${q}" (code ${codeResults.length}, ${embTag})`);
+        if (codeResults.length === 0) {
+          console.log('  No matches found.');
+          return;
+        }
+        for (const r of codeResults) {
+          printCodeResult(r, '  ', isTTY, qTerms);
         }
         return;
       }
@@ -241,13 +351,38 @@ export function registerSearchCommand(program: Command): void {
       const codeCount = merged.filter(r => r.source === 'code').length;
 
       if (opts.json) {
-        console.log(JSON.stringify({ query: q, wikiCount, codeCount, count: merged.length, results: merged }, null, 2));
+        const typeCountsJson: Record<string, number> = {};
+        for (const r of merged) {
+          let dt: string;
+          if (r.source === 'code') dt = 'code';
+          else if (r.category === 'session') dt = 'session';
+          else if (r.category === 'scratch') dt = 'scratch';
+          else dt = r.kind;
+          typeCountsJson[dt] = (typeCountsJson[dt] ?? 0) + 1;
+        }
+        console.log(JSON.stringify({ query: q, wikiCount, codeCount, typeCounts: typeCountsJson, count: merged.length, results: merged }, null, 2));
         return;
       }
 
+      // Per-type breakdown header
+      const TYPE_DISPLAY_ORDER = ['spec', 'domain', 'knowhow', 'issue', 'project', 'roadmap', 'note', 'session', 'scratch', 'code'];
+      const typeCounts = new Map<string, number>();
+      for (const r of merged) {
+        let displayType: string;
+        if (r.source === 'code') displayType = 'code';
+        else if (r.category === 'session') displayType = 'session';
+        else if (r.category === 'scratch') displayType = 'scratch';
+        else displayType = r.kind;
+        typeCounts.set(displayType, (typeCounts.get(displayType) ?? 0) + 1);
+      }
       const countParts: string[] = [];
-      if (wikiCount > 0) countParts.push(`wiki ${wikiCount}个`);
-      if (codeCount > 0) countParts.push(`代码 ${codeCount}个`);
+      for (const t of TYPE_DISPLAY_ORDER) {
+        const c = typeCounts.get(t);
+        if (c) countParts.push(`${t} ${c}`);
+      }
+      for (const [t, c] of typeCounts) {
+        if (!TYPE_DISPLAY_ORDER.includes(t)) countParts.push(`${t} ${c}`);
+      }
       const countSummary = countParts.length > 0
         ? `${countParts.join(' + ')} = ${merged.length} results`
         : '0 results';
@@ -263,13 +398,15 @@ export function registerSearchCommand(program: Command): void {
       }
 
       for (const r of merged) {
-        const name = isTTY ? highlightTerms(r.name, qTerms) : r.name;
+        const displayName = truncate(r.name, 60);
+        const name = isTTY ? highlightTerms(displayName, qTerms) : displayName;
         const scoreTag = `  (${r.normalizedScore.toFixed(4)})`;
         if (r.source === 'wiki') {
           console.log(`  [wiki:${r.kind}]  ${name}  ${r.detail}${scoreTag}`);
-          if (r.snippet) {
-            const snippet = isTTY ? highlightTerms(r.snippet, qTerms) : r.snippet;
-            console.log(`    ${snippet}`);
+          const subtitle = pickSubtitle(r);
+          if (subtitle) {
+            const text = isTTY ? highlightTerms(subtitle, qTerms) : subtitle;
+            console.log(`    ${text}`);
           }
         } else {
           const sigTag = r.signature ? `  ${truncate(r.signature, 60)}` : '';
@@ -278,21 +415,100 @@ export function registerSearchCommand(program: Command): void {
       }
     });
 
+  // ── Search daemon management ───────────────────────────────────────────
+
+  program
+    .command('search-daemon')
+    .description('Manage the resident search daemon (warm ONNX model)')
+    .argument('<action>', 'start | stop | status')
+    .action(async (action: string) => {
+      const workflowRoot = resolve('.workflow');
+
+      if (action === 'start' || action === 'start-daemon') {
+        const info = readDaemonInfo(workflowRoot);
+        if (info && isDaemonAlive(info)) {
+          console.log(`Search daemon already running (pid=${info.pid}, port=${info.port})`);
+          return;
+        }
+        console.log('Starting search daemon...');
+        const projectPath = process.cwd();
+        const wsConfig = loadWorkspaceConfig(projectPath);
+        const resolved = resolveWorkspaceLinks(projectPath, wsConfig);
+        const linkedWorkspaces = resolved
+          .filter(lw => lw.valid)
+          .map(lw => ({ name: lw.name, workflowRoot: lw.workflowRoot, shareTypes: lw.share }));
+        const { startDaemon } = await import('../search/daemon.js');
+        const { port } = await startDaemon(workflowRoot, { workflowRoot, linkedWorkspaces });
+        console.log(`Search daemon started (pid=${process.pid}, port=${port})`);
+        // Keep process alive
+        return;
+      }
+
+      if (action === 'stop') {
+        const stopped = stopDaemon(workflowRoot);
+        console.log(stopped ? 'Search daemon stopped.' : 'No daemon running.');
+        return;
+      }
+
+      if (action === 'status') {
+        const info = readDaemonInfo(workflowRoot);
+        if (!info) { console.log('Search daemon: not running'); return; }
+        const alive = isDaemonAlive(info);
+        console.log(`Search daemon: ${alive ? 'running' : 'stale (pid dead)'}  pid=${info.pid}  port=${info.port}  started=${info.startedAt}`);
+        if (!alive) try { const { unlinkSync } = await import('node:fs'); unlinkSync(getDaemonPath(workflowRoot)); } catch {}
+        return;
+      }
+
+      console.error(`Unknown action: ${action}. Use: start, stop, status`);
+    });
+
+  // Hidden flag for hook-spawned daemon startup
+  program
+    .command('search-start-daemon', { hidden: true })
+    .action(async () => {
+      const workflowRoot = resolve('.workflow');
+      const projectPath = process.cwd();
+      const wsConfig = loadWorkspaceConfig(projectPath);
+      const resolved = resolveWorkspaceLinks(projectPath, wsConfig);
+      const linkedWorkspaces = resolved
+        .filter(lw => lw.valid)
+        .map(lw => ({ name: lw.name, workflowRoot: lw.workflowRoot, shareTypes: lw.share }));
+      try {
+        const { startDaemon } = await import('../search/daemon.js');
+        await startDaemon(workflowRoot, { workflowRoot, linkedWorkspaces });
+      } catch { process.exit(0); }
+    });
+
   program
     .command('embedding')
     .description('Embedding model status, warmup, and rebuild')
     .argument('[action]', 'status (default), warmup, rebuild', 'status')
     .action(async (action: string) => {
       const workflowRoot = resolve('.workflow');
-      const { isAvailable, getUnavailableReason, loadEmbeddingIndex, embedTexts, getDeviceSummary, detectDevice } = await import('#maestro-dashboard/wiki/embedding.js');
+      const { isAvailable, getUnavailableReason, loadEmbeddingIndex, embedTexts, getDeviceSummary, detectDevice, setProgressCallback, DEFAULT_MODEL_ID, isApiMode, getModelId, loadEmbeddingApiConfig } = await import('#maestro-dashboard/wiki/embedding.js');
 
       if (action === 'status') {
-        const avail = await isAvailable();
-        console.log(`Transformers: ${avail ? 'available' : 'NOT available (' + (getUnavailableReason?.() ?? 'unknown') + ')'}`);
-        if (avail) {
-          await detectDevice();
-          console.log(`Device: ${getDeviceSummary()}`);
+        const apiMode = isApiMode();
+        const apiConf = loadEmbeddingApiConfig();
+        if (apiMode && apiConf) {
+          console.log(`Mode: API (external)`);
+          console.log(`Endpoint: ${apiConf.baseUrl}`);
+          console.log(`Model: ${apiConf.model}`);
+          if (apiConf.dimensions) console.log(`Dimensions: ${apiConf.dimensions}`);
+          const batchInfo = apiConf.batchSize
+            ? `fixed ${apiConf.batchSize}`
+            : `dynamic (ctx ${apiConf.contextLength ?? 8192} tokens)`;
+          console.log(`Batching: ${batchInfo}, concurrency: ${apiConf.concurrency ?? 4}`);
+        } else {
+          const avail = await isAvailable();
+          console.log(`Transformers: ${avail ? 'available' : 'NOT available (' + (getUnavailableReason?.() ?? 'unknown') + ')'}`);
+          if (avail) {
+            await detectDevice();
+            console.log(`Device: ${getDeviceSummary()}`);
+          }
+          console.log(`Model: ${DEFAULT_MODEL_ID} (~465 MB)`);
         }
+        console.log(`Active model: ${getModelId()}`);
         const idx = loadEmbeddingIndex(workflowRoot);
         if (idx) {
           console.log(`Index: ${idx.docIds.length} docs, dim=${idx.dimension}, model=${idx.modelId}`);
@@ -310,6 +526,42 @@ export function registerSearchCommand(program: Command): void {
           console.error(`Embedding unavailable: ${getUnavailableReason?.() ?? 'unknown'}`);
           process.exit(1);
         }
+
+        if (isApiMode()) {
+          console.log(`Warming up API embedding (${getModelId()})...`);
+          const t0 = Date.now();
+          await embedTexts(['warmup']);
+          console.log(`API embedding ready (${Date.now() - t0}ms)`);
+          return;
+        }
+
+        const isTTY = process.stderr.isTTY === true;
+        let downloadStarted = false;
+        let lastPct = -1;
+        setProgressCallback((info) => {
+          if (info.status === 'progress' && info.file === 'onnx/model.onnx' && !downloadStarted) {
+            downloadStarted = true;
+            console.error(`Downloading model ${DEFAULT_MODEL_ID} (~465 MB)...`);
+          }
+          if (info.status === 'progress' && info.file === 'onnx/model.onnx' && typeof info.progress === 'number') {
+            const pct = Math.round(info.progress);
+            if (pct === lastPct) return;
+            lastPct = pct;
+            const loaded = info.loaded ? `${(info.loaded / 1024 / 1024).toFixed(0)}` : '0';
+            const total = info.total ? `${(info.total / 1024 / 1024).toFixed(0)}` : '?';
+            if (isTTY) {
+              const bar = '█'.repeat(Math.floor(pct / 5)) + '░'.repeat(20 - Math.floor(pct / 5));
+              process.stderr.write(`  [${bar}] ${pct}% ${loaded}/${total} MB\r`);
+            } else if (pct % 25 === 0) {
+              console.error(`  ${pct}% (${loaded}/${total} MB)`);
+            }
+          }
+          if (info.status === 'done' && info.file === 'onnx/model.onnx' && downloadStarted) {
+            if (isTTY) process.stderr.write('\x1b[2K\r');
+            console.error(`  ✓ model.onnx downloaded`);
+          }
+        });
+
         console.log('Warming up model...');
         const t0 = Date.now();
         await embedTexts(['warmup']);
@@ -348,20 +600,25 @@ export function registerSearchCommand(program: Command): void {
 
 // ── Display helpers ──────────────────────────────────────────────────
 
-function printWikiResult(r: SearchResult, indent: string, isTTY: boolean, qTerms: string[]): void {
-  const typeTag = `[${r.type}]`;
-  const catTag = r.category ? ` ${r.category}` : '';
-  const wsTag = r.workspace ? ` [ws:${r.workspace}]` : '';
-  const scoreTag = r.score !== null ? `  (${r.score.toFixed(4)})` : '';
-  const title = isTTY ? highlightTerms(r.title, qTerms) : r.title;
-  console.log(`${indent}${typeTag}${catTag}${wsTag}  ${r.id}  ${title}${scoreTag}`);
+function isDuplicate(text: string, title: string): boolean {
+  const a = text.replace(/^#+\s+/, '').replace(/^[-*]\s+/, '').trim();
+  const b = title.trim();
+  if (!a || !b) return true;
+  if (a === b) return true;
+  if (a.startsWith(b.slice(0, 30)) || b.startsWith(a.slice(0, 30))) return true;
+  return false;
+}
+
+function pickSubtitle(r: MergedResult): string | null {
   if (r.snippet) {
-    const snippet = isTTY ? highlightTerms(r.snippet, qTerms) : r.snippet;
-    console.log(`${indent}  ${snippet}`);
-  } else if (r.summary) {
-    const summary = isTTY ? highlightTerms(truncate(r.summary, 80), qTerms) : truncate(r.summary, 80);
-    console.log(`${indent}  ${summary}`);
+    const content = r.snippet.replace(/^L\d+:\s*/, '');
+    if (!isDuplicate(content, r.name)) return r.snippet;
   }
+  if (r.summary) {
+    const cleaned = r.summary.replace(/^#+\s+/, '').trim();
+    if (!isDuplicate(cleaned, r.name)) return truncate(cleaned, 80);
+  }
+  return null;
 }
 
 function printCodeResult(r: CodeSearchResult, indent: string, isTTY: boolean, qTerms: string[]): void {
@@ -385,7 +642,9 @@ export interface MergedResult {
   detail: string;
   normalizedScore: number;
   snippet?: string;
+  summary?: string;
   signature?: string;
+  category?: string;
 }
 
 const WIKI_TYPE_BOOST: Record<string, number> = {
@@ -509,6 +768,8 @@ function mergeAndNormalize(wiki: SearchResult[], code: CodeSearchResult[], limit
       detail: r.category ? `${r.category}  ${r.id}` : r.id,
       normalizedScore: wikiRanks[i] * WIKI_WEIGHT,
       snippet: r.snippet ?? undefined,
+      summary: r.summary || undefined,
+      category: r.category ?? undefined,
     });
   }
   for (let i = 0; i < codeScored.length; i++) {

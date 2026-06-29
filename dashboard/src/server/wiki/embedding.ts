@@ -9,8 +9,9 @@
  */
 
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, renameSync } from 'node:fs';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -39,6 +40,206 @@ export interface DeviceConfig {
   device: DeviceType;
   dtype: DtypeType;
   batchSize: number;
+}
+
+// ---------------------------------------------------------------------------
+// External embedding API configuration (~/.maestro/api-embedding.json)
+// ---------------------------------------------------------------------------
+
+export interface EmbeddingApiConfig {
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  dimensions?: number;
+  /** Model context window in tokens. Used for dynamic batch sizing. Default: 8192. */
+  contextLength?: number;
+  /** Fixed batch size (number of texts). Overrides dynamic batching when set. */
+  batchSize?: number;
+  concurrency?: number;
+}
+
+const API_CONFIG_PATH = join(homedir(), '.maestro', 'api-embedding.json');
+
+let _apiConfig: EmbeddingApiConfig | null | undefined;
+
+export function loadEmbeddingApiConfig(): EmbeddingApiConfig | null {
+  if (_apiConfig !== undefined) return _apiConfig;
+  if (!existsSync(API_CONFIG_PATH)) {
+    _apiConfig = null;
+    return null;
+  }
+  try {
+    const raw = JSON.parse(readFileSync(API_CONFIG_PATH, 'utf-8')) as EmbeddingApiConfig;
+    if (raw.baseUrl && raw.apiKey && raw.model) {
+      _apiConfig = raw;
+      return raw;
+    }
+    _apiConfig = null;
+    return null;
+  } catch {
+    _apiConfig = null;
+    return null;
+  }
+}
+
+export function isApiMode(): boolean {
+  return loadEmbeddingApiConfig() !== null;
+}
+
+function getApiProxy(): string | undefined {
+  const proxy = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || process.env.ALL_PROXY;
+  if (proxy) return proxy;
+  const cliToolsPath = join(homedir(), '.maestro', 'cli-tools.json');
+  if (!existsSync(cliToolsPath)) return undefined;
+  try {
+    const raw = JSON.parse(readFileSync(cliToolsPath, 'utf-8')) as { proxy?: { enabled?: boolean; httpProxy?: string } };
+    if (raw.proxy?.enabled && raw.proxy.httpProxy) return raw.proxy.httpProxy;
+  } catch { /* ignore */ }
+  return undefined;
+}
+
+type FetchFn = (url: string, init: RequestInit) => Promise<Response>;
+let _cachedFetcher: FetchFn | null = null;
+
+async function getFetcher(): Promise<FetchFn> {
+  if (_cachedFetcher) return _cachedFetcher;
+  const proxy = getApiProxy();
+  if (!proxy) {
+    _cachedFetcher = (u, init) => globalThis.fetch(u, init);
+    return _cachedFetcher;
+  }
+  try {
+    const undici = await import('undici');
+    const dispatcher = new undici.ProxyAgent({ uri: proxy });
+    _cachedFetcher = (u, init) => undici.fetch(u, { ...init, dispatcher } as any) as unknown as Promise<Response>;
+  } catch {
+    _cachedFetcher = (u, init) => globalThis.fetch(u, init);
+  }
+  return _cachedFetcher;
+}
+
+const MAX_RETRIES = 2;
+const RETRY_STATUS = new Set([429, 500, 502, 503, 504]);
+
+async function fetchBatchWithRetry(
+  doFetch: FetchFn, url: string, batch: string[], batchOffset: number, config: EmbeddingApiConfig,
+): Promise<Float32Array[]> {
+  const body: Record<string, unknown> = { model: config.model, input: batch, encoding_format: 'float' };
+  if (config.dimensions) body.dimensions = config.dimensions;
+  const reqInit: RequestInit = {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` },
+    body: JSON.stringify(body),
+  };
+
+  let lastErr: Error | null = null;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    if (attempt > 0) await new Promise(r => setTimeout(r, Math.min(1000 * 2 ** (attempt - 1), 4000)));
+    try {
+      const resp = await doFetch(url, reqInit);
+      if (!resp.ok) {
+        const errText = await resp.text().catch(() => '');
+        if (RETRY_STATUS.has(resp.status) && attempt < MAX_RETRIES) { lastErr = new Error(`Embedding API error ${resp.status}: ${errText}`); continue; }
+        throw new Error(`Embedding API error ${resp.status}: ${errText}`);
+      }
+      const json = await resp.json() as { data?: unknown };
+      if (!Array.isArray(json.data)) throw new Error(`Embedding API returned invalid data: missing "data" array`);
+
+      const out = new Array<Float32Array>(batch.length);
+      for (const item of json.data as Array<{ embedding?: number[]; index?: number }>) {
+        if (!Array.isArray(item.embedding) || typeof item.index !== 'number') continue;
+        out[item.index] = new Float32Array(item.embedding);
+      }
+      for (let j = 0; j < batch.length; j++) {
+        if (!out[j]) throw new Error(`Embedding API returned no vector for input index ${j} in batch starting at ${batchOffset}`);
+      }
+      return out;
+    } catch (e: unknown) {
+      lastErr = e instanceof Error ? e : new Error(String(e));
+      const isNetwork = lastErr.message.includes('fetch failed') || lastErr.message.includes('ECONNREFUSED') || lastErr.message.includes('Timeout');
+      if (isNetwork && attempt < MAX_RETRIES) continue;
+      throw lastErr;
+    }
+  }
+  throw lastErr!;
+}
+
+const DEFAULT_API_CONCURRENCY = 4;
+const DEFAULT_CONTEXT_LENGTH = 8192;
+const MAX_TEXTS_PER_REQUEST = 256;
+
+function estimateTokens(text: string): number {
+  let ascii = 0;
+  for (let i = 0; i < text.length; i++) {
+    if (text.charCodeAt(i) < 128) ascii++;
+  }
+  return Math.ceil(ascii / 4 + (text.length - ascii) / 1.5);
+}
+
+function buildChunks(texts: string[], config: EmbeddingApiConfig): { offset: number; batch: string[] }[] {
+  if (config.batchSize) {
+    const chunks: { offset: number; batch: string[] }[] = [];
+    for (let i = 0; i < texts.length; i += config.batchSize) {
+      chunks.push({ offset: i, batch: texts.slice(i, i + config.batchSize) });
+    }
+    return chunks;
+  }
+
+  const ctxLen = config.contextLength ?? DEFAULT_CONTEXT_LENGTH;
+  const maxBatchTokens = ctxLen * 0.9;
+  const chunks: { offset: number; batch: string[] }[] = [];
+  let batchStart = 0;
+  let batchTokens = 0;
+  let batchCount = 0;
+  for (let i = 0; i < texts.length; i++) {
+    const t = estimateTokens(texts[i]);
+    if ((batchTokens + t > maxBatchTokens || batchCount >= MAX_TEXTS_PER_REQUEST) && i > batchStart) {
+      chunks.push({ offset: batchStart, batch: texts.slice(batchStart, i) });
+      batchStart = i;
+      batchTokens = 0;
+      batchCount = 0;
+    }
+    batchTokens += t;
+    batchCount++;
+  }
+  if (batchStart < texts.length) {
+    chunks.push({ offset: batchStart, batch: texts.slice(batchStart) });
+  }
+  return chunks;
+}
+
+async function callEmbeddingApi(texts: string[], config: EmbeddingApiConfig): Promise<Float32Array[]> {
+  const doFetch = await getFetcher();
+  const url = config.baseUrl.replace(/\/+$/, '') + '/embeddings';
+  const concurrency = config.concurrency ?? DEFAULT_API_CONCURRENCY;
+
+  const chunks = buildChunks(texts, config);
+
+  const results: Float32Array[] = new Array(texts.length);
+
+  let firstErr: Error | null = null;
+  for (let w = 0; w < chunks.length; w += concurrency) {
+    const window = chunks.slice(w, w + concurrency);
+    const settled = await Promise.allSettled(
+      window.map(c => fetchBatchWithRetry(doFetch, url, c.batch, c.offset, config)),
+    );
+    for (let ci = 0; ci < window.length; ci++) {
+      const s = settled[ci];
+      if (s.status === 'fulfilled') {
+        for (let j = 0; j < s.value.length; j++) results[window[ci].offset + j] = s.value[j];
+      } else if (!firstErr) {
+        firstErr = s.reason instanceof Error ? s.reason : new Error(String(s.reason));
+      }
+    }
+  }
+
+  if (firstErr) {
+    const filled = results.filter(Boolean).length;
+    if (filled === 0) throw firstErr;
+    if (filled < texts.length) throw firstErr;
+  }
+
+  return results;
 }
 
 // ---------------------------------------------------------------------------
@@ -87,20 +288,6 @@ export function mergeRRFSignals(
   for (const [docId, score] of scores) merged.push({ docId, score });
   merged.sort((a, b) => b.score - a.score);
   return merged.slice(0, limit);
-}
-
-export function mergeRRF(
-  bm25Results: RankedResult[],
-  vectorResults: RankedResult[],
-  limit: number,
-  k = 60,
-  bm25Weight = 0.6,
-  vectorWeight = 0.4,
-): RankedResult[] {
-  return mergeRRFSignals([
-    { name: 'bm25', weight: bm25Weight, results: bm25Results },
-    { name: 'vector', weight: vectorWeight, results: vectorResults },
-  ], limit, k);
 }
 
 /**
@@ -188,6 +375,7 @@ export async function detectDevice(): Promise<DeviceConfig> {
 }
 
 export function getDeviceSummary(): string {
+  if (isApiMode()) return 'api (external)';
   if (!_detectedConfig) return 'not initialized';
   return `${_detectedConfig.device}/${_detectedConfig.dtype} batch=${_detectedConfig.batchSize}`;
 }
@@ -222,8 +410,12 @@ export async function getHardwareInfo(): Promise<HardwareInfo> {
 // Pipeline management — lazy-loads model with detected device
 // ---------------------------------------------------------------------------
 
-const DEFAULT_MODEL = 'Xenova/multilingual-e5-small';
-export const DEFAULT_MODEL_ID = DEFAULT_MODEL;
+const DEFAULT_LOCAL_MODEL = 'Xenova/multilingual-e5-small';
+export function getModelId(): string {
+  const apiConf = loadEmbeddingApiConfig();
+  return apiConf ? apiConf.model : DEFAULT_LOCAL_MODEL;
+}
+export const DEFAULT_MODEL_ID = DEFAULT_LOCAL_MODEL;
 const CACHE_FILE = 'embedding-index.json';
 
 let _pipeline: any = null;
@@ -234,12 +426,20 @@ async function configureProxy(): Promise<void> {
   if (!proxy) return;
   try {
     const { ProxyAgent, setGlobalDispatcher } = await import('undici');
-    setGlobalDispatcher(new ProxyAgent(proxy));
+    setGlobalDispatcher(new ProxyAgent({ uri: proxy }));
   } catch { /* undici not available */ }
 }
 
 async function loadTransformers(): Promise<{ pipeline: any }> {
   return await import('@huggingface/transformers');
+}
+
+export type ModelProgressCallback = (info: { status: string; file?: string; progress?: number; loaded?: number; total?: number }) => void;
+
+let _progressCallback: ModelProgressCallback | null = null;
+
+export function setProgressCallback(cb: ModelProgressCallback | null): void {
+  _progressCallback = cb;
 }
 
 async function getPipeline(): Promise<any> {
@@ -248,16 +448,22 @@ async function getPipeline(): Promise<any> {
   await configureProxy();
   const config = await detectDevice();
   const { pipeline } = await loadTransformers();
-  _pipeline = await pipeline('feature-extraction', DEFAULT_MODEL, {
+  _pipeline = await pipeline('feature-extraction', DEFAULT_LOCAL_MODEL, {
     dtype: config.dtype,
     device: config.device,
+    progress_callback: _progressCallback ?? undefined,
   });
+  _progressCallback = null;
   return _pipeline;
 }
 
 let _unavailableReason: string | null = null;
 
 export async function isAvailable(): Promise<boolean> {
+  if (isApiMode()) {
+    _available = true;
+    return true;
+  }
   if (_available !== null) return _available;
   try {
     await loadTransformers();
@@ -279,6 +485,11 @@ export function getUnavailableReason(): string | null {
 
 export async function embedTexts(texts: string[]): Promise<Float32Array[]> {
   if (texts.length === 0) return [];
+
+  const apiConf = loadEmbeddingApiConfig();
+  if (apiConf) {
+    return callEmbeddingApi(texts.map(t => t.slice(0, 8192)), apiConf);
+  }
 
   const pipe = await getPipeline();
   const config = await detectDevice();
@@ -306,8 +517,13 @@ export async function embedTexts(texts: string[]): Promise<Float32Array[]> {
 }
 
 export async function embedQuery(query: string): Promise<Float32Array> {
+  const apiConf = loadEmbeddingApiConfig();
+  if (apiConf) {
+    const [vec] = await callEmbeddingApi([query.slice(0, 8192)], apiConf);
+    return vec;
+  }
+
   const pipe = await getPipeline();
-  // E5 models require "query: " prefix for search queries
   const output = await pipe(('query: ' + query).slice(0, 512), { pooling: 'mean', normalize: true });
   return new Float32Array(output.data);
 }
@@ -377,7 +593,9 @@ export function saveEmbeddingIndex(index: EmbeddingIndex, dir: string): void {
     offset += dim * 4;
   }
 
-  writeFileSync(join(dir, BINARY_FILE), buf);
+  const tmpPath = join(dir, BINARY_FILE + '.tmp');
+  writeFileSync(tmpPath, buf);
+  renameSync(tmpPath, join(dir, BINARY_FILE));
 
   // Remove legacy files
   for (const f of [CACHE_FILE, SQLITE_FILE, SQLITE_FILE + '-shm', SQLITE_FILE + '-wal', SQLITE_FILE + '-journal']) {
@@ -389,7 +607,14 @@ export function loadEmbeddingIndex(dir: string): EmbeddingIndex | null {
   // Primary: packed binary
   const binPath = join(dir, BINARY_FILE);
   if (existsSync(binPath)) {
-    try { return loadFromBinary(binPath); } catch { return null; }
+    try {
+      return loadFromBinary(binPath);
+    } catch (e: unknown) {
+      if (process.env.DEBUG || process.env.MAESTRO_DEBUG) {
+        console.warn(`[embedding] binary index corrupted, will rebuild: ${e instanceof Error ? e.message : e}`);
+      }
+      return null;
+    }
   }
 
   // Legacy: SQLite → migrate to binary
@@ -429,11 +654,17 @@ function loadFromBinary(filePath: string): EmbeddingIndex {
 
   const dim = meta.dimension;
   const n = meta.count;
+  const vecBytes = n * dim * 4;
+  const vecStart = raw.byteOffset + offset;
   const vectors: Float32Array[] = new Array(n);
-  for (let i = 0; i < n; i++) {
-    const ab = raw.buffer.slice(raw.byteOffset + offset, raw.byteOffset + offset + dim * 4);
-    vectors[i] = new Float32Array(ab);
-    offset += dim * 4;
+  if (vecStart % 4 === 0) {
+    const allFloats = new Float32Array(raw.buffer, vecStart, n * dim);
+    for (let i = 0; i < n; i++) vectors[i] = allFloats.subarray(i * dim, (i + 1) * dim);
+  } else {
+    const aligned = new ArrayBuffer(vecBytes);
+    new Uint8Array(aligned).set(raw.subarray(offset, offset + vecBytes));
+    const allFloats = new Float32Array(aligned);
+    for (let i = 0; i < n; i++) vectors[i] = allFloats.subarray(i * dim, (i + 1) * dim);
   }
 
   return {
@@ -513,22 +744,25 @@ function docToText(d: DocForEmbedding): string {
   if (d.summary) parts.push(d.summary);
   if (d.tags.length > 0) parts.push(d.tags.join(' '));
   if (d.body) parts.push(d.body.slice(0, 500));
-  // E5 models require "passage: " prefix for documents
-  return 'passage: ' + parts.join('. ');
+  const text = parts.join('. ');
+  return isApiMode() ? text : 'passage: ' + text;
 }
 
 export async function buildEmbeddingIndex(
   docs: DocForEmbedding[],
   existingIndex?: EmbeddingIndex | null,
+  precomputedHashes?: string[],
 ): Promise<EmbeddingIndex> {
-  const config = await detectDevice();
+  const apiMode = isApiMode();
+  const config = apiMode ? null : await detectDevice();
   const t0 = Date.now();
 
-  const currentHashes = docs.map(hashDocContent);
+  const currentHashes = precomputedHashes ?? docs.map(hashDocContent);
   let vectors: Float32Array[];
 
+  const activeModel = getModelId();
   // Model changed → discard all cached vectors, force full rebuild
-  const modelMatch = existingIndex && existingIndex.modelId === DEFAULT_MODEL;
+  const modelMatch = existingIndex && existingIndex.modelId === activeModel;
   if (modelMatch && existingIndex!.docIds.length > 0) {
     // Incremental: reuse vectors only for docs with matching content hash
     const existingMap = new Map<string, { vector: Float32Array; hash: string }>();
@@ -565,13 +799,13 @@ export async function buildEmbeddingIndex(
   }
 
   return {
-    modelId: DEFAULT_MODEL,
+    modelId: activeModel,
     dimension: vectors[0]?.length ?? 384,
     docIds: docs.map(d => d.id),
     vectors,
     contentHashes: currentHashes,
     builtAt: Date.now(),
-    deviceUsed: `${config.device}/${config.dtype}`,
+    deviceUsed: apiMode ? 'api' : `${config!.device}/${config!.dtype}`,
     buildTimeMs: Date.now() - t0,
   };
 }

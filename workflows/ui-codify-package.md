@@ -1,7 +1,5 @@
 # UI Codify: Phase 3 — Reference Package Generation
 
-将提取结果转换为可分享的参考包，包含交互式预览页面。
-
 ## Prerequisites
 
 来自前序 Phase 的变量：
@@ -52,7 +50,7 @@ echo "[Phase 3] Token files prepared"
 **Agent Task**:
 
 ```javascript
-Agent(ui-design-agent): `
+MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Agent(ui-design-agent): `
   [PREVIEW_SHOWCASE_GENERATION]
   Generate interactive multi-component showcase panel for reference package
 

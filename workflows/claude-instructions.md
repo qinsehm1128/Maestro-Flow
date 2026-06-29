@@ -9,55 +9,137 @@
 
 **Strictly follow the cli-tools.json configuration**
 
+## Explore
+
+`maestro explore` takes priority over Glob, Grep, and Read. When locating files or searching code patterns, call `maestro explore` first and stop to wait for results.
+
+```bash
+maestro explore "FIND: <target + condition>\nSCOPE: <paths>" [more prompts...] [options]
+```
+
+Lightweight read-only codebase search. 1 prompt = 1 agent. Not for write-mode/long sessions — use `delegate`.
+
+| Option | Description |
+|--------|-------------|
+| `-e, --endpoint <names>` | Endpoint name(s), comma-separated |
+| `--all` | Fan out each prompt to all endpoints |
+| `--max-turns <n>` | Max agent turns per job |
+| `-f, --file <path>` | Load prompts from JSON or text file |
+| `--cd <dir>` | Working directory |
+| `--json` | Output results as JSON |
+
+### Context Injection
+
+Explore agent 无项目认知，调用前注入上下文：
+
+| 注入项 | 写入字段 | 内容 |
+|--------|----------|------|
+| 结构 | SCOPE | 相关目录的具体路径（非通配泛扫） |
+| 领域 | SCOPE | `maestro search` 已返回的关键文件路径 |
+| 约束 | ATTENTION | 框架、语言、命名惯例 |
+
+```
+FIND: authentication middleware that validates JWT tokens
+SCOPE: src/middleware/, src/auth/, src/api/routes/
+ATTENTION: Express.js, middleware files named *.middleware.ts
+```
+
+### Prompt Structure
+
+**FIND + SCOPE 为最低标准。** 每个字段一句陈述句，禁止嵌套条件。
+
+| Field | Required | Rule |
+|-------|----------|------|
+| `FIND` | **Yes** | 可判定的具体目标（什么 + 判定条件） |
+| `SCOPE` | **Yes** | 明确路径或 glob，禁止 `**/*` 泛扫 |
+| `EXCLUDE` | No | 要跳过的文件类型或目录 |
+| `ATTENTION` | No | 框架、命名惯例、已知陷阱 |
+| `EXPECTED` | Recommended | 输出格式：`file:line` 列表 / 摘要 / JSON |
+
+```
+FIND: Functions that call db.query() with string concatenation instead of $1/$2
+SCOPE: src/db/**/*.ts, src/api/**/*.ts
+EXCLUDE: **/*.test.ts
+EXPECTED: file:line list with the SQL string
+```
+
+### Cross-Search
+
+对重要搜索，用 2-3 个不同角度的 prompt 并发，结果由 Claude 交叉验证。
+
+**按角度拆分，不按关键词拆分：**
+
+| 角度 | Prompt A | Prompt B |
+|------|----------|----------|
+| 定义 vs 调用 | 找函数定义 | 找调用点 |
+| 正例 vs 反例 | 找正确用法 | 找遗漏用法 |
+| 入口 vs 实现 | 找 export/路由 | 找内部逻辑 |
+| 按文件类型 | .ts 中的用法 | .vue 中的用法 |
+
+```bash
+maestro explore \
+  "FIND: All functions exported from auth module\nSCOPE: src/auth/\nEXPECTED: function name + file:line" \
+  "FIND: All imports from auth module\nSCOPE: src/**/*.ts\nEXCLUDE: src/auth/\nEXPECTED: import path + file:line" \
+  --json
+```
+
+**结果置信度：**
+- 双命中 → 高置信，直接使用
+- 单命中 → 用 Grep/Read 二次确认
+- 零命中 → 换角度重搜或目标不存在
+
+### Execution
+
+Multi-prompt — background；single lookup — foreground：
+
+```
+Bash({ command: "maestro explore \"p1\" \"p2\" --json", run_in_background: true })
+Bash({ command: "maestro explore \"FIND: ...\nSCOPE: ...\"" })
+```
+
+Session: `maestro explore show` / `maestro explore output <id>`
+
 ## Knowledge System
 
-**Gate rule: On any coding/modification/debugging task, run `maestro search` BEFORE reading code or editing files. Use targeted queries — multiple short searches beat one long one.**
-
-### Required search (every task, no exceptions)
+**Gate rule**: run `maestro search` + `maestro load` BEFORE reading code or editing files.
 
 ```bash
-maestro search "<1-3 word topic phrase>"
+maestro search "<query>" [--type <type>] [--category <cat>] [--code] [--kg]
+maestro load --type <type> [--list] [--category <cat>] [--keyword <word>] [--id <id>]
 ```
 
-**Query rules:**
-- Use **1-3 core keywords** per query — never dump all context into one search
-- Separate concepts from symbols: `maestro search "topology layout"` then `maestro search "DetailedTopologySVG" --code`
-- Run multiple targeted searches rather than one broad query
+**--type**: `spec`, `knowhow`, `domain`, `issue`, `session`, `scratch`, `note`, `project`, `roadmap`
+**--category** (spec only): `coding`, `arch`, `debug`, `test`, `review`, `learning`, `ui`
+
+### Query Rules
+
+1-3 core keywords per query — multiple short queries beat one long one.
+Separate concepts from symbols. Add `--code` for symbols, `--kg` for full-source.
 
 ```bash
-# ❌ Bad: keyword dump (5+ unrelated terms → diluted BM25 scores)
+# ❌ keyword dump
 maestro search "topology display frontend DetailedTopologySVG elk"
 
-# ✅ Good: targeted multi-search
+# ✅ targeted
 maestro search "topology layout"
 maestro search "DetailedTopologySVG" --code
-maestro search "elk layout" --type knowhow
+maestro load --type spec --category coding
 ```
-
-Then add follow-up searches based on results:
-- Specific symbol/function → `maestro kg search <symbol>` or `maestro kg context <node>`
-- Architecture/testing → `maestro search --type spec --category arch|test`
-- Call chains → `maestro kg callers <fn>` / `maestro kg callees <fn>`
-- Domain rules → `maestro spec load --category <cat> [--keyword <kw>]`
 
 ### Record
 
-- **Spec** → `/spec-add <category> "title" "content" --keywords kw1,kw2 --description "summary"`
-- **Knowhow** → `/manage-knowhow-capture` (use `--spec-category <cat>` to bridge into agent injection)
+| What | Command |
+|------|---------|
+| Spec | `/spec-add <category> "title" "content" --keywords kw1,kw2 --description "summary"` |
+| Knowhow | `/manage-knowhow-capture` (`--spec-category <cat>` for agent injection) |
 
 Category routing: decisions→`arch`, patterns→`coding`, pitfalls→`debug`/`learning`, rules→`review`, tests→`test`.
 
-### Confidence & Conflict Marking
-
-When search results conflict with current context, **mark the entry**:
+### Conflict Marking
 
 ```bash
-maestro spec conflict mark <file> <line> --note "<conflict reason>"
-maestro spec conflict list                    # view all marked entries
+maestro spec conflict mark <file> <line> --note "<reason>"
 ```
 
-Confidence levels: `high` (verified) → `medium` (default) → `low` (stale) → `contested` (conflict detected).
-
-- `contested` → 注入时排末尾，`[CONTESTED]` 标记 + 冲突说明
-- `low` → `[LOW CONFIDENCE]` 标记
-- 消除由 `/manage-knowledge-audit` 审查命令专门处理
+Levels: `high` → `medium` (default) → `low` (`[LOW CONFIDENCE]`) → `contested` (`[CONTESTED]`).
+Resolution: `/manage-knowledge-audit`

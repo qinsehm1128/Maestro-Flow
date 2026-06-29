@@ -35,6 +35,11 @@ export interface ComponentDef {
    */
   defaultSelected?: boolean;
   /**
+   * If true, this component is always installed and cannot be deselected.
+   * Core infrastructure components (workflows, templates, chains, etc.) should be mandatory.
+   */
+  mandatory?: boolean;
+  /**
    * Build callback — when present, the install pipeline calls this instead of
    * copyRecursive. Receives the `.claude` directory (source of truth) and the
    * resolved target directory. Returns file count for stats tracking.
@@ -56,6 +61,12 @@ export interface ComponentDef {
    * Components sharing the same category display under a shared header.
    */
   category?: string;
+  /**
+   * Target platform for this component. Used by TUI to group and filter components.
+   * 'shared' = always visible regardless of platform selection.
+   * undefined = treated as 'shared' for backward compat.
+   */
+  platform?: 'claude' | 'codex' | 'agy' | 'agents-standard' | 'shared';
 }
 
 // ---------------------------------------------------------------------------
@@ -137,6 +148,8 @@ export const COMPONENT_DEFS: ComponentDef[] = [
     sourcePath: 'workflows',
     target: () => join(paths.home, 'workflows'),
     alwaysGlobal: true,
+    mandatory: true,
+    platform: 'shared',
   },
   {
     id: 'templates',
@@ -145,6 +158,8 @@ export const COMPONENT_DEFS: ComponentDef[] = [
     sourcePath: 'templates',
     target: () => join(paths.home, 'templates'),
     alwaysGlobal: true,
+    mandatory: true,
+    platform: 'shared',
   },
   {
     id: 'chains',
@@ -153,6 +168,8 @@ export const COMPONENT_DEFS: ComponentDef[] = [
     sourcePath: 'chains',
     target: () => join(paths.home, 'chains'),
     alwaysGlobal: true,
+    mandatory: true,
+    platform: 'shared',
   },
   {
     id: 'overlays',
@@ -161,6 +178,8 @@ export const COMPONENT_DEFS: ComponentDef[] = [
     sourcePath: join('overlays', '_shipped'),
     target: () => join(paths.home, 'overlays', '_shipped'),
     alwaysGlobal: true,
+    mandatory: true,
+    platform: 'shared',
   },
   {
     id: 'commands',
@@ -172,7 +191,9 @@ export const COMPONENT_DEFS: ComponentDef[] = [
         ? join(homedir(), '.claude', 'commands')
         : join(projectPath, '.claude', 'commands'),
     alwaysGlobal: false,
+    mandatory: true,
     category: 'commands',
+    platform: 'claude',
     fileFilter: (name) => !name.startsWith('odyssey-') && !name.startsWith('learn-'),
   },
   {
@@ -186,7 +207,7 @@ export const COMPONENT_DEFS: ComponentDef[] = [
         : join(projectPath, '.claude', 'commands'),
     alwaysGlobal: false,
     category: 'commands',
-    defaultSelected: false,
+    platform: 'claude',
     fileFilter: (name) => name.startsWith('odyssey-'),
   },
   {
@@ -200,7 +221,7 @@ export const COMPONENT_DEFS: ComponentDef[] = [
         : join(projectPath, '.claude', 'commands'),
     alwaysGlobal: false,
     category: 'commands',
-    defaultSelected: false,
+    platform: 'claude',
     fileFilter: (name) => name.startsWith('learn-'),
   },
   {
@@ -213,6 +234,8 @@ export const COMPONENT_DEFS: ComponentDef[] = [
         ? join(homedir(), '.claude', 'agents')
         : join(projectPath, '.claude', 'agents'),
     alwaysGlobal: false,
+    mandatory: true,
+    platform: 'claude',
   },
   {
     id: 'skills',
@@ -224,7 +247,9 @@ export const COMPONENT_DEFS: ComponentDef[] = [
         ? join(homedir(), '.claude', 'skills')
         : join(projectPath, '.claude', 'skills'),
     alwaysGlobal: false,
+    mandatory: true,
     category: 'skills',
+    platform: 'claude',
     fileFilter: (name) => !NON_CORE_SKILL_NAMES.has(name),
   },
   {
@@ -237,7 +262,9 @@ export const COMPONENT_DEFS: ComponentDef[] = [
         ? join(homedir(), '.claude', 'skills')
         : join(projectPath, '.claude', 'skills'),
     alwaysGlobal: false,
+    mandatory: true,
     category: 'skills',
+    platform: 'claude',
     fileFilter: (name) => BUILTIN_TEAM_SKILLS.has(name),
   },
   {
@@ -250,7 +277,9 @@ export const COMPONENT_DEFS: ComponentDef[] = [
         ? join(homedir(), '.claude', 'CLAUDE.md')
         : join(projectPath, '.claude', 'CLAUDE.md'),
     alwaysGlobal: false,
+    mandatory: true,
     inject: true,
+    platform: 'claude',
   },
   {
     id: 'codex-agents-md',
@@ -263,6 +292,7 @@ export const COMPONENT_DEFS: ComponentDef[] = [
         : join(projectPath, '.codex', 'AGENTS.md'),
     alwaysGlobal: false,
     inject: true,
+    platform: 'codex',
   },
   {
     id: 'claude-md-chinese',
@@ -276,6 +306,7 @@ export const COMPONENT_DEFS: ComponentDef[] = [
     alwaysGlobal: false,
     inject: true,
     section: 'chinese',
+    platform: 'claude',
   },
   {
     id: 'codex-md-chinese',
@@ -289,6 +320,7 @@ export const COMPONENT_DEFS: ComponentDef[] = [
     alwaysGlobal: false,
     inject: true,
     section: 'chinese',
+    platform: 'codex',
   },
   {
     id: 'codex-agents',
@@ -300,6 +332,7 @@ export const COMPONENT_DEFS: ComponentDef[] = [
         ? join(homedir(), '.codex', 'agents')
         : join(projectPath, '.codex', 'agents'),
     alwaysGlobal: false,
+    platform: 'codex',
   },
   {
     id: 'codex-skills',
@@ -311,6 +344,7 @@ export const COMPONENT_DEFS: ComponentDef[] = [
         ? join(homedir(), '.codex', 'skills')
         : join(projectPath, '.codex', 'skills'),
     alwaysGlobal: false,
+    platform: 'codex',
   },
   // ---------------------------------------------------------------------------
   // Antigravity (agy) CLI assets
@@ -332,6 +366,7 @@ export const COMPONENT_DEFS: ComponentDef[] = [
         : join(projectPath, 'AGENTS.md'),
     alwaysGlobal: false,
     inject: true,
+    platform: 'agy',
   },
   {
     id: 'agy-md-chinese',
@@ -345,6 +380,7 @@ export const COMPONENT_DEFS: ComponentDef[] = [
     alwaysGlobal: false,
     inject: true,
     section: 'chinese',
+    platform: 'agy',
   },
   {
     id: 'agy-skills',
@@ -357,6 +393,7 @@ export const COMPONENT_DEFS: ComponentDef[] = [
         ? join(homedir(), '.gemini', 'antigravity-cli', 'skills')
         : join(projectPath, '.agents', 'skills'),
     alwaysGlobal: false,
+    platform: 'agy',
     build: (claudeDir, targetDir) => {
       const { buildAgySkills } = require('./skill-converter.js');
       return buildAgySkills(claudeDir, targetDir);
@@ -373,6 +410,7 @@ export const COMPONENT_DEFS: ComponentDef[] = [
         ? join(homedir(), '.gemini', 'antigravity-cli', 'agents')
         : join(projectPath, '.agents', 'agents'),
     alwaysGlobal: false,
+    platform: 'agy',
     build: (claudeDir, targetDir) => {
       const { buildAgyAgents } = require('./skill-converter.js');
       return buildAgyAgents(claudeDir, targetDir);
@@ -387,6 +425,33 @@ export const COMPONENT_DEFS: ComponentDef[] = [
   // other .agents/-aware tools.
   // ---------------------------------------------------------------------------
   {
+    id: 'agents-standard-md-chinese',
+    label: 'Chinese Response (Agents Standard)',
+    description: 'Chinese response guidelines → .agents/AGENTS.md',
+    sourcePath: join('workflows', 'chinese-response.md'),
+    target: (mode, projectPath) =>
+      mode === 'global'
+        ? join(homedir(), '.agents', 'AGENTS.md')
+        : join(projectPath, '.agents', 'AGENTS.md'),
+    alwaysGlobal: false,
+    inject: true,
+    section: 'chinese',
+    platform: 'agents-standard',
+  },
+  {
+    id: 'agents-standard-context',
+    label: 'Agent Context (AGENTS.md)',
+    description: 'Open-standard .agents/ project instructions',
+    sourcePath: join('workflows', 'codex-instructions.md'),
+    target: (mode, projectPath) =>
+      mode === 'global'
+        ? join(homedir(), '.agents', 'AGENTS.md')
+        : join(projectPath, '.agents', 'AGENTS.md'),
+    alwaysGlobal: false,
+    inject: true,
+    platform: 'agents-standard',
+  },
+  {
     id: 'agents-standard-skills',
     label: 'Agent Skills — Open Standard',
     description: 'Open-standard .agents/skills/ — portable across all .agents/-aware CLIs and IDEs',
@@ -397,6 +462,7 @@ export const COMPONENT_DEFS: ComponentDef[] = [
         ? join(homedir(), '.agents', 'skills')
         : join(projectPath, '.agents', 'skills'),
     alwaysGlobal: false,
+    platform: 'agents-standard',
     build: (claudeDir, targetDir) => {
       const { buildAgentsStandardSkills } = require('./skill-converter.js');
       return buildAgentsStandardSkills(claudeDir, targetDir);
@@ -413,6 +479,7 @@ export const COMPONENT_DEFS: ComponentDef[] = [
         ? join(homedir(), '.agents', 'agents')
         : join(projectPath, '.agents', 'agents'),
     alwaysGlobal: false,
+    platform: 'agents-standard',
     build: (claudeDir, targetDir) => {
       const { buildAgentsStandardAgents } = require('./skill-converter.js');
       return buildAgentsStandardAgents(claudeDir, targetDir);
@@ -432,6 +499,7 @@ export const COMPONENT_DEFS: ComponentDef[] = [
         : join(projectPath, '.claude', 'skills'),
     alwaysGlobal: false,
     category: 'skills',
+    platform: 'claude',
     defaultSelected: false,
     fileFilter: (name) => EXTRA_TEAM_SKILL_NAMES.has(name),
   },
@@ -446,6 +514,7 @@ export const COMPONENT_DEFS: ComponentDef[] = [
         : join(projectPath, '.claude', 'skills'),
     alwaysGlobal: false,
     category: 'skills',
+    platform: 'claude',
     defaultSelected: false,
     fileFilter: (name) => SCHOLAR_SKILL_NAMES.has(name),
   },
@@ -460,6 +529,7 @@ export const COMPONENT_DEFS: ComponentDef[] = [
         : join(projectPath, '.claude', 'skills'),
     alwaysGlobal: false,
     category: 'skills',
+    platform: 'claude',
     defaultSelected: false,
     fileFilter: (name) => META_SKILL_NAMES.has(name),
   },
@@ -487,4 +557,20 @@ export function migrateComponentIds(ids: string[]): string[] {
     }
   }
   return Array.from(result);
+}
+
+/**
+ * Migrate old IDs + merge new default-selected components.
+ * Used during `maestro update` reinstall so new-version components
+ * with `defaultSelected !== false` are automatically included.
+ */
+export function mergeNewDefaults(existingIds: string[]): string[] {
+  const migrated = migrateComponentIds(existingIds);
+  const migratedSet = new Set(migrated);
+  for (const def of COMPONENT_DEFS) {
+    if (!migratedSet.has(def.id) && def.defaultSelected !== false) {
+      migrated.push(def.id);
+    }
+  }
+  return migrated;
 }

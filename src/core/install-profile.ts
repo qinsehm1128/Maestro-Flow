@@ -12,7 +12,8 @@ import type { HookLevel } from '../commands/hooks.js';
 import { getHooksForLevel } from '../commands/hooks.js';
 import type { ExtraMcpTargetId } from '../commands/install-backend.js';
 import { MCP_TOOLS } from '../commands/install-backend.js';
-import { findManifest } from './manifest.js';
+import { findManifest, type Manifest } from './manifest.js';
+import { COMPONENT_DEFS } from './component-defs.js';
 import { paths } from '../config/paths.js';
 
 const PROFILE_DIR = join(homedir(), '.maestro', 'install-profiles');
@@ -72,6 +73,11 @@ export interface InstallProfile {
   backup: {
     claudeMd: boolean;
     all: boolean;
+  };
+  plugin?: {
+    enabled: boolean;
+    claude: boolean;
+    codex: boolean;
   };
 }
 
@@ -146,6 +152,96 @@ export interface ProfileSummary {
   createdAt: string;
 }
 
+/**
+ * Build an InstallProfile directly from a Manifest object.
+ * Used by `maestro update` reinstall — avoids the findManifest() lookup
+ * since the caller already has the manifest in hand.
+ */
+export function manifestToProfile(manifest: Manifest): InstallProfile {
+  // hooks.claude.level (schema v2) takes precedence, then legacy hookLevel (v1), then default
+  const claudeLevel = (manifest.hooks?.claude?.level ?? manifest.hookLevel ?? 'standard') as HookLevel;
+  const codexLevel = (manifest.hooks?.codex?.level as HookLevel) || 'none';
+  const agyLevel = (manifest.hooks?.agy?.level as HookLevel) || 'none';
+
+  // Bug fix: detect custom hook selections by comparing installed hooks with level preset
+  const claudeInstalledHooks = manifest.hooks?.claude?.installed ?? [];
+  const claudeLevelHooks = getHooksForLevel(claudeLevel, 'claude');
+  const claudeIsCustom = claudeInstalledHooks.length > 0 &&
+    JSON.stringify([...claudeInstalledHooks].sort()) !== JSON.stringify([...claudeLevelHooks].sort());
+
+  const codexInstalledHooks = manifest.hooks?.codex?.installed ?? [];
+  const codexLevelHooks = getHooksForLevel(codexLevel, 'codex');
+  const codexIsCustom = codexInstalledHooks.length > 0 &&
+    JSON.stringify([...codexInstalledHooks].sort()) !== JSON.stringify([...codexLevelHooks].sort());
+
+  const agyInstalledHooks = manifest.hooks?.agy?.installed ?? [];
+  const agyLevelHooks = getHooksForLevel(agyLevel, 'agy');
+  const agyIsCustom = agyInstalledHooks.length > 0 &&
+    JSON.stringify([...agyInstalledHooks].sort()) !== JSON.stringify([...agyLevelHooks].sort());
+
+  // Bug fix: for old manifests without mcp/statusline fields, infer from hookLevel presence
+  const wasFullInstall = !!(manifest.hookLevel || manifest.hooks);
+
+  return {
+    $schema: SCHEMA_VERSION,
+    name: `reinstall-${manifest.scope}`,
+    createdAt: new Date().toISOString(),
+    scope: manifest.scope,
+    components: {
+      enabled: true,  // Always enable components during reinstall
+      selectedIds: manifest.selectedComponentIds?.length
+        ? manifest.selectedComponentIds
+        : COMPONENT_DEFS.filter(d => d.defaultSelected !== false).map(d => d.id),
+    },
+    claude: {
+      hooks: {
+        enabled: !!(manifest.hooks?.claude?.installed?.length),
+        basePreset: claudeLevel,
+        selectedHooks: manifest.hooks?.claude?.installed ?? getHooksForLevel(claudeLevel, 'claude'),
+        isCustom: claudeIsCustom,
+      },
+      mcp: {
+        enabled: manifest.mcp?.claude ? true : wasFullInstall,
+        tools: [...MCP_TOOLS],
+        projectRoot: '',
+      },
+      statusline: {
+        enabled: manifest.statusline ? true : wasFullInstall,
+        theme: manifest.statusline?.theme || 'notion',
+      },
+    },
+    codex: {
+      hooks: {
+        enabled: !!(manifest.hooks?.codex?.installed?.length),
+        basePreset: codexLevel,
+        selectedHooks: manifest.hooks?.codex?.installed ?? getHooksForLevel(codexLevel, 'codex'),
+        isCustom: codexIsCustom,
+      },
+      mcp: {
+        enabled: manifest.mcp?.codex ? true : wasFullInstall,
+        tools: [...MCP_TOOLS],
+        projectRoot: '',
+      },
+    },
+    agy: {
+      hooks: {
+        enabled: !!(manifest.hooks?.agy?.installed?.length),
+        basePreset: agyLevel,
+        selectedHooks: manifest.hooks?.agy?.installed ?? getHooksForLevel(agyLevel, 'agy'),
+        isCustom: agyIsCustom,
+      },
+    },
+    extraMcp: {
+      enabled: !!(manifest.mcp?.extras?.length),
+      targetIds: (manifest.mcp?.extras?.map(e => e.targetId) ?? []) as ExtraMcpTargetId[],
+    },
+    backup: { claudeMd: true, all: false },
+    plugin: manifest.plugin
+      ? { enabled: !!(manifest.plugin.claude || manifest.plugin.codex), claude: !!manifest.plugin.claude, codex: !!manifest.plugin.codex }
+      : undefined,
+  };
+}
+
 export function exportProfileFromManifest(
   scope: 'global' | 'project',
   filePath?: string,
@@ -153,9 +249,28 @@ export function exportProfileFromManifest(
   const targetPath = scope === 'global' ? paths.home : process.cwd();
   const manifest = findManifest(scope, targetPath);
 
-  const claudeLevel = (manifest?.hooks?.claude?.level as HookLevel) || 'standard';
+  const claudeLevel = (manifest?.hooks?.claude?.level ?? manifest?.hookLevel ?? 'standard') as HookLevel;
   const codexLevel = (manifest?.hooks?.codex?.level as HookLevel) || 'none';
   const agyLevel = (manifest?.hooks?.agy?.level as HookLevel) || 'none';
+
+  // Detect custom hook selections by comparing installed hooks with level preset
+  const claudeInstalledHooks = manifest?.hooks?.claude?.installed ?? [];
+  const claudeLevelHooks = getHooksForLevel(claudeLevel, 'claude');
+  const claudeIsCustom = claudeInstalledHooks.length > 0 &&
+    JSON.stringify([...claudeInstalledHooks].sort()) !== JSON.stringify([...claudeLevelHooks].sort());
+
+  const codexInstalledHooks = manifest?.hooks?.codex?.installed ?? [];
+  const codexLevelHooks = getHooksForLevel(codexLevel, 'codex');
+  const codexIsCustom = codexInstalledHooks.length > 0 &&
+    JSON.stringify([...codexInstalledHooks].sort()) !== JSON.stringify([...codexLevelHooks].sort());
+
+  const agyInstalledHooks = manifest?.hooks?.agy?.installed ?? [];
+  const agyLevelHooks = getHooksForLevel(agyLevel, 'agy');
+  const agyIsCustom = agyInstalledHooks.length > 0 &&
+    JSON.stringify([...agyInstalledHooks].sort()) !== JSON.stringify([...agyLevelHooks].sort());
+
+  // For old manifests without mcp/statusline fields, infer from hookLevel presence
+  const wasFullInstall = !!(manifest?.hookLevel || manifest?.hooks);
 
   const profile: InstallProfile = {
     $schema: SCHEMA_VERSION,
@@ -163,23 +278,25 @@ export function exportProfileFromManifest(
     createdAt: new Date().toISOString(),
     scope,
     components: {
-      enabled: !!(manifest?.selectedComponentIds?.length),
-      selectedIds: manifest?.selectedComponentIds ?? [],
+      enabled: true,  // Always enable components during export
+      selectedIds: manifest?.selectedComponentIds?.length
+        ? manifest.selectedComponentIds
+        : COMPONENT_DEFS.filter(d => d.defaultSelected !== false).map(d => d.id),
     },
     claude: {
       hooks: {
         enabled: !!(manifest?.hooks?.claude?.installed?.length),
         basePreset: claudeLevel,
         selectedHooks: manifest?.hooks?.claude?.installed ?? getHooksForLevel(claudeLevel, 'claude'),
-        isCustom: false,
+        isCustom: claudeIsCustom,
       },
       mcp: {
-        enabled: !!manifest?.mcp?.claude,
+        enabled: manifest?.mcp?.claude ? true : wasFullInstall,
         tools: [...MCP_TOOLS],
         projectRoot: '',
       },
       statusline: {
-        enabled: !!manifest?.statusline,
+        enabled: manifest?.statusline ? true : wasFullInstall,
         theme: manifest?.statusline?.theme || 'notion',
       },
     },
@@ -188,10 +305,10 @@ export function exportProfileFromManifest(
         enabled: !!(manifest?.hooks?.codex?.installed?.length),
         basePreset: codexLevel,
         selectedHooks: manifest?.hooks?.codex?.installed ?? getHooksForLevel(codexLevel, 'codex'),
-        isCustom: false,
+        isCustom: codexIsCustom,
       },
       mcp: {
-        enabled: !!manifest?.mcp?.codex,
+        enabled: manifest?.mcp?.codex ? true : wasFullInstall,
         tools: [...MCP_TOOLS],
         projectRoot: '',
       },
@@ -201,7 +318,7 @@ export function exportProfileFromManifest(
         enabled: !!(manifest?.hooks?.agy?.installed?.length),
         basePreset: agyLevel,
         selectedHooks: manifest?.hooks?.agy?.installed ?? getHooksForLevel(agyLevel, 'agy'),
-        isCustom: false,
+        isCustom: agyIsCustom,
       },
     },
     extraMcp: {
@@ -257,6 +374,9 @@ export function configToProfile(
     },
     extraMcp: { enabled: config.installExtraMcp, targetIds: config.extraMcpTargetIds },
     backup: { claudeMd: config.backupClaudeMd, all: config.backupAll },
+    plugin: (config.installPluginClaude || config.installPluginCodex)
+      ? { enabled: true, claude: !!config.installPluginClaude, codex: !!config.installPluginCodex }
+      : undefined,
   };
 }
 
@@ -293,6 +413,8 @@ export function profileToStateValues(profile: InstallProfile): ProfileApplyResul
       extraMcp: profile.extraMcp.enabled,
       statusline: profile.claude.statusline.enabled,
       backup: profile.backup.claudeMd || profile.backup.all,
+      pluginClaude: profile.plugin?.claude ?? false,
+      pluginCodex: profile.plugin?.codex ?? false,
     },
     selectedComponentIds: profile.components.selectedIds,
     claudeHooks: { basePreset: profile.claude.hooks.basePreset, selectedHooks: profile.claude.hooks.selectedHooks, isCustom: profile.claude.hooks.isCustom },

@@ -39,18 +39,22 @@ Scan codebase from multiple perspectives (bug, security, test-coverage, code-qua
 
 **Low complexity**: Use `` for quick pattern-based scan.
 
-**Medium/High complexity**: CLI fan-out -- one `maestro delegate --mode analysis` per perspective:
+**Medium/High complexity**: Multi-prompt `maestro explore` (preferred for read-only scan):
 
-For each active perspective, build prompt:
+Build one prompt per active perspective:
+```bash
+maestro explore \
+  "FIND: <perspective1> issues and anti-patterns
+SCOPE: <scan-scope>
+ATTENTION: common <perspective1> problems
+EXPECTED: severity + file:line + description" \
+  "FIND: <perspective2> issues and anti-patterns
+SCOPE: <scan-scope>
+EXPECTED: severity + file:line + description" \
+  --max-turns 3 --json
 ```
-PURPOSE: Scan code from <perspective> perspective to discover potential issues
-TASK: Analyze code patterns for <perspective> problems, identify anti-patterns, check for common issues
-MODE: analysis
-CONTEXT: @<scan-scope>
-EXPECTED: List of findings with severity (critical/high/medium/low), file:line references, description
-CONSTRAINTS: Focus on actionable findings only
-```
-Execute via: `maestro delegate "<prompt>" --role analyze --mode analysis`
+
+**Fallback** (when deeper analysis needed per perspective): `maestro delegate "<prompt>" --role analyze --mode analysis`
 
 After all perspectives complete:
 - Parse CLI outputs into structured findings

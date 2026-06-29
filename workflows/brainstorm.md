@@ -1,7 +1,5 @@
 # Workflow: Brainstorm
 
-Dual-mode brainstorming: auto pipeline (full multi-role analysis) or single role analysis.
-
 ## Architecture
 
 ```
@@ -133,7 +131,7 @@ Pre-seed from context-package:
 - `insights[]` → Step 4 role agents
 - `requirements[]` → Step 3 Phase 4.5
 
-W007 if source not found: continue without upstream.
+W007 if source not found: continue without upstream; flag guidance-specification.md as [LOW CONFIDENCE] (no upstream context).
 
 ---
 
@@ -150,7 +148,7 @@ specs_content = maestro spec load --category arch
 **Trigger**: Always in auto mode. Skip if `--skip-questions` and no tech keywords.
 
 ```
-// Step 1.7.1: Spawn external researcher for design routes
+// Step 1.7.1: Spawn external researcher for design routes — MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep
 Agent(
   subagent_type="workflow-external-researcher",
   prompt="""
@@ -187,7 +185,7 @@ designResearchContext = agent_output
 
 `designResearchContext` → Steps 2, 3, 4. Persisted to `{output_dir}/design-research.md`.
 
-W005 on failure: continue without external context.
+W005 on failure: continue without external context; flag role analyses as [LOW CONFIDENCE] (no design research).
 
 ---
 
@@ -202,9 +200,12 @@ Pass into Steps 2 and 3.
 
 ### Step 2: Terminology & Boundary Definition (Auto Mode)
 
-1. Extract 5-10 core domain terms (merge upstream locked terms if available)
-2. AskUserQuestion for Non-Goals (multiSelect, include "其他" option)
-3. Store terminology + non_goals to session
+1. Load existing domain terms: read `.workflow/domain/glossary.yaml` 中已注册术语，避免重复定义
+2. Extract 5-10 core domain terms (merge upstream locked terms + existing glossary terms)
+3. AskUserQuestion for Non-Goals (multiSelect, include "其他" option)
+4. Store terminology + non_goals to session
+
+新候选术语仅存入 `context-package.json#domain.terminology[]`，不直接写 glossary.yaml。由 chain 末尾 `manage-harvest --auto` 触发 finish-work Step 3.5 统一提升为正式术语。
 
 **Skip if**: `--yes` (auto-generate terms, empty non-goals)
 
@@ -270,6 +271,8 @@ Seven sub-phases producing guidance-specification.md:
 
 **Output**: `{output_dir}/guidance-specification.md`, session metadata (workflow-session.json)
 
+**GATE Step 3→4**: REQUIRED `guidance-specification.md` written with §10 Feature Decomposition list; BLOCKED if `guidance-specification.md` missing or §10 feature list absent.
+
 ### Step 3.5: Visual Style Foundation (Auto Mode, conditional)
 
 **Condition**: `ui-designer` selected AND `.workflow/impeccable/DESIGN.md` does not exist. Skip with `--skip-design`.
@@ -285,6 +288,7 @@ Seven sub-phases producing guidance-specification.md:
 Spawn `role-design-author` per role in parallel. ALWAYS use absolute paths. Pass `null` (literal string) for absent optional fields.
 
 ```
+// MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep
 Agent({
   subagent_type: "role-design-author",
   prompt: """
@@ -322,11 +326,14 @@ Agent({
 - §4: listed files exist on disk, feature coverage matches
 - system-architect: §3 has "Data Model" and "State Machine" headings
 
+**GATE Step 4→4.5**: REQUIRED all `{role}/analysis.md` verified on disk via Glob (per role in selected_roles); BLOCKED if any `analysis.md` missing.
+
 ### Step 4.5: Cross-Role Review (Auto Mode)
 
 Spawn ONE `cross-role-reviewer` to compare Decision Digests across roles.
 
 ```
+// MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep
 Agent({
   subagent_type: "cross-role-reviewer",
   prompt: """
@@ -496,4 +503,6 @@ Write `{output_dir}/context-package.json` by extracting from session artifacts:
 
 Register artifact in state.json with additional field:
   `context_package: "{output_dir}/context-package.json"`   (relative to .workflow/)
+
+**GATE Step 7.5→complete**: Glob `{output_dir}/context-package.json` MUST exist before workflow report; BLOCKED if missing.
 

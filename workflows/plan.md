@@ -76,8 +76,6 @@ When plan resolves to `scope == "standalone"` AND `state.json.current_milestone 
 5. Use this milestone ID for artifact registration (P5 Step 4)
 ```
 
-This ensures downstream commands (verify, milestone-audit, milestone-complete) have a valid milestone context without requiring roadmap.
-
 **Backward compatibility:** If `state.json.milestones[]` already has entries with `current_milestone != null`, skip creation (existing milestone takes precedence). Missing `type` field on legacy milestones defaults to `"standard"`.
 
 ---
@@ -147,10 +145,16 @@ When `--tdd` is active:
 4. **Load codebase context**
    - Read `.workflow/codebase/doc-index.json` if exists → extract relevant features, components, requirements
 
+4a. **Wiki knowledge search** (optional, proceed without if unavailable)
+   - Extract 2-5 key terms from phase goal/title
+   - Run `maestro search "<phase_keywords>" --json 2>/dev/null`
+   - If results: take top 10 entries as prior knowledge context for planner agent
+   - If unavailable: log W003, continue
+
 4b. **Load design reference** (if available)
    - If `${PHASE_DIR}/design-ref/MASTER.md` exists: load MASTER.md, design-tokens.json, animation-tokens.json (optional), layout-templates/layout-*.json
      - Every UI task must include in `read_first[]`: design-tokens.json, animation-tokens.json, relevant layout-*.json, MASTER.md
-   - Else if phase goal matches UI keywords (`landing|page|dashboard|frontend|UI|component|界面`): suggest running `maestro-impeccable --chain build` (non-blocking)
+   - Else if phase goal matches UI keywords (`landing|page|dashboard|frontend|UI|component|界面`): run `maestro-impeccable --chain build` (REQUIRED when design keywords matched)
 
 5. **Load upstream analysis** (if available)
    - If `${PHASE_DIR}/conclusions.json` exists with non-empty status: load as explorationContext (conclusions + explorations.json + perspectives.json)
@@ -168,13 +172,14 @@ When `--tdd` is active:
 
 6. **Parallel exploration** (skip if `--gaps` or upstream analysis loaded)
    - Exploration angles (1-4 based on complexity): architecture, implementation, integration, risk
-   - Spawn 1-4 `cli-explore-agent` in parallel, each with phase goal + success_criteria + one angle
+   - MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: Spawn 1-4 `cli-explore-agent` in parallel, each with phase goal + success_criteria + one angle
    - Output: `.process/exploration-{angle}.json`, `.process/explorations-manifest.json`, `.process/context-package.json`
 
 6b. **CLI supplementary context** (runs in parallel with step 6, skip if `--gaps` or no CLI tools enabled)
    ```
    IF no CLI tools enabled: skip
 
+   MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep:
    Bash({
      command: 'maestro delegate "PURPOSE: Gather implementation context for planning phase
    TASK: Identify existing patterns for similar features | Map dependency graph of target modules | Find potential conflict points with other recent changes
@@ -321,7 +326,7 @@ Bidirectional linking (main flow, post-planner): update matching issues in `.wor
 
 ### Steps
 
-1. **Spawn workflow-plan-checker agent**
+1. MANDATORY, NOT SUBSTITUTABLE by manual Read/Grep: **Spawn workflow-plan-checker agent**
    - Input: plan.json + all .task/TASK-*.json + index.json (success_criteria)
    - Check dimensions: requirements coverage, feasibility, dependency correctness (no circular deps), convergence criteria quality (grep-verifiable, no subjective language), read_first completeness, action concreteness (no vague references), wave structure (no conflicting files), completeness (no orphan tasks), UI-observable coverage (when plan touches UI: each delivery wave has ≥1 `[UI-observable]` criterion)
 
@@ -337,7 +342,7 @@ Bidirectional linking (main flow, post-planner): update matching issues in `.wor
 
 4. **Plan Readiness Gate** (blocks P4.5)
 
-   Block if: requirements_coverage < 40% | task missing read_first/convergence.criteria | no pressure pass | circular deps. If blocked → AskUserQuestion: 修订计划 or 忽略风险并继续 (record residual_risks). Add confidence section to plan.json.
+   Block if: requirements_coverage < 40% | task missing read_first/convergence.criteria | no pressure pass | circular deps. If blocked → AskUserQuestion: 修订计划 or 忽略风险并继续 (record residual_risks). Add confidence section to plan.json with `evidence_source: plan-checker findings (round N)`.
 
 5. **Update index.json**
    - Set `index.json.plan` = `{ task_ids, task_count, complexity, waves, executor_assignments: {}, confidence: overall_score }`
@@ -414,9 +419,9 @@ Bidirectional linking (main flow, post-planner): update matching issues in `.wor
 | E005: Plan directory not found (--check) | Check path, use --dir |
 | Phase directory not found | Abort with message: "Phase {phase} not found. Run /workflow:init first." |
 | No context.md | Warn, proceed with exploration only |
-| Exploration agent fails | Log error, continue with available explorations |
+| Exploration agent fails | Log error, continue with available explorations; flag plan as [LOW CONFIDENCE] (partial explorations) |
 | Planner produces invalid JSON | Retry once, then abort with error details |
-| Plan-checker exceeds 3 rounds | Accept plan with warnings, note in index.json |
+| Plan-checker exceeds 3 rounds | Accept plan with warnings, note in index.json; flag plan as [LOW CONFIDENCE] (checker unresolved) |
 | User cancels clarification | Proceed with available context |
 
 ---
