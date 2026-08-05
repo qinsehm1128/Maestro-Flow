@@ -1,0 +1,12 @@
+/goal
+[maestro-brain · brain-20260628-060000] 自治调度大脑 loop
+需求：Build a small Python kvstore lib — M1 get/set (MANDATORY), M2 delete (MANDATORY), M3 ttl-expiry (OPTIONAL/stretch, deferrable)
+循环：每轮 装配输入 → 自决(推进/插入修复/修正roadmap) → 派外部CLI实现 → 防假绿验收 → 记台账
+继续条件：仍有 MANDATORY milestone 未 completed，或 optional 既未 completed 也未 acknowledged-deferred
+**停止条件（达成即完成并停止）**：全部 MANDATORY milestone (M1 get/set, M2 delete) == "completed"，
+  且每个 OPTIONAL milestone (M3 ttl-expiry) == "completed" 或 (deferred 且 defer_reason 非空=acknowledged)，
+  且无未决 defect blocker（以子会话 status.json/实际 pytest 对账为准，不信过期 state.json）
+  —— 不得因 M3 (optional) 未实现而 loop 不停；也不得在 M1/M2 (mandatory) 未完成时停。
+终止态：全 completed → completed；M3 被 ack-deferred → completed-with-optional-deferred（非失败/非 PARTIAL）
+自治：--auto -y：loop 内撞硬信号转全链路分析+自主决策、永不中途停；仅 max_rounds(10) 安全兜底
+安全兜底：round 超过 10 强制以 PARTIAL 收尾（非正常停止依据）

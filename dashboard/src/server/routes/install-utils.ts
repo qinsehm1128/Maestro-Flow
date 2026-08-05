@@ -28,8 +28,8 @@ import {
   paths,
   injectDocFile,
   COMPONENT_DEFS,
-} from 'maestro-flow';
-import type { Manifest, ManifestEntry, ComponentDef } from 'maestro-flow';
+} from '../../../../src/index.js';
+import type { Manifest, ManifestEntry, ComponentDef } from '../../../../src/index.js';
 import {
   scanDisabledItems,
   restoreDisabledState,
@@ -132,7 +132,7 @@ export function scanAvailableSources(
   mode: 'global' | 'project',
   projectPath?: string,
 ): ComponentInfo[] {
-  return COMPONENT_DEFS.map((def) => {
+  return COMPONENT_DEFS.map((def: ComponentDef) => {
     const fullSource = join(sourceDir, def.sourcePath);
     const fileCount = countFiles(fullSource);
     const targetDir = def.target(mode, projectPath ?? '');

@@ -46,3 +46,5 @@ dashboard/node_modules/
 .agents/
 
 search-cache.json
+maestro-research/_scratch/
+.claude/worktrees/
